@@ -10,8 +10,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Plotweaver',
-        short_name: 'Plotweaver',
+        name: 'LoomFiction',
+        short_name: 'LoomFiction',
         description: 'Écris tes livres, chapitres et idées, même sans connexion.',
         lang: 'fr',
         display: 'standalone',
