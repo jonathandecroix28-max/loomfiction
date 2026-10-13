@@ -11,11 +11,11 @@ target/
 *.log
 
 # Frontend build artifacts
-PlotWeaver/node_modules/
-PlotWeaver/dist/
-PlotWeaver/dist-ssr/
-PlotWeaver/.vite/
-PlotWeaver/.eslintcache
+LoomFiction/node_modules/
+LoomFiction/dist/
+LoomFiction/dist-ssr/
+LoomFiction/.vite/
+LoomFiction/.eslintcache
 
 # Backend build artifacts
 plotweaverback/plotweaver-api/target/
