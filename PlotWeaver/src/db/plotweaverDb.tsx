@@ -160,9 +160,19 @@ export async function rwTx(): Promise<RwTx> {
 export const httpStatus = (err: unknown): number | undefined =>
   (err as any)?.response?.status;
 
-/** Le navigateur pense-t-il être en ligne ? (faux négatifs possibles, pas de faux positifs fiables) */
+/**
+ * Interrupteur de la synchro avec le back-end.
+ * Désactivée par défaut : l'app fonctionne alors 100 % en local (IndexedDB) et n'envoie
+ * aucune requête. Pour l'activer plus tard : VITE_SYNC_ENABLED=true (puis relancer un build).
+ */
+export const SYNC_ENABLED = import.meta.env.VITE_SYNC_ENABLED === 'true';
+
+/**
+ * Peut-on parler au serveur ? Faux si la synchro est désactivée, ou si le navigateur est hors-ligne.
+ * Toutes les fabriques de services passent par cette fonction avant tout appel réseau.
+ */
 export const isOnline = (): boolean =>
-  typeof navigator === 'undefined' || navigator.onLine !== false;
+  SYNC_ENABLED && (typeof navigator === 'undefined' || navigator.onLine !== false);
 
 /**
  * Abandonne l'attente d'une promesse après `ms` millisecondes.
