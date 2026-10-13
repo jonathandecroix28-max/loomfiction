@@ -10,7 +10,7 @@ type ExportMenuProps = {
 
 export function ExportMenu({ bookId, className = '' }: ExportMenuProps) {
   const [open, setOpen] = useState(false);
-  const [format, setFormat] = useState<ExportFormat>('pdf');
+  const [format, setFormat] = useState<ExportFormat>('docx');
   const [author, setAuthor] = useState(() => {
     try {
       return localStorage.getItem(AUTHOR_KEY) ?? '';

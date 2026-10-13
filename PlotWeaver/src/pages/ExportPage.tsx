@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   EXPORT_FORMATS,
   buildPreviewDocument,
+  copyBookToClipboard,
   countWords,
   exportBook,
   loadBookForExport,
@@ -12,6 +14,7 @@ import {
 } from '../services/exportService';
 
 const AUTHOR_KEY = 'plotweaver:export-author';
+const PREVIEW_STEP = 12; // nombre de chapitres affichés dans l'aperçu, par paquet
 
 type BookOption = { id: number; title: string };
 type Status = { type: 'ok' | 'error'; text: string } | null;
@@ -36,16 +39,25 @@ export function ExportPage() {
   const [bookLoading, setBookLoading] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
-  const [format, setFormat] = useState<ExportFormat>('pdf');
+  const [format, setFormat] = useState<ExportFormat>('docx');
   const [author, setAuthor] = useState(readAuthor);
   const [debouncedAuthor, setDebouncedAuthor] = useState(author);
   const [titlePage, setTitlePage] = useState(true);
   const [chapterNumbers, setChapterNumbers] = useState(true);
 
+  // Aperçu
   const [showPreview, setShowPreview] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
   );
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fontScale, setFontScale] = useState(1);
+  const [darkPreview, setDarkPreview] = useState(false);
+  const [previewLimit, setPreviewLimit] = useState(PREVIEW_STEP);
+
+  // Actions
   const [busy, setBusy] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [status, setStatus] = useState<Status>(null);
 
   /* ───── Chargement de la liste des romans ───── */
@@ -56,6 +68,7 @@ export function ExportPage() {
       .then((list) => {
         if (cancelled) return;
         setBooks(list);
+        // Sans roman choisi dans l'URL, on prend le premier
         if (!bookIdParam && list.length > 0) {
           setSearchParams({ book: String(list[0].id) }, { replace: true });
         }
@@ -71,6 +84,7 @@ export function ExportPage() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ───── Chargement du roman choisi (avec ses chapitres) ───── */
@@ -89,6 +103,7 @@ export function ExportPage() {
         if (cancelled) return;
         setBook(loaded);
         setSelected(new Set(loaded.chapters.map((_, index) => index)));
+        setPreviewLimit(PREVIEW_STEP);
       })
       .catch((error) => {
         console.error('Erreur de chargement du roman :', error);
@@ -105,10 +120,28 @@ export function ExportPage() {
     };
   }, [bookIdParam]);
 
+  // On attend la fin de la saisie avant de reconstruire l'aperçu
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedAuthor(author), 300);
     return () => clearTimeout(timer);
   }, [author]);
+
+  // Plein écran : verrouille le défilement de la page derrière, Échap pour fermer
+  useEffect(() => {
+    if (!fullscreen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [fullscreen]);
 
   /* ───── Données dérivées ───── */
   const options = useMemo(() => ({ titlePage, chapterNumbers }), [titlePage, chapterNumbers]);
@@ -123,13 +156,21 @@ export function ExportPage() {
     [selectedChapters]
   );
 
+  // Aperçu limité à quelques chapitres : reste fluide même sur un long roman
+  const previewChapters = useMemo(() => selectedChapters.slice(0, previewLimit), [selectedChapters, previewLimit]);
+  const hiddenChapters = selectedChapters.length - previewChapters.length;
+
   const previewHtml = useMemo(() => {
-    if (!showPreview || !book || selectedChapters.length === 0) return '';
+    if (!(showPreview || fullscreen) || !book || previewChapters.length === 0) return '';
     return buildPreviewDocument(
-      { ...book, author: debouncedAuthor.trim() || undefined, chapters: selectedChapters },
-      options
+      { ...book, author: debouncedAuthor.trim() || undefined, chapters: previewChapters },
+      options,
+      { fontScale, dark: darkPreview }
     );
-  }, [showPreview, book, selectedChapters, debouncedAuthor, options]);
+  }, [showPreview, fullscreen, book, previewChapters, debouncedAuthor, options, fontScale, darkPreview]);
+
+  const canAct = !!book && selectedChapters.length > 0 && !bookLoading;
+  const formatInfo = EXPORT_FORMATS.find((item) => item.key === format);
 
   /* ───── Actions ───── */
   const toggleChapter = (index: number) => {
@@ -144,41 +185,152 @@ export function ExportPage() {
   const selectAll = () => setSelected(new Set((book?.chapters ?? []).map((_, index) => index)));
   const selectNone = () => setSelected(new Set());
 
+  const exportData = (): ExportBook => ({
+    ...(book as ExportBook),
+    author: author.trim() || undefined,
+    chapters: selectedChapters,
+  });
+
+  const rememberAuthor = () => {
+    try {
+      localStorage.setItem(AUTHOR_KEY, author.trim());
+    } catch {
+      // Ignorer les erreurs de stockage local
+    }
+  };
+
   const handleExport = async () => {
-    if (!book || selectedChapters.length === 0) return;
+    if (!canAct) return;
 
     setBusy(true);
+    setProgress(null);
     setStatus(null);
     try {
-      try {
-        localStorage.setItem(AUTHOR_KEY, author.trim());
-      } catch {
-        // Ignorer les erreurs de stockage local
-      }
-
-      await exportBook(
-        { ...book, author: author.trim() || undefined, chapters: selectedChapters },
-        format,
-        options
-      );
-
-      setStatus({
-        type: 'ok',
-        text:
-          format === 'pdf'
-            ? 'La boîte d’impression est ouverte : choisis « Enregistrer au format PDF ».'
-            : 'Ton fichier a été généré et téléchargé.',
-      });
+      rememberAuthor();
+      await exportBook(exportData(), format, options, (done, total) => setProgress({ done, total }));
+      setStatus({ type: 'ok', text: formatInfo?.done ?? 'Export terminé.' });
     } catch (error) {
       console.error('Erreur lors de l’export :', error);
       setStatus({ type: 'error', text: 'L’export a échoué. Réessaie dans un instant.' });
     } finally {
       setBusy(false);
+      setProgress(null);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!canAct) return;
+
+    setCopying(true);
+    setStatus(null);
+    try {
+      rememberAuthor();
+      const mode = await copyBookToClipboard(exportData(), options);
+      setStatus({
+        type: 'ok',
+        text:
+          mode === 'rich'
+            ? 'Texte copié avec sa mise en forme : colle-le dans Word, Google Docs, Notion ou un éditeur de blog.'
+            : 'Texte copié (sans mise en forme, ton navigateur ne la permet pas).',
+      });
+    } catch (error) {
+      console.error('Erreur lors de la copie :', error);
+      setStatus({ type: 'error', text: 'Copie impossible. Autorise l’accès au presse-papiers ou utilise un export.' });
+    } finally {
+      setCopying(false);
     }
   };
 
   const sectionClass = 'rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/60 p-4 sm:p-5 shadow-xl space-y-3';
   const labelClass = 'block text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40';
+  const smallBtn =
+    'px-2.5 py-1.5 rounded-lg border border-amber-900/30 bg-neutral-900 text-amber-200 text-xs font-medium cursor-pointer hover:border-amber-700/60 transition';
+
+  /* ───── Éléments d'aperçu réutilisés (inline + plein écran) ───── */
+  const previewControls = (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setFontScale((value) => Math.max(0.8, Math.round((value - 0.1) * 10) / 10))}
+        aria-label="Réduire la taille du texte"
+        className={smallBtn}
+      >
+        A−
+      </button>
+      <button
+        type="button"
+        onClick={() => setFontScale((value) => Math.min(1.6, Math.round((value + 0.1) * 10) / 10))}
+        aria-label="Agrandir la taille du texte"
+        className={smallBtn}
+      >
+        A+
+      </button>
+      <button
+        type="button"
+        onClick={() => setDarkPreview((value) => !value)}
+        aria-label={darkPreview ? 'Papier clair' : 'Papier sombre'}
+        className={smallBtn}
+      >
+        {darkPreview ? '☀️' : '🌙'}
+      </button>
+    </div>
+  );
+
+  const moreChaptersButton =
+    hiddenChapters > 0 ? (
+      <button
+        type="button"
+        onClick={() => setPreviewLimit((value) => value + PREVIEW_STEP)}
+        className={`${smallBtn} w-full py-2.5`}
+      >
+        Afficher {Math.min(PREVIEW_STEP, hiddenChapters)} chapitre{Math.min(PREVIEW_STEP, hiddenChapters) > 1 ? 's' : ''} de plus
+        <span className="text-amber-200/40"> ({hiddenChapters} masqué{hiddenChapters > 1 ? 's' : ''} dans l’aperçu)</span>
+      </button>
+    ) : null;
+
+  const fullscreenView =
+    fullscreen && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Aperçu en plein écran"
+            className="fixed inset-0 z-[80] flex flex-col bg-[#1c1411] text-[#fcf9f2] font-serif"
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-amber-900/40 bg-neutral-950 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+              <button
+                type="button"
+                onClick={() => setFullscreen(false)}
+                className="px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-50 text-sm font-medium cursor-pointer"
+              >
+                ✕ Fermer
+              </button>
+              <span className="hidden sm:block min-w-0 truncate text-sm text-amber-200/60">{book?.title}</span>
+              {previewControls}
+            </div>
+
+            {previewHtml ? (
+              <iframe
+                title="Aperçu de l’export en plein écran"
+                sandbox=""
+                srcDoc={previewHtml}
+                className="min-h-0 w-full flex-1 border-0 bg-white"
+              />
+            ) : (
+              <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-amber-200/50">
+                Sélectionne au moins un chapitre pour générer l’aperçu.
+              </div>
+            )}
+
+            {moreChaptersButton && (
+              <div className="border-t border-amber-900/40 bg-neutral-950 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                {moreChaptersButton}
+              </div>
+            )}
+          </div>,
+          document.body
+        )
+      : null;
 
   /* ───── Rendu ───── */
   return (
@@ -188,7 +340,8 @@ export function ExportPage() {
           <p className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-amber-200/40 mb-1 sm:mb-2">Publication</p>
           <h1 className="text-2xl sm:text-4xl font-bold text-amber-100">Exporter un roman</h1>
           <p className="text-sm sm:text-base text-amber-200/55 mt-1 sm:mt-2 max-w-2xl">
-            Choisis le roman, les chapitres et le format, vérifie l’aperçu, puis télécharge ton manuscrit.
+            Choisis le roman, les chapitres et le format, vérifie l’aperçu, puis télécharge ton manuscrit ou copie-le pour
+            le coller ailleurs.
           </p>
         </header>
 
@@ -231,20 +384,8 @@ export function ExportPage() {
                 <div className="flex items-center justify-between gap-3">
                   <span className={labelClass}>Chapitres</span>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={selectAll}
-                      className="px-2.5 py-1.5 rounded-md text-xs border border-amber-900/30 bg-neutral-900 text-amber-200 cursor-pointer"
-                    >
-                      Tous
-                    </button>
-                    <button
-                      type="button"
-                      onClick={selectNone}
-                      className="px-2.5 py-1.5 rounded-md text-xs border border-amber-900/30 bg-neutral-900 text-amber-200 cursor-pointer"
-                    >
-                      Aucun
-                    </button>
+                    <button type="button" onClick={selectAll} className={smallBtn}>Tous</button>
+                    <button type="button" onClick={selectNone} className={smallBtn}>Aucun</button>
                   </div>
                 </div>
 
@@ -257,11 +398,7 @@ export function ExportPage() {
                     {book.chapters.map((chapter, index) => (
                       <li key={`${chapter.number}-${index}`}>
                         <label className="flex items-center gap-3 px-3 py-2.5 text-sm text-amber-100/90 cursor-pointer hover:bg-neutral-900/50">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(index)}
-                            onChange={() => toggleChapter(index)}
-                          />
+                          <input type="checkbox" checked={selected.has(index)} onChange={() => toggleChapter(index)} />
                           <span className="text-amber-200/40 shrink-0">{chapter.number}.</span>
                           <span className="truncate">{chapter.title}</span>
                         </label>
@@ -294,7 +431,7 @@ export function ExportPage() {
                           : 'bg-neutral-900 border-amber-900/30 text-amber-200 hover:border-amber-700/60'
                       }`}
                     >
-                      <div className="flex items-center gap-2 font-semibold">
+                      <div className="flex items-center gap-2 font-semibold text-sm sm:text-base">
                         <span aria-hidden className="text-lg">{item.icon}</span>
                         {item.label}
                       </div>
@@ -330,10 +467,11 @@ export function ExportPage() {
                 </label>
               </section>
 
-              {/* Action */}
+              {/* Actions */}
               <section className="space-y-3">
                 {status && (
                   <div
+                    role="status"
                     className={`rounded-xl border px-4 py-3 text-sm ${
                       status.type === 'ok'
                         ? 'border-emerald-900/30 bg-emerald-950/30 text-emerald-300'
@@ -347,12 +485,26 @@ export function ExportPage() {
                 <button
                   type="button"
                   onClick={handleExport}
-                  disabled={busy || bookLoading || selectedChapters.length === 0}
+                  disabled={busy || copying || !canAct}
                   className="w-full px-4 py-3.5 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 font-medium transition-colors shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {busy ? 'Préparation…' : `Exporter en ${EXPORT_FORMATS.find((item) => item.key === format)?.label}`}
+                  {busy
+                    ? progress && progress.total > 1
+                      ? `Préparation… ${progress.done}/${progress.total}`
+                      : 'Préparation…'
+                    : `Exporter en ${formatInfo?.label}`}
                 </button>
-                {selectedChapters.length === 0 && !bookLoading && book && book.chapters.length > 0 && (
+
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  disabled={busy || copying || !canAct}
+                  className="w-full px-4 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-amber-900/30 text-amber-200 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {copying ? 'Copie…' : '📋 Copier le texte (pour le coller ailleurs)'}
+                </button>
+
+                {!canAct && !bookLoading && book && book.chapters.length > 0 && (
                   <p className="text-xs text-amber-200/50 text-center">Sélectionne au moins un chapitre.</p>
                 )}
               </section>
@@ -360,45 +512,64 @@ export function ExportPage() {
 
             {/* ───── Aperçu ───── */}
             <section className={`${sectionClass} lg:sticky lg:top-24`}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <span className={labelClass}>Aperçu</span>
                   <p className="text-xs text-amber-200/40 mt-1">
                     Mise en page indicative : le rendu final dépend du format choisi.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowPreview((value) => !value)}
-                  className="shrink-0 px-3 py-2 rounded-lg border border-amber-900/30 bg-neutral-900 text-amber-200 text-xs font-medium cursor-pointer"
-                >
-                  {showPreview ? 'Masquer' : 'Afficher'}
-                </button>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFullscreen(true)}
+                    disabled={!canAct}
+                    className="px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-50 text-xs font-medium cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    ⛶ Plein écran
+                  </button>
+                  <button type="button" onClick={() => setShowPreview((value) => !value)} className={smallBtn}>
+                    {showPreview ? 'Masquer' : 'Afficher'}
+                  </button>
+                </div>
               </div>
 
-              {showPreview &&
-                (book && selectedChapters.length > 0 && previewHtml ? (
-                  <iframe
-                    title="Aperçu de l’export"
-                    sandbox=""
-                    srcDoc={previewHtml}
-                    className="w-full h-[60vh] lg:h-[calc(100vh-14rem)] rounded-xl border border-amber-900/20 bg-white"
-                  />
-                ) : (
-                  <div className="rounded-xl border border-dashed border-amber-900/30 py-16 text-center text-sm text-amber-200/50">
-                    {bookLoading
-                      ? 'Chargement...'
-                      : !book
-                        ? 'Choisis un roman pour prévisualiser l’export.'
-                        : selectedChapters.length === 0
-                          ? 'Sélectionne au moins un chapitre pour générer l’aperçu.'
-                          : 'Rien à afficher pour le moment.'}
+              {showPreview && (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-amber-200/40">Texte et papier</span>
+                    {previewControls}
                   </div>
-                ))}
+
+                  {!fullscreen &&
+                    (book && selectedChapters.length > 0 && previewHtml ? (
+                      <iframe
+                        title="Aperçu de l’export"
+                        sandbox=""
+                        srcDoc={previewHtml}
+                        className="w-full h-[55vh] lg:h-[calc(100vh-17rem)] rounded-xl border border-amber-900/20 bg-white"
+                      />
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-amber-900/30 py-16 text-center text-sm text-amber-200/50">
+                        {bookLoading
+                          ? 'Chargement...'
+                          : !book
+                            ? 'Choisis un roman pour prévisualiser l’export.'
+                            : selectedChapters.length === 0
+                              ? 'Sélectionne au moins un chapitre pour générer l’aperçu.'
+                              : 'Rien à afficher pour le moment.'}
+                      </div>
+                    ))}
+
+                  {!fullscreen && moreChaptersButton}
+                </>
+              )}
             </section>
           </div>
         )}
       </div>
+
+      {fullscreenView}
     </div>
   );
 }
