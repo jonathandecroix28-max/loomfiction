@@ -64,7 +64,7 @@ function buildLineDiff(currentText: string, versionText: string): LineDiffRow[] 
     }
   }
 
-  let removed: number[] = []; 
+  let removed: number[] = [];
   let added: number[] = [];
 
   const flush = () => {
@@ -213,6 +213,9 @@ export function ChapterVersionsPage() {
 
   const { versions, selectedVersion, isLoading, error, refetch } = useChapterVersions(numChapterId, numVersionId);
   const [chapter, setChapter] = useState<ChapterResponse | null>(null);
+  // Le chapitre se charge en parallèle des versions : on suit les deux chargements,
+  // sinon la page redirige vers /404 avant que le chapitre soit arrivé.
+  const [chapterLoading, setChapterLoading] = useState(true);
   const [isRestoring, setIsRestoring] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [search, setSearch] = useState('');
@@ -222,16 +225,36 @@ export function ChapterVersionsPage() {
   const [contentLineChoices, setContentLineChoices] = useState<Record<string, 'current' | 'version'>>({});
 
   useEffect(() => {
-    if (!numChapterId) return;
+    if (!numChapterId) {
+      setChapterLoading(false);
+      return;
+    }
 
-    offlineChapterService.getById(numChapterId).then(setChapter).catch(() => setChapter(null));
+    let cancelled = false;
+    setChapterLoading(true);
+
+    offlineChapterService
+      .getById(numChapterId)
+      .then((c) => {
+        if (!cancelled) setChapter(c);
+      })
+      .catch(() => {
+        if (!cancelled) setChapter(null);
+      })
+      .finally(() => {
+        if (!cancelled) setChapterLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [numChapterId]);
 
   useEffect(() => {
-    if (!isLoading && (error || !chapter)) {
+    if (!isLoading && !chapterLoading && (error || !chapter)) {
       navigate('/404', { replace: true });
     }
-  }, [isLoading, error, chapter, navigate]);
+  }, [isLoading, chapterLoading, error, chapter, navigate]);
 
   const visibleVersions = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -297,7 +320,7 @@ export function ChapterVersionsPage() {
     setFeedback('Impossible de supprimer cette version.');
   };
 
-  if (isLoading) {
+  if (isLoading || chapterLoading) {
     return (
       <div className="min-h-full bg-[#1c1411] flex items-center justify-center font-serif text-amber-200/60 py-24">
         Consultation de l’historique...

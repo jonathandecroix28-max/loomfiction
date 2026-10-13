@@ -206,6 +206,9 @@ export function IdeaVersionsPage() {
 
   const { versions, selectedVersion, isLoading, error, refetch } = useIdeaVersions(numIdeaId, numVersionId);
   const [idea, setIdea] = useState<IdeaResponse | null>(null);
+  // L'idée se charge en parallèle des versions : on suit les deux chargements,
+  // sinon la page redirige vers /404 avant que l'idée soit arrivée.
+  const [ideaLoading, setIdeaLoading] = useState(true);
   const [isRestoring, setIsRestoring] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [search, setSearch] = useState('');
@@ -215,16 +218,36 @@ export function IdeaVersionsPage() {
   const [descriptionLineChoices, setDescriptionLineChoices] = useState<Record<string, 'current' | 'version'>>({});
 
   useEffect(() => {
-    if (!numIdeaId) return;
+    if (!numIdeaId) {
+      setIdeaLoading(false);
+      return;
+    }
 
-    offlineIdeaService.getById(numIdeaId).then(setIdea).catch(() => setIdea(null));
+    let cancelled = false;
+    setIdeaLoading(true);
+
+    offlineIdeaService
+      .getById(numIdeaId)
+      .then((i) => {
+        if (!cancelled) setIdea(i);
+      })
+      .catch(() => {
+        if (!cancelled) setIdea(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIdeaLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [numIdeaId]);
 
   useEffect(() => {
-    if (!isLoading && (error || !idea)) {
+    if (!isLoading && !ideaLoading && (error || !idea)) {
       navigate('/404', { replace: true });
     }
-  }, [isLoading, error, idea, navigate]);
+  }, [isLoading, ideaLoading, error, idea, navigate]);
 
   const visibleVersions = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -314,7 +337,7 @@ export function IdeaVersionsPage() {
     setFeedback('Impossible de supprimer cette version.');
   };
 
-  if (isLoading) {
+  if (isLoading || ideaLoading) {
     return (
       <div className="min-h-full bg-[#1c1411] flex items-center justify-center font-serif text-amber-200/60 py-24">
         Consultation de l’historique...
