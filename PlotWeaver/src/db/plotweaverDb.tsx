@@ -112,6 +112,23 @@ export function getDb(): Promise<IDBPDatabase<PlotweaverDB>> {
             outbox.createIndex('by_entity', 'entity');
           }
         },
+
+        // Un autre onglet garde l'ancienne version ouverte : la montée de version attend.
+        blocked() {
+          console.warn('Base Plotweaver bloquée : ferme les autres onglets de l\'application.');
+        },
+
+        // Une nouvelle version de l'app veut ouvrir la base : on libère notre connexion
+        // (indispensable avec une PWA qui se met à jour pendant qu'un onglet est ouvert).
+        blocking(_currentVersion, _blockedVersion, event) {
+          (event.target as IDBDatabase).close();
+          dbPromise = null;
+        },
+
+        // Le navigateur a fermé la connexion (purge du stockage, etc.) : on rouvrira au prochain appel.
+        terminated() {
+          dbPromise = null;
+        },
       });
 
       try {
@@ -121,7 +138,11 @@ export function getDb(): Promise<IDBPDatabase<PlotweaverDB>> {
         console.error('Migration localStorage → IndexedDB échouée (retentée au prochain lancement) :', e);
       }
       return db;
-    })();
+    })().catch((err) => {
+      // Sans ça, la promesse rejetée resterait en cache et plus rien ne marcherait avant un rechargement.
+      dbPromise = null;
+      throw err;
+    });
   }
   return dbPromise;
 }
@@ -138,6 +159,30 @@ export async function rwTx(): Promise<RwTx> {
 
 export const httpStatus = (err: unknown): number | undefined =>
   (err as any)?.response?.status;
+
+/** Le navigateur pense-t-il être en ligne ? (faux négatifs possibles, pas de faux positifs fiables) */
+export const isOnline = (): boolean =>
+  typeof navigator === 'undefined' || navigator.onLine !== false;
+
+/**
+ * Abandonne l'attente d'une promesse après `ms` millisecondes.
+ * Ne annule pas la requête sous-jacente : sert juste à ne pas bloquer l'affichage des données locales.
+ */
+export function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Délai dépassé')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
 
 export const sortNewestFirst = <T extends { createdAt?: string }>(items: T[]): T[] =>
   [...items].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
@@ -285,6 +330,8 @@ interface AnyStore<T> {
   getAll(): Promise<T[]>;
   clear(): Promise<void>;
   put(value: T): Promise<unknown>;
+  delete(key: number): Promise<void>;
+  index(name: string): { getAll(key: number): Promise<T[]> };
 }
 
 /**
@@ -301,9 +348,11 @@ export async function mergeServerSnapshot<T extends { id: number }>(
     normalize?: (item: T) => T;
     pendingPosition?: 'start' | 'end';
     finalize?: (items: T[]) => T[];
+    /** Ne fusionne qu'un sous-ensemble (ex. les versions d'un chapitre) via un index. */
+    scope?: { index: string; key: number };
   } = {}
 ): Promise<T[]> {
-  const { normalize = (x: T) => x, pendingPosition = 'start', finalize } = opts;
+  const { normalize = (x: T) => x, pendingPosition = 'start', finalize, scope } = opts;
 
   const tx = await rwTx();
   const store = tx.objectStore(ENTITY_STORE[entity]) as unknown as AnyStore<T>;
@@ -312,7 +361,9 @@ export async function mergeServerSnapshot<T extends { id: number }>(
   const deleted = new Set(ops.filter((o) => o.type === 'delete').map((o) => o.entityId));
   const updated = new Set(ops.filter((o) => o.type === 'update').map((o) => o.entityId));
 
-  const local = await store.getAll();
+  const local = scope
+    ? await store.index(scope.index).getAll(scope.key)
+    : await store.getAll();
   const localById = new Map(local.map((i) => [i.id, i] as const));
 
   const pending = local.filter((i) => isTempId(i.id)).sort((a, b) => b.id - a.id);
@@ -323,7 +374,11 @@ export async function mergeServerSnapshot<T extends { id: number }>(
   let merged = pendingPosition === 'start' ? [...pending, ...fromServer] : [...fromServer, ...pending];
   if (finalize) merged = finalize(merged);
 
-  await store.clear();
+  if (scope) {
+    for (const l of local) await store.delete(l.id);
+  } else {
+    await store.clear();
+  }
   for (const item of merged) await store.put(item);
   await tx.done;
   return merged;
