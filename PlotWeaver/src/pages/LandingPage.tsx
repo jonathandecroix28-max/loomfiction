@@ -214,6 +214,7 @@ export function LandingPage() {
             <Link to="/privacy" className="hover:text-neutral-300 transition">Confidentialité</Link>
             <Link to="/terms" className="hover:text-neutral-300 transition">Conditions</Link>
             <Link to="/support" className="hover:text-neutral-300 transition">Support</Link>
+            <Link to="github.com/jonathandecroix/plotweaver" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-300 transition">GitHub</Link>
             {/* <Link to="/donate" className="hover:text-neutral-300 transition">☕ Soutenir</Link> */}
           </nav>
         </div>
