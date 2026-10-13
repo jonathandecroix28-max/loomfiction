@@ -205,7 +205,7 @@ export function LandingPage() {
       <footer className="relative border-t border-neutral-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-neutral-500">
           <div className="flex items-center gap-3">
-            <span className="w-8 h-8 rounded-lg bg-amber-900 flex items-center justify-center font-serif font-bold text-amber-50">P</span>
+            <span className="w-8 h-8 rounded-lg bg-amber-900 flex items-center justify-center font-serif font-bold text-amber-50">L</span>
             <span>© {new Date().getFullYear()} LoomFiction développé par Jonathan Decroix. Tous droits réservés.</span>
           </div>
 
