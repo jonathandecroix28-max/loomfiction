@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://plotweaver-hwf7.onrender.com/sitemap.xml
