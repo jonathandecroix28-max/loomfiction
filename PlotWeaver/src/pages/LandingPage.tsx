@@ -47,7 +47,7 @@ export function LandingPage() {
   return (
     <div className="min-h-full bg-[#1c1411] text-[#fcf9f2] overflow-x-hidden relative font-sans">
       {/* Lueurs d'ambiance */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[42rem] bg-[radial-gradient(circle_at_20%_20%,rgba(180,83,9,0.18),transparent_55%),radial-gradient(circle_at_85%_35%,rgba(120,53,15,0.15),transparent_50%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-168 bg-[radial-gradient(circle_at_20%_20%,rgba(180,83,9,0.18),transparent_55%),radial-gradient(circle_at_85%_35%,rgba(120,53,15,0.15),transparent_50%)]" />
 
       {/* ───── Header ───── */}
       <header className="sticky top-0 z-30 border-b border-amber-900/30 bg-[#1c1411]/85 backdrop-blur">

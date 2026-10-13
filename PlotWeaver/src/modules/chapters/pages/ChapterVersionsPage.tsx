@@ -362,7 +362,7 @@ export function ChapterVersionsPage() {
             {labels.version}
           </button>
         </div>
-        <div className="text-[11px] text-amber-200/40 whitespace-pre-wrap break-words">{activeLine ? displayLine(activeLine) : '—'}</div>
+        <div className="text-[11px] text-amber-200/40 whitespace-pre-wrap wrap-break-word">{activeLine ? displayLine(activeLine) : '—'}</div>
       </div>
     );
   };
@@ -593,8 +593,8 @@ export function ChapterVersionsPage() {
                 {compareCards.map((card) => (
                   <article key={card.label} className="rounded-xl sm:rounded-2xl border border-amber-900/20 bg-neutral-950/60 p-3 sm:p-5 min-w-0">
                     <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-2">{card.label}</div>
-                    <h3 className="text-lg sm:text-2xl font-bold text-amber-100 mb-2 break-words">{card.name}</h3>
-                    <div className="max-h-64 md:max-h-96 overflow-y-auto prose prose-invert max-w-none break-words text-amber-100/90 font-serif text-sm sm:text-base [&_img]:max-w-full">
+                    <h3 className="text-lg sm:text-2xl font-bold text-amber-100 mb-2 wrap-break-word">{card.name}</h3>
+                    <div className="max-h-64 md:max-h-96 overflow-y-auto prose prose-invert max-w-none wrap-break-word text-amber-100/90 font-serif text-sm sm:text-base [&_img]:max-w-full">
                       <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(card.content || '') }} />
                     </div>
                   </article>
@@ -621,16 +621,16 @@ export function ChapterVersionsPage() {
                             {row.kind === 'equal' && <span className="text-emerald-300">Identique</span>}
                           </div>
                           {row.kind === 'equal' ? (
-                            <div className="text-sm text-amber-100/80 whitespace-pre-wrap break-words">{renderSide(row, 'current')}</div>
+                            <div className="text-sm text-amber-100/80 whitespace-pre-wrap wrap-break-word">{renderSide(row, 'current')}</div>
                           ) : (
                             <>
                               <div>
                                 <div className="text-[10px] uppercase tracking-widest text-amber-200/40 mb-0.5">Actuel</div>
-                                <div className={`rounded px-2 py-1 text-sm text-amber-100/80 whitespace-pre-wrap break-words ${sideBg(row, 'current')}`}>{renderSide(row, 'current')}</div>
+                                <div className={`rounded px-2 py-1 text-sm text-amber-100/80 whitespace-pre-wrap wrap-break-word ${sideBg(row, 'current')}`}>{renderSide(row, 'current')}</div>
                               </div>
                               <div>
                                 <div className="text-[10px] uppercase tracking-widest text-amber-200/40 mb-0.5">Version</div>
-                                <div className={`rounded px-2 py-1 text-sm text-amber-100/80 whitespace-pre-wrap break-words ${sideBg(row, 'version')}`}>{renderSide(row, 'version')}</div>
+                                <div className={`rounded px-2 py-1 text-sm text-amber-100/80 whitespace-pre-wrap wrap-break-word ${sideBg(row, 'version')}`}>{renderSide(row, 'version')}</div>
                               </div>
                               {renderLineChoice(row)}
                             </>
@@ -654,8 +654,8 @@ export function ChapterVersionsPage() {
                           {contentDiffRows.map((row) => (
                             <tr key={row.id} className={row.kind === 'equal' ? 'bg-neutral-950/35' : 'bg-neutral-950/55'}>
                               <td className="px-4 py-3 align-top text-xs text-amber-200/40 whitespace-nowrap">{lineNumberOf(row)}</td>
-                              <td className={`px-4 py-3 align-top whitespace-pre-wrap break-words text-sm text-amber-100/80 ${sideBg(row, 'current')}`}>{renderSide(row, 'current')}</td>
-                              <td className={`px-4 py-3 align-top whitespace-pre-wrap break-words text-sm text-amber-100/80 ${sideBg(row, 'version')}`}>{renderSide(row, 'version')}</td>
+                              <td className={`px-4 py-3 align-top whitespace-pre-wrap wrap-break-word text-sm text-amber-100/80 ${sideBg(row, 'current')}`}>{renderSide(row, 'current')}</td>
+                              <td className={`px-4 py-3 align-top whitespace-pre-wrap wrap-break-word text-sm text-amber-100/80 ${sideBg(row, 'version')}`}>{renderSide(row, 'version')}</td>
                               <td className="px-4 py-3 align-top">{renderLineChoice(row)}</td>
                             </tr>
                           ))}
