@@ -339,7 +339,7 @@ export function IdeaVersionsPage() {
 
   if (isLoading || ideaLoading) {
     return (
-      <div className="min-h-full bg-[#1c1411] flex items-center justify-center font-serif text-amber-200/60 py-24">
+      <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411]  flex items-center justify-center font-serif text-amber-200/60 py-24">
         Consultation de l’historique...
       </div>
     );
@@ -347,7 +347,7 @@ export function IdeaVersionsPage() {
 
   if (error || !idea) {
     return (
-      <div className="min-h-full bg-[#1c1411] text-[#fcf9f2] font-serif px-4 py-20">
+      <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411]  text-[#fcf9f2] font-serif px-4 py-20">
         <div className="max-w-xl mx-auto rounded-2xl border border-red-900/30 bg-red-950/20 p-6 text-center text-red-200">
           {error ?? 'Cette idée n’existe plus ou est introuvable.'}
         </div>
@@ -423,7 +423,7 @@ export function IdeaVersionsPage() {
     : [];
 
   return (
-    <div className="min-h-full bg-[#1c1411] text-[#fcf9f2] font-serif">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411]  text-[#fcf9f2] font-serif">
       {/* Plus de sticky : la navbar est déjà collée et ce bandeau mangeait l'écran */}
       <header className="border-b border-amber-900/40 bg-neutral-950/90">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

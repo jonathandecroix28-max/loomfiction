@@ -209,7 +209,7 @@ export function VersionsHubPage() {
   }, [chapterRows.length, ideaRows.length]);
 
   return (
-    <div className="min-h-full bg-[#1c1411] text-[#fcf9f2] font-serif overflow-x-hidden">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif overflow-x-hidden">
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-5 sm:py-10 space-y-5 sm:space-y-8">
         <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
