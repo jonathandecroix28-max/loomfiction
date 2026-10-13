@@ -1,226 +1,67 @@
 import { bookService } from '../modules/books/services/bookService';
 import type { BookResponse } from '../types/book';
-import {
-  getDb,
-  rwTx,
-  isTempId,
-  newTempId,
-  httpStatus,
-  sortNewestFirst,
-  queueOp,
-  getOps,
-  clearOp,
-  clearOpsFor,
-  mergeServerSnapshot,
-  remapBookId,
-} from '../db/plotweaverDb';
+import { newTempId, sortNewestFirst, remapBookId, isTempId } from '../db/plotweaverDb';
+import { createOfflineRepository, nowIso, sameText } from '../db/Createofflinerepository';
 
-let bookSyncPromise: Promise<void> | null = null;
+type BookPayload = { title: string; description?: string; coverImage?: string };
 
-async function replaceBook(tempId: number, serverBook: BookResponse) {
-  const tx = await rwTx();
-  await tx.objectStore('books').delete(tempId);
-  await tx.objectStore('books').put(serverBook);
-  await remapBookId(tx, tempId, serverBook.id);
-  await tx.done;
-}
+const repo = createOfflineRepository<BookResponse, BookPayload>({
+  entity: 'book',
+  store: 'books',
+  notFound: 'Livre introuvable.',
+  remote: bookService,
+  toPayload: ({ title, description, coverImage }) => ({ title, description, coverImage }),
+  arrange: sortNewestFirst,
 
-export const offlineBookService = {
-  async getLocalBooks(): Promise<BookResponse[]> {
-    const db = await getDb();
-    return sortNewestFirst(await db.getAll('books'));
-  },
+  // un livre local de même titre qu'un livre serveur = le même livre
+  matchOnServer: (local, server) => server.find((s) => sameText(s.title, local.title)),
 
-  async getAll(): Promise<BookResponse[]> {
-    try {
-      await this.syncToServer();
+  // chapitres et idées du livre temporaire passent sur l'id serveur
+  afterReplace: (tx, tempId, server) => remapBookId(tx, tempId, server.id),
 
-      const serverBooks = await bookService.getAll();
-      if (Array.isArray(serverBooks)) {
-        return await mergeServerSnapshot('book', serverBooks);
-      }
-    } catch (error) {
-      console.warn('Mode hors-ligne actif : utilisation du stockage local.');
-    }
-
-    return this.getLocalBooks();
-  },
-
-  async getById(id: number): Promise<BookResponse> {
-    const db = await getDb();
-    const book = await db.get('books', id);
-    if (!book) throw new Error('Livre introuvable.');
-    return book;
-  },
-
-  async create(title: string, description?: string, coverImage?: string): Promise<BookResponse[]> {
-    const db = await getDb();
-
-    const tempBook: BookResponse = {
-      id: newTempId(),
-      title,
-      description,
-      coverImage,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      chapterCount: 0,
-    };
-    await db.put('books', tempBook);
-
-    try {
-      const createdServerBook = await bookService.create({ title, description, coverImage });
-      await replaceBook(tempBook.id, createdServerBook);
-    } catch (err) {
-      console.log('Livre enregistré localement en attente de synchronisation.');
-    }
-
-    return this.getLocalBooks();
-  },
-
-  async remove(id: number): Promise<BookResponse[]> {
-    const tx = await rwTx();
-
-    await tx.objectStore('books').delete(id);
-
+  beforeRemove: async (tx, id) => {
+    // les idées liées perdent leur livre
     const ideas = tx.objectStore('ideas');
     for (const idea of await ideas.index('by_book').getAll(id)) {
       await ideas.put({ ...idea, bookId: null });
     }
-
+    // un livre jamais synchronisé emporte ses chapitres en attente
     if (isTempId(id)) {
       const chapters = tx.objectStore('chapters');
-      for (const c of await chapters.index('by_book').getAll(id)) {
-        await chapters.delete(c.id);
-      }
-    } else {
-      await queueOp(tx, 'book', 'delete', id);
-    }
-    await tx.done;
-
-    if (isTempId(id)) return this.getLocalBooks();
-
-    try {
-      await bookService.delete(id);
-      await clearOpsFor('book', 'delete', id);
-    } catch (err) {
-      if (httpStatus(err) === 404) {
-        await clearOpsFor('book', 'delete', id);
-      } else {
-        console.log('Suppression enregistrée en local (serveur injoignable).');
+      for (const chapter of await chapters.index('by_book').getAll(id)) {
+        await chapters.delete(chapter.id);
       }
     }
-
-    return this.getLocalBooks();
   },
+});
 
-  async update(id: number, title: string, description?: string, coverImage?: string): Promise<BookResponse[]> {
-    const db = await getDb();
-    const current = await db.get('books', id);
-    if (!current) throw new Error('Livre introuvable.');
+export const offlineBookService = {
+  getLocalBooks: repo.getLocal,
+  getAll: repo.getAll,
+  getById: repo.getById,
+  syncToServer: repo.syncToServer,
 
-    const updatedBook: BookResponse = {
-      ...current,
+  async create(title: string, description?: string, coverImage?: string): Promise<BookResponse[]> {
+    const now = nowIso();
+    await repo.insert({
+      id: newTempId(),
       title,
       description,
       coverImage,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const tx = await rwTx();
-    await tx.objectStore('books').put(updatedBook);
-    await queueOp(tx, 'book', 'update', id);
-    await tx.done;
-
-    if (!isTempId(id)) {
-      try {
-        const serverUpdated = await bookService.update(id, { title, description, coverImage });
-        await db.put('books', serverUpdated);
-        await clearOpsFor('book', 'update', id);
-      } catch (err) {
-        console.log('Mise à jour enregistrée en local.');
-      }
-    }
-
-    return this.getLocalBooks();
-  },
-
-  async syncToServer(): Promise<void> {
-    if (bookSyncPromise) return bookSyncPromise;
-
-    bookSyncPromise = this._doSync().finally(() => {
-      bookSyncPromise = null;
+      createdAt: now,
+      updatedAt: now,
+      chapterCount: 0,
     });
-    return bookSyncPromise;
+    return repo.getLocal();
   },
 
-  async _doSync(): Promise<void> {
-    const db = await getDb();
+  async update(id: number, title: string, description?: string, coverImage?: string): Promise<BookResponse[]> {
+    await repo.patch(id, (book) => ({ ...book, title, description, coverImage, updatedAt: nowIso() }));
+    return repo.getLocal();
+  },
 
-    for (const op of await getOps('book', 'delete')) {
-      try {
-        await bookService.delete(op.entityId);
-        await clearOp(op.key!);
-      } catch (err) {
-        if (httpStatus(err) === 404) {
-          console.log(`Le livre ${op.entityId} n'existe plus sur le serveur.`);
-          await clearOp(op.key!);
-        }
-      }
-    }
-
-    for (const op of await getOps('book', 'update')) {
-      const local = await db.get('books', op.entityId);
-      if (!local) {
-        await clearOp(op.key!);
-        continue;
-      }
-      try {
-        const serverUpdated = await bookService.update(local.id, {
-          title: local.title,
-          description: local.description,
-          coverImage: local.coverImage,
-        });
-        await db.put('books', serverUpdated);
-        await clearOp(op.key!);
-      } catch (err) {
-        if (httpStatus(err) === 404) await clearOp(op.key!);
-      }
-    }
-
-    const pending = (await db.getAll('books')).filter((b) => isTempId(b.id));
-    if (pending.length === 0) return;
-
-    let serverBooks: BookResponse[];
-    try {
-      const res = await bookService.getAll();
-      if (!Array.isArray(res)) return;
-      serverBooks = res;
-    } catch (err) {
-      return;
-    }
-
-    for (const book of pending) {
-      const existingOnServer = serverBooks.find(
-        (s) => s.title.trim().toLowerCase() === book.title.trim().toLowerCase()
-      );
-
-      if (existingOnServer) {
-        await replaceBook(book.id, existingOnServer);
-        continue;
-      }
-
-      try {
-        const created = await bookService.create({
-          title: book.title,
-          description: book.description,
-          coverImage: book.coverImage,
-        });
-        serverBooks.push(created);
-        await replaceBook(book.id, created);
-      } catch (err) {
-        console.warn(`Impossible de synchroniser la création du livre : ${book.title}`);
-        return; 
-      }
-    }
+  async remove(id: number): Promise<BookResponse[]> {
+    await repo.remove(id);
+    return repo.getLocal();
   },
 };
