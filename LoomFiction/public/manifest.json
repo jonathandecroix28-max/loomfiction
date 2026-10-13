@@ -1,6 +1,6 @@
 {
-  "name": "Plotweaver - Gestion de Romans",
-  "short_name": "Plotweaver",
+  "name": "LoomFiction - Gestion de Romans",
+  "short_name": "LoomFiction",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fcf9f2",
