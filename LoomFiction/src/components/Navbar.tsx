@@ -78,7 +78,7 @@ export function Navbar() {
       aria-label="LoomFiction, retour à la bibliothèque"
     >
       <span className="w-9 h-9 rounded-xl bg-amber-800 text-amber-50 flex items-center justify-center font-serif font-bold text-lg shadow-sm group-hover:bg-amber-700 transition shrink-0">
-        P
+        L
       </span>
       <span className="text-lg sm:text-xl font-serif font-bold text-amber-100 tracking-tight group-hover:text-amber-50 transition truncate">
         LoomFiction

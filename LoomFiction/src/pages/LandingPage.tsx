@@ -54,7 +54,7 @@ export function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-3 min-w-0 group">
             <span className="w-10 h-10 rounded-xl bg-amber-800 group-hover:bg-amber-700 transition flex items-center justify-center font-serif font-bold text-xl text-amber-50 shadow-md shrink-0">
-              P
+              L
             </span>
             <span className="font-serif font-bold text-xl tracking-tight text-amber-100 truncate">LoomFiction</span>
           </Link>
