@@ -47,7 +47,7 @@ function AppContent() {
           {/* <Route path="/terms" element={<TermsPage />} /> */}
           {/* <Route path="/privacy" element={<PrivacyPage />} /> */}
           {/* <Route path="/support" element={<SupportPage />} /> */}
-          <Route path="/github" element={<a href="https://github.com/jonathandecroix28-max/plotweaver" target="_blank" rel="noopener noreferrer">GitHub</a>} />
+          <Route path="/github" element={<a href="https://github.com/jonathandecroix28-max/loomfiction" target="_blank" rel="noopener noreferrer">GitHub</a>} />
 
           {/* Route 404 */}
           <Route path="/404" element={<NotFound />} />

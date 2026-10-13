@@ -61,8 +61,8 @@ export function Navbar() {
     <button
       type="button"
       onClick={() => navigate("/donate")}
-      title="Soutenir Plotweaver"
-      aria-label="Soutenir Plotweaver"
+      title="Soutenir LoomFiction"
+      aria-label="Soutenir LoomFiction"
       className="text-xs bg-yellow-400/10 hover:bg-yellow-400/20 text-yellow-200 px-3 py-2 rounded-xl border border-yellow-500/30 font-medium transition cursor-pointer flex items-center gap-2"
     >
       <span aria-hidden>☕</span>
@@ -75,13 +75,13 @@ export function Navbar() {
       type="button"
       onClick={() => navigate("/books")}
       className="flex items-center gap-3 min-w-0 group cursor-pointer"
-      aria-label="Plotweaver, retour à la bibliothèque"
+      aria-label="LoomFiction, retour à la bibliothèque"
     >
       <span className="w-9 h-9 rounded-xl bg-amber-800 text-amber-50 flex items-center justify-center font-serif font-bold text-lg shadow-sm group-hover:bg-amber-700 transition shrink-0">
         P
       </span>
       <span className="text-lg sm:text-xl font-serif font-bold text-amber-100 tracking-tight group-hover:text-amber-50 transition truncate">
-        Plotweaver
+        LoomFiction
       </span>
     </button>
   );

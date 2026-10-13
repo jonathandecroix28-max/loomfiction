@@ -45,7 +45,7 @@ export function NotFound() {
       </div>
 
       <footer className="mt-8 text-xs text-amber-200/40 font-serif italic relative z-10">
-        PlotWeaver &bull; L'art de tisser des histoires
+        LoomFiction &bull; L'art de tisser des histoires
       </footer>
 
     </div>

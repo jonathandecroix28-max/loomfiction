@@ -79,7 +79,7 @@ export function ExportMenu({ bookId, className = '' }: ExportMenuProps) {
 
       {open && (
         <div
-          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm sm:p-6"
+          className="fixed inset-0 z-60 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm sm:p-6"
           onClick={close}
         >
           <div
