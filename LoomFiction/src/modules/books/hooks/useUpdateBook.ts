@@ -12,7 +12,7 @@ export function useUpdateBook() {
     try {
       const updatedBooks = await offlineBookService.update(id, title, description, coverImage);
       return updatedBooks;
-    } catch (err) {
+    } catch {
       setError("Erreur lors de la mise à jour du livre.");
       return null;
     } finally {

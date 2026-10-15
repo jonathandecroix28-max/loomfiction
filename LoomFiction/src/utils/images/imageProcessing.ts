@@ -30,6 +30,7 @@ async function decode(file: File): Promise<Decoded> {
       const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
       return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close() };
     } catch {
+      // Ignore errors and fallback to the Image approach below.
     }
   }
 

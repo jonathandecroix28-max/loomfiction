@@ -12,7 +12,7 @@ export function useDeleteBook() {
     try {
       const updatedBooks = await offlineBookService.remove(id);
       return updatedBooks;
-    } catch (err) {
+    } catch {
       setError("Erreur lors de la suppression du livre.");
       return null;
     } finally {

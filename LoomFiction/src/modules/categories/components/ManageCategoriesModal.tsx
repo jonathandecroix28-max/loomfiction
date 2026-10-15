@@ -52,7 +52,7 @@ export function ManageCategoriesModal({ isOpen, onClose, onCategoriesChanged }: 
       setEditingId(null);
       await fetchCategories();
       onCategoriesChanged();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'enregistrement de la catégorie (Vérifiez qu'elle n'existe pas déjà).");
     } finally {
       setIsLoading(false);
@@ -71,7 +71,7 @@ export function ManageCategoriesModal({ isOpen, onClose, onCategoriesChanged }: 
       await offlineCategoryService.remove(id);
       await fetchCategories();
       onCategoriesChanged();
-    } catch (err) {
+    } catch {
       alert("Impossible de supprimer la catégorie.");
     }
   };

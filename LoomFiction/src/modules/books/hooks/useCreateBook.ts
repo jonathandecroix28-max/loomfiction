@@ -12,7 +12,7 @@ export function useCreateBook() {
     try {
       const updatedBooks = await offlineBookService.create(title, description, coverImage);
       return updatedBooks;
-    } catch (err) {
+    } catch {
       setError("Erreur lors de la création du livre.");
       return null;
     } finally {

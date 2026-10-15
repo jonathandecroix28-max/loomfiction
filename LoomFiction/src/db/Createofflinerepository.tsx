@@ -147,7 +147,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
             finalize: cfg.finalize,
           });
         }
-      } catch (error) {
+      } catch {
         console.warn(`Mode hors-ligne actif : ${cfg.entity} lus depuis le stockage local.`);
       }
     }
@@ -170,7 +170,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
             scope: { index: parent.index, key: Number(parentId) },
           });
         }
-      } catch (error) {
+      } catch {
         console.warn(`Mode hors-ligne actif : ${cfg.entity} lus depuis le stockage local.`);
       }
     }
@@ -201,7 +201,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
         const created = await net(() => cfg.remote.create(cfg.toPayload(temp)));
         await replace(temp.id, created);
         return normalize(created);
-      } catch (err) {
+      } catch {
         console.log(`${cfg.entity} enregistré localement en attente de synchronisation.`);
       }
     }
@@ -283,7 +283,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
     for (const syncParent of cfg.syncFirst ?? []) {
       try {
         await syncParent();
-      } catch (e) {
+      } catch {
         console.warn('Synchro d\'un parent ignorée temporairement.');
       }
     }
@@ -334,7 +334,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
         const res = await net(() => cfg.remote.getAll());
         if (!Array.isArray(res)) return;
         serverItems = res;
-      } catch (err) {
+      } catch {
         return;
       }
     }
