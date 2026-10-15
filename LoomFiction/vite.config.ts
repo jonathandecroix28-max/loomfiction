@@ -28,9 +28,9 @@ export default defineConfig({
       workbox: {
         // tout le "shell" de l'app est mis en cache pour fonctionner sans internet
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
-        // les routes React (ex. /chapters/3/versions) retombent sur index.html hors-ligne
+        // les routes React retombent sur index.html hors-ligne
         navigateFallback: '/index.html',
-        // par défaut, tout fichier > 2 Mo est ignoré du cache (et l'app ne se charge plus hors-ligne)
+        // par défaut, tout fichier > 2 Mo est ignoré du cache (passé ici à 5 Mo)
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // supprime les anciens caches à chaque nouveau déploiement
         cleanupOutdatedCaches: true,
@@ -39,6 +39,31 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'vendor-react'
+            }
+            if (id.includes('@tiptap')) {
+              return 'vendor-tiptap'
+            }
+            if (
+              id.includes('jszip') ||
+              id.includes('dompurify') ||
+              id.includes('idb') ||
+              id.includes('axios')
+            ) {
+              return 'vendor-utils'
+            }
+          }
+        },
+      },
+    },
+  },
   server: {
     host: true,
     port: 5173,
