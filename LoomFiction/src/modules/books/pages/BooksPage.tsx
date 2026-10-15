@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; 
 import { useBooks } from '../hooks/useBooks';          
 import { useDeleteBook } from '../hooks/useDeleteBook';
+import { useChapterCounts } from '../hooks/useChapterCounts';
 import { BookCard } from '../components/BookCard';
 import { BookModal } from '../components/BookModal';
 
@@ -11,6 +12,7 @@ export function BooksPage() {
 
   const { books, isLoading, error, setBooks } = useBooks();
   const { deleteBook } = useDeleteBook();
+  const chapterCountOf = useChapterCounts(books);
 
   const handleSelectBook = (bookId: number) => {
     navigate(`/books/${bookId}`);
@@ -93,6 +95,7 @@ export function BooksPage() {
               <BookCard 
                 key={book.id} 
                 book={book} 
+                chapterCount={chapterCountOf(book)}
                 onSelect={handleSelectBook} 
                 onDelete={handleDeleteBook}
               />

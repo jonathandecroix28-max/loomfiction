@@ -5,11 +5,13 @@ interface BookCardProps {
   book: BookResponse;
   onSelect?: (bookId: number) => void; 
   onDelete?: (bookId: number) => void;
+  chapterCount?: number;
 }
 
-export function BookCard({ book, onSelect, onDelete }: BookCardProps) {
+export function BookCard({ book, onSelect, onDelete, chapterCount }: BookCardProps) {
   const imageUrl = (book as any).cover_image || book.coverImage;
   const createdDate = (book as any).created_at || book.createdAt;
+  const chapters = chapterCount ?? book.chapterCount ?? 0;
 
   return (
     <div 
@@ -22,8 +24,9 @@ export function BookCard({ book, onSelect, onDelete }: BookCardProps) {
             e.stopPropagation();
             onDelete(book.id);
           }}
-          className="absolute top-3 right-3 bg-red-950/80 hover:bg-red-700 text-red-200 text-xs font-sans font-medium px-2.5 py-1 rounded-lg backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer border border-red-900/40"
+          className="absolute top-3 right-3 bg-red-950/80 hover:bg-red-700 text-red-200 text-xs font-sans font-medium px-2.5 py-1 rounded-lg backdrop-blur-xs [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity z-20 cursor-pointer border border-red-900/40"
           title="Supprimer le livre"
+          aria-label={`Supprimer ${book.title}`}
         >
           Supprimer
         </button>
@@ -46,7 +49,7 @@ export function BookCard({ book, onSelect, onDelete }: BookCardProps) {
         )}
 
         <div className="absolute top-3 left-3 bg-neutral-900/90 backdrop-blur-xs text-amber-200 text-xs font-sans font-medium px-2.5 py-1 rounded-lg border border-amber-900/30 shadow-sm">
-          {book.chapterCount ?? 0} {book.chapterCount && book.chapterCount > 1 ? 'chapitres' : 'chapitre'}
+          {chapters} {chapters > 1 ? 'chapitres' : 'chapitre'}
         </div>
       </div>
 
