@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
-import { imageFilesFrom, insertImageFiles } from '../utils/editorImages';
+import { imageFilesFrom, insertImageFiles } from '../../utils/images/editorImages';
 
 interface EditorToolbarProps {
   editor: Editor | null;

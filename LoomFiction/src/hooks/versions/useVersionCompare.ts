@@ -6,7 +6,7 @@ import {
   mergeWithDefaults,
   type LineChoice,
   type LineChoices,
-} from '../utils/lineDiff';
+} from '../../utils/versions/lineDiff';
 
 export type SortBy = 'newest' | 'oldest' | 'version';
 export type CompareMode = 'current-left' | 'version-left';

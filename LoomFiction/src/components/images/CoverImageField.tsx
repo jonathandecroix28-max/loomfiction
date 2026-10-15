@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { COVER_IMAGE, compressImage, isDataImageUrl } from '../utils/imageProcessing';
+import { COVER_IMAGE, compressImage, isDataImageUrl } from '../../utils/images/imageProcessing';
 
 interface CoverImageFieldProps {
   value: string;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { isValidCoverUrl } from '../utils/validation';
-import { isDataImageUrl } from '../utils/imageProcessing';
+import { isValidCoverUrl } from '../../utils/validation';
+import { isDataImageUrl } from '../../utils/images/imageProcessing';
 
 const URL_ERROR = "L'URL doit commencer par http:// ou https://";
 
