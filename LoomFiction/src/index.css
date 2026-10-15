@@ -1,6 +1,19 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* ═══════════════════════════════════════════════════════════════
+   THÈMES LoomFiction
+
+   Deux palettes jumelles, construites de la même façon :
+     • :root                → COUCHER DE SOLEIL (sombre, par défaut)
+     • html.sunrise-mode    → LEVER DE SOLEIL  (clair, « aube dorée »)
+
+   Les pages utilisent les couleurs Tailwind (amber-*, neutral-*…).
+   On les redéfinit plus bas à partir des variables --c-* ci-dessous :
+   changer l'ambiance d'un thème = modifier ces variables, rien d'autre.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Palette sombre : coucher de soleil ── */
 :root {
   color-scheme: dark;
 
@@ -260,6 +273,8 @@ html.sunrise-mode {
    Ajustements propres au mode clair
    ═══════════════════════════════════════════════════════════════ */
 
+/* Carte « format » sélectionnée (ExportPage / ExportMenu) :
+   fond ambre clair → texte foncé */
 html.sunrise-mode .bg-amber-900\/60.text-amber-50,
 html.sunrise-mode .bg-amber-900\/70.text-amber-50 {
   color: var(--c-heading);
@@ -270,4 +285,21 @@ html.sunrise-mode .bg-amber-900\/70.text-amber-50 {
   html.sunrise-mode .group:hover .group-hover\:text-amber-50:not(.group-hover\:bg-amber-700) {
     color: var(--c-a800);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Images dans les chapitres (éditeur, lecture, aperçu, versions)
+   ═══════════════════════════════════════════════════════════════ */
+.prose img,
+.ProseMirror img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem auto;
+  border-radius: 0.75rem;
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 3px solid var(--c-a500);
+  outline-offset: 3px;
 }
