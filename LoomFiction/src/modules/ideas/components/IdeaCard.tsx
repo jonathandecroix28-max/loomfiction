@@ -1,5 +1,5 @@
 import type { IdeaResponse, IdeaStatus } from '../../../types/idea';
-import { formatDate } from '../../../utils/dateFormatter';
+import { formatDate } from '../../../utils/date/dateFormatter';
 
 interface IdeaCardProps {
   idea: IdeaResponse & { bookTitle?: string };

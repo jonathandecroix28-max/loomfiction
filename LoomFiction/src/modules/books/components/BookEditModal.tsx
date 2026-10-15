@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useUpdateBook } from '../hooks/useUpdateBook';
 import type { BookResponse } from '../../../types/book';
-import { CoverImageField } from '../../../components/CoverImageField';
+import { CoverImageField } from '../../../components/images/CoverImageField';
 
 interface BookEditModalProps {
   isOpen: boolean;

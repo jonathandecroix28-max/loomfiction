@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useCreateBook } from '../hooks/useCreateBook';
-import { useCoverImage } from '../../../hooks/useCoverImage'; 
+import { useCoverImage } from '../../../hooks/images/useCoverImage'; 
 import type { BookResponse } from '../../../types/book';
-import { CoverImageField } from '../../../components/CoverImageField';
+import { CoverImageField } from '../../../components/images/CoverImageField';
 
 interface BookModalProps {
   isOpen: boolean;

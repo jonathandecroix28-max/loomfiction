@@ -1,5 +1,5 @@
 import type { BookResponse } from '../../../types/book';
-import { formatDate } from '../../../utils/dateFormatter';
+import { formatDate } from '../../../utils/date/dateFormatter';
 
 interface BookCardProps {
   book: BookResponse;

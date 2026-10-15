@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import type { SortBy } from '../../hooks/useVersionCompare';
-import { btnBase, ghostBtn } from '../../utils/versionStyles';
+import type { SortBy } from '../../hooks/versions/useVersionCompare';
+import { btnBase, ghostBtn } from '../../utils/versions/versionStyles';
 
 /* ───────────────────────── États de la page ───────────────────────── */
 

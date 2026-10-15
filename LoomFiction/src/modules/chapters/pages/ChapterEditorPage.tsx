@@ -9,8 +9,8 @@ import { offlineChapterService } from '../../../services/offlineChapterService';
 import { offlineChapterVersionService } from '../../../services/offlineChapterVersionService';
 import { useUpdateChapter } from '../../chapters/hooks/UseUpdateChapter';
 import { useChapterVersions } from '../hooks/useChapterVersions';
-import { EditorToolbar } from '../../../components/EditorToolbar';
-import { imageFilesFrom, insertImageFiles } from '../../../utils/editorImages';
+import { EditorToolbar } from '../../../components/tools/EditorToolbar';
+import { imageFilesFrom, insertImageFiles } from '../../../utils/images/editorImages';
 import type { ChapterResponse } from '../../../types/chapter';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
 

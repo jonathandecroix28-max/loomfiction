@@ -8,9 +8,9 @@ import {
   type LineChoice,
   type LineChoices,
   type LineDiffRow,
-} from '../../utils/lineDiff';
-import { displayLine } from '../../utils/sanitizeHtml';
-import { choiceBtn } from '../../utils/versionStyles';
+} from '../../utils/versions/lineDiff';
+import { displayLine } from '../../utils/versions/sanitizeHtml';
+import { choiceBtn } from '../../utils/versions/versionStyles';
 
 interface Props {
   rows: LineDiffRow[];

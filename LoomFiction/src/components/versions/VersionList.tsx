@@ -1,5 +1,5 @@
-import type { BaseVersion } from '../../hooks/useVersionCompare';
-import { btnBase } from '../../utils/versionStyles';
+import type { BaseVersion } from '../../hooks/versions/useVersionCompare';
+import { btnBase } from '../../utils/versions/versionStyles';
 
 interface Props<V extends BaseVersion> {
   versions: V[];

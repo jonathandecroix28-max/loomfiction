@@ -4,7 +4,7 @@ import { useBook } from '../hooks/useBook';
 import { useChapters } from '../../chapters/hooks/useChapter';
 import { useDeleteChapter } from '../../chapters/hooks/useDeleteChapter';
 import { ChapterModal } from '../../chapters/components/ChapterModal'; 
-import { formatDate } from '../../../utils/dateFormatter';
+import { formatDate } from '../../../utils/date/dateFormatter';
 import { BookEditModal } from '../components/BookEditModal';
 
 export function BookDetailPage() {

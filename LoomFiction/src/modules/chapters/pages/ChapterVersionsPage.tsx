@@ -5,7 +5,7 @@ import { useChapterVersions } from '../hooks/useChapterVersions';
 import { offlineChapterService } from '../../../services/offlineChapterService';
 import { offlineChapterVersionService } from '../../../services/offlineChapterVersionService';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
-import { useParentItem, useVersionCompare } from '../../../hooks/useVersionCompare';
+import { useParentItem, useVersionCompare } from '../../../hooks/versions/useVersionCompare';
 import {
   FeedbackBanner,
   MergeOptions,

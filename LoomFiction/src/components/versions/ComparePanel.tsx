@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import type { CompareMode } from '../../hooks/useVersionCompare';
-import { toggleBtn } from '../../utils/versionStyles';
+import type { CompareMode } from '../../hooks/versions/useVersionCompare';
+import { toggleBtn } from '../../utils/versions/versionStyles';
 
 /* ───────────────────────── Panneau ───────────────────────── */
 

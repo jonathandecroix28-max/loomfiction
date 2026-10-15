@@ -4,7 +4,7 @@ import { useIdeaVersions } from '../hooks/useIdeaVersions';
 import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineIdeaVersionService } from '../../../services/offlineIdeaVersionService';
 import type { IdeaVersionResponse } from '../../../types/ideaVersion';
-import { useParentItem, useVersionCompare } from '../../../hooks/useVersionCompare';
+import { useParentItem, useVersionCompare } from '../../../hooks/versions/useVersionCompare';
 import {
   FeedbackBanner,
   MergeOptions,
