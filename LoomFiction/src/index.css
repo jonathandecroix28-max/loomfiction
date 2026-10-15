@@ -1,21 +1,79 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-/* Configuration de base (Coucher de soleil par défaut) */
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
+
+  --c-page: #221510;        /* fond : brun braise */
+  --c-glow: 232 110 40;     /* lueur d'horizon (rgb) */
+  --c-glow-a: 0.22;
+  --c-surface: #342013;     /* cartes (neutral-950) */
+  --c-surface-2: #422a19;   /* champs, boutons secondaires (neutral-900) */
+  --c-surface-3: #543725;   /* survols (neutral-800) */
+  --c-ink: #fbeed8;         /* texte principal : crème chaude */
+  --c-heading: #ffeccb;     /* titres */
+  --c-text-2: #f0c58c;      /* texte secondaire : or pâle */
+  --c-a50:  #fffaf0;        /* texte sur boutons orange */
+  --c-a300: #f7b267;
+  --c-a400: #f59e3b;
+  --c-a500: #f08a24;
+  --c-a600: #dd6a1c;
+  --c-a700: #c4510d;        /* bouton principal */
+  --c-a800: #9d400f;
+  --c-a900: #7d3d18;        /* bordures, onglet actif */
+  --c-a950: #451f0e;        /* fonds de badges */
+  --c-shadow: rgb(12 5 1 / 0.45);
+  --c-overlay: rgb(18 8 3 / 0.75);
+
+  /* Opacité effective des textes atténués (/30 … /80) */
+  --m30: 50%; --m40: 58%; --m50: 66%; --m55: 70%; --m60: 75%; --m70: 84%; --m80: 92%;
+  --m-h80: 92%; --m-h90: 96%;
 }
 
+/* ── Palette claire : lever de soleil (aube dorée) ── */
+html.sunrise-mode {
+  color-scheme: light;
+
+  --c-page: #f4dfb8;
+  --c-glow: 255 170 80;
+  --c-glow-a: 0.42;
+  --c-surface: #fff4de;
+  --c-surface-2: #f9e6c2;
+  --c-surface-3: #f1d6a6;
+  --c-ink: #2f1b0c;
+  --c-heading: #2a1507;
+  --c-text-2: #5a3212;
+  --c-a50:  #fffaf0;
+  --c-a300: #8f3a07;
+  --c-a400: #a8480a;
+  --c-a500: #e8821a;
+  --c-a600: #d85f10;
+  --c-a700: #b8420a;
+  --c-a800: #9a3507;
+  --c-a900: #dfae66;
+  --c-a950: #fbe0ae;
+  --c-shadow: rgb(120 53 15 / 0.18);
+  --c-overlay: rgb(60 30 12 / 0.5);
+
+  --m30: 60%; --m40: 72%; --m50: 78%; --m55: 82%; --m60: 86%; --m70: 92%; --m80: 96%;
+  --m-h80: 92%; --m-h90: 96%;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Base
+   ═══════════════════════════════════════════════════════════════ */
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  accent-color: var(--c-a700);
+  scrollbar-color: var(--c-a900) var(--c-page);
 }
 
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background-color: #1c1411; /* Fond coucher de soleil sombre profond */
-  color: #fcf9f2;
+  background-color: var(--c-page);
+  color: var(--c-ink);
   overflow-x: hidden;
 }
 
@@ -23,7 +81,12 @@ html,
 body,
 #root {
   min-height: 100%;
-  background-color: #1c1411;
+  background-color: var(--c-page);
+}
+
+::selection {
+  background: var(--c-a900);
+  color: var(--c-heading);
 }
 
 img,
@@ -78,30 +141,133 @@ code,
   }
 }
 
-/* --- Lever de soleil (Mode Clair / Sunrise) --- */
-html.sunrise-mode body {
-  background-color: #fffaf0 !important; 
-  color: #3a2518 !important;
+/* ═══════════════════════════════════════════════════════════════
+   Couleurs Tailwind → palette du thème actif
+   (non « layered » : ces règles l'emportent sur les utilitaires)
+   ═══════════════════════════════════════════════════════════════ */
+html {
+  --color-neutral-950: var(--c-surface);
+  --color-neutral-900: var(--c-surface-2);
+  --color-neutral-800: var(--c-surface-3);
+
+  --color-amber-50:  var(--c-a50);
+  --color-amber-100: var(--c-heading);
+  --color-amber-200: var(--c-text-2);
+  --color-amber-300: var(--c-a300);
+  --color-amber-400: var(--c-a400);
+  --color-amber-500: var(--c-a500);
+  --color-amber-600: var(--c-a600);
+  --color-amber-700: var(--c-a700);
+  --color-amber-800: var(--c-a800);
+  --color-amber-900: var(--c-a900);
+  --color-amber-950: var(--c-a950);
 }
 
-/* Adaptation automatique des cartes et modales en mode Lever de soleil */
-html.sunrise-mode .bg-neutral-950,
-html.sunrise-mode .bg-\[\#1c1411\],
-html.sunrise-mode .bg-neutral-900 {
-  background-color: #fffdf9 !important;
-  color: #3a2518 !important;
-  border-color: rgba(120, 53, 15, 0.15) !important;
+/* États (succès / erreur / info) : versions pastel en mode clair */
+html.sunrise-mode {
+  --color-red-200: #8f1a1a;
+  --color-red-300: #b01c1c;
+  --color-red-400: #c42222;
+  --color-red-700: #ee9a96;
+  --color-red-900: #eea29e;
+  --color-red-950: #fdd9d5;
+
+  --color-emerald-300: #046a4b;
+  --color-emerald-800: #5fd9a8;
+  --color-emerald-900: #9be8c6;
+  --color-emerald-950: #c9eed9;
+
+  --color-blue-300: #1a43c0;
+  --color-blue-800: #86b6f5;
+  --color-blue-950: #cfe0f7;
 }
 
-html.sunrise-mode input,
-html.sunrise-mode textarea,
-html.sunrise-mode select {
-  background-color: #fcf9f2 !important;
-  color: #3a2518 !important;
-  border-color: rgba(120, 53, 15, 0.2) !important;
+/* Ombres teintées */
+* {
+  --tw-shadow-color: var(--c-shadow);
 }
 
-html.sunrise-mode .text-amber-100,
-html.sunrise-mode .text-amber-200 {
-  color: #5c3a21 !important;
+/* Valeurs écrites en dur dans les composants */
+.bg-\[\#1c1411\] {
+  background-color: var(--c-page);
+}
+
+.bg-\[\#1c1411\]\/95 {
+  background-color: color-mix(in srgb, var(--c-page) 95%, transparent);
+}
+
+.text-\[\#fcf9f2\],
+.bg-\[\#1c1411\].text-amber-50 {
+  color: var(--c-ink);
+}
+
+/* Modales : fond « carte » pour bien les détacher de la page */
+.bg-\[\#1c1411\].rounded-3xl {
+  background-color: var(--c-surface);
+}
+
+/* Voile derrière les modales */
+.bg-black\/70 {
+  background-color: var(--c-overlay);
+}
+
+/* Lueur d'horizon en haut des pages à pleine hauteur */
+.bg-\[\#1c1411\].min-h-screen,
+.bg-\[\#1c1411\].min-h-full,
+.bg-\[\#1c1411\].h-screen,
+.bg-\[\#1c1411\].grow,
+.bg-\[\#1c1411\][class*="min-h-["] {
+  background-image: radial-gradient(
+    ellipse 90% 420px at 50% 0%,
+    rgb(var(--c-glow) / var(--c-glow-a)),
+    transparent 75%
+  );
+}
+
+/* ── Lisibilité : textes atténués (opacité effective par thème) ── */
+.text-amber-200\/30 { color: color-mix(in srgb, var(--c-text-2) var(--m30), transparent); }
+.text-amber-200\/40 { color: color-mix(in srgb, var(--c-text-2) var(--m40), transparent); }
+.text-amber-200\/50 { color: color-mix(in srgb, var(--c-text-2) var(--m50), transparent); }
+.text-amber-200\/55 { color: color-mix(in srgb, var(--c-text-2) var(--m55), transparent); }
+.text-amber-200\/60 { color: color-mix(in srgb, var(--c-text-2) var(--m60), transparent); }
+.text-amber-200\/70 { color: color-mix(in srgb, var(--c-text-2) var(--m70), transparent); }
+.text-amber-200\/80 { color: color-mix(in srgb, var(--c-text-2) var(--m80), transparent); }
+.text-amber-100\/80 { color: color-mix(in srgb, var(--c-heading) var(--m-h80), transparent); }
+.text-amber-100\/90 { color: color-mix(in srgb, var(--c-heading) var(--m-h90), transparent); }
+.placeholder\:text-amber-200\/30::placeholder { color: color-mix(in srgb, var(--c-text-2) var(--m30), transparent); }
+
+/* ── Textes longs (lecture, aperçu) : plugin typography ── */
+.prose-invert {
+  --tw-prose-body: var(--c-ink);
+  --tw-prose-headings: var(--c-heading);
+  --tw-prose-lead: var(--c-text-2);
+  --tw-prose-links: var(--c-a400);
+  --tw-prose-bold: var(--c-heading);
+  --tw-prose-counters: var(--c-text-2);
+  --tw-prose-bullets: var(--c-a600);
+  --tw-prose-hr: color-mix(in srgb, var(--c-a800) 35%, transparent);
+  --tw-prose-quotes: var(--c-ink);
+  --tw-prose-quote-borders: var(--c-a700);
+  --tw-prose-captions: var(--c-text-2);
+  --tw-prose-code: var(--c-heading);
+  --tw-prose-pre-code: #fde7c4;
+  --tw-prose-pre-bg: #1a0f08;
+  --tw-prose-th-borders: var(--c-a900);
+  --tw-prose-td-borders: color-mix(in srgb, var(--c-a800) 30%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Ajustements propres au mode clair
+   ═══════════════════════════════════════════════════════════════ */
+
+html.sunrise-mode .bg-amber-900\/60.text-amber-50,
+html.sunrise-mode .bg-amber-900\/70.text-amber-50 {
+  color: var(--c-heading);
+}
+
+/* Survol du logo (Navbar) : on assombrit au lieu d'éclaircir */
+@media (hover: hover) {
+  html.sunrise-mode .group:hover .group-hover\:text-amber-50:not(.group-hover\:bg-amber-700) {
+    color: var(--c-a800);
+  }
 }

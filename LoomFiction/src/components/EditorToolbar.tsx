@@ -29,19 +29,19 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   const chain = () => editor.chain().focus();
 
   const baseBtn =
-    'px-3 py-1.5 rounded text-xs font-sans font-medium transition-colors cursor-pointer flex items-center justify-center min-w-[32px] touch-target bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-200';
+    'px-3 py-1.5 rounded text-xs font-sans font-medium transition-colors cursor-pointer flex items-center justify-center min-w-[32px] touch-target bg-[#fef3c7] hover:bg-[#fde68a] text-[#78350f] border border-[#fde68a]';
 
   const activeBtn =
-    'px-3 py-1.5 rounded text-xs font-sans font-medium transition-colors cursor-pointer flex items-center justify-center min-w-[32px] touch-target bg-amber-300 text-amber-950 border border-amber-400 shadow-xs';
+    'px-3 py-1.5 rounded text-xs font-sans font-medium transition-colors cursor-pointer flex items-center justify-center min-w-[32px] touch-target bg-[#fcd34d] text-[#451a03] border border-[#fbbf24] shadow-xs';
 
   const btnClass = (isActive: boolean) => (isActive ? activeBtn : baseBtn);
 
   const plainBtn = `${baseBtn} disabled:opacity-40 disabled:cursor-not-allowed`;
 
-  const separator = <span className="text-amber-300 mx-1">|</span>;
+  const separator = <span className="text-[#fcd34d] mx-1">|</span>;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 pb-4 mb-4 border-b border-amber-200 text-amber-950 bg-amber-50 p-2 rounded-lg overflow-x-auto">
+    <div className="flex flex-wrap items-center gap-1.5 pb-4 mb-4 border-b border-[#fde68a] text-[#451a03] bg-[#fffbeb] p-2 rounded-lg overflow-x-auto">
 
       {/* Historique */}
       <button
