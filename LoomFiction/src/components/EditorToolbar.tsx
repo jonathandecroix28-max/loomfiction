@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
+import { imageFilesFrom, insertImageFiles } from '../utils/editorImages';
 
 interface EditorToolbarProps {
   editor: Editor | null;
+  onImageError?: (message: string | null) => void;
 }
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({ editor, onImageError }: EditorToolbarProps) {
   const [, setForceUpdate] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [imageBusy, setImageBusy] = useState(false);
 
   useEffect(() => {
     if (!editor) return;
@@ -27,6 +31,17 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   }
 
   const chain = () => editor.chain().focus();
+
+  const handleImageFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = imageFilesFrom(event.target.files);
+    event.target.value = '';
+    if (files.length === 0) return;
+
+    setImageBusy(true);
+    const error = await insertImageFiles(editor.view, files);
+    setImageBusy(false);
+    onImageError?.(error);
+  };
 
   const baseBtn =
     'px-3 py-1.5 rounded text-xs font-sans font-medium transition-colors cursor-pointer flex items-center justify-center min-w-[32px] touch-target bg-[#fef3c7] hover:bg-[#fde68a] text-[#78350f] border border-[#fde68a]';
@@ -126,6 +141,20 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       <button type="button" onClick={() => chain().setHorizontalRule().run()} className={baseBtn} title="Séparateur">
         ―
       </button>
+
+      {separator}
+
+      {/* Image */}
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        disabled={imageBusy}
+        className={plainBtn}
+        title="Insérer une image"
+      >
+        {imageBusy ? '…' : '🖼 Image'}
+      </button>
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageFiles} />
 
     </div>
   );

@@ -3,12 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
+import Image from '@tiptap/extension-image';
 import DOMPurify from 'dompurify'; 
 import { offlineChapterService } from '../../../services/offlineChapterService';
 import { offlineChapterVersionService } from '../../../services/offlineChapterVersionService';
 import { useUpdateChapter } from '../../chapters/hooks/UseUpdateChapter';
 import { useChapterVersions } from '../hooks/useChapterVersions';
 import { EditorToolbar } from '../../../components/EditorToolbar';
+import { imageFilesFrom, insertImageFiles } from '../../../utils/editorImages';
 import type { ChapterResponse } from '../../../types/chapter';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
 
@@ -22,6 +24,7 @@ export function ChapterEditorPage() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [saveMessage, setSaveMessage] = useState('');
   const [isPreview, setIsPreview] = useState(false); 
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const { updateChapter, isUpdating, error: updateError } = useUpdateChapter();
   const { versions: chapterVersions, refetch: refetchChapterVersions } = useChapterVersions(chapterIdNumber);
@@ -29,6 +32,8 @@ export function ChapterEditorPage() {
   const editor = useEditor({
     extensions: [
       StarterKit,
+      // allowBase64 : les images sont stockées dans le texte du chapitre (data URL), donc hors-ligne
+      Image.configure({ allowBase64: true }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       })
@@ -38,8 +43,34 @@ export function ChapterEditorPage() {
       attributes: {
         class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] text-lg leading-relaxed text-amber-100/90 font-serif',
       },
+      // Coller une image (capture d'écran, « copier l'image »…)
+      handlePaste: (view, event) => {
+        const files = imageFilesFrom(event.clipboardData?.files);
+        // un collage Word / web contient aussi du texte : on le laisse suivre son cours normal
+        if (files.length === 0 || event.clipboardData?.getData('text/plain')) return false;
+        event.preventDefault();
+        void insertImageFiles(view, files).then(setImageError);
+        return true;
+      },
+      // Glisser-déposer un fichier image depuis l'ordinateur
+      handleDrop: (view, event, _slice, moved) => {
+        if (moved) return false;
+        const files = imageFilesFrom(event.dataTransfer?.files);
+        if (files.length === 0) return false;
+        event.preventDefault();
+        const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+        void insertImageFiles(view, files, pos).then(setImageError);
+        return true;
+      },
     },
   });
+
+  // le message d'erreur d'image disparaît tout seul
+  useEffect(() => {
+    if (!imageError) return;
+    const timer = setTimeout(() => setImageError(null), 6000);
+    return () => clearTimeout(timer);
+  }, [imageError]);
 
   useEffect(() => {
     const fetchChapter = async () => {
@@ -203,7 +234,12 @@ export function ChapterEditorPage() {
           />
         ) : (
           <>
-            <EditorToolbar editor={editor} />
+            <EditorToolbar editor={editor} onImageError={setImageError} />
+            {imageError && (
+              <p role="alert" className="text-sm font-sans text-red-400 mt-3">
+                {imageError}
+              </p>
+            )}
             <div className="flex-1 w-full bg-transparent cursor-text mt-4">
               <EditorContent editor={editor} />
             </div>
