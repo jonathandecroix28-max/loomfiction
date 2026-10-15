@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useUpdateBook } from '../hooks/useUpdateBook';
 import type { BookResponse } from '../../../types/book';
-import { fileService } from '../../../services/fileService';
+import { CoverImageField } from '../../../components/CoverImageField';
 
 interface BookEditModalProps {
   isOpen: boolean;
@@ -15,7 +15,6 @@ export function BookEditModal({ isOpen, onClose, book, onBookUpdated }: BookEdit
   const [description, setDescription] = useState('');
   const [coverImage, setCoverImage] = useState(''); 
   const [urlError, setUrlError] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   
   const { updateBook, isUpdating, error } = useUpdateBook();
 
@@ -60,22 +59,6 @@ export function BookEditModal({ isOpen, onClose, book, onBookUpdated }: BookEdit
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      const url = await fileService.uploadCover(file);
-      setCoverImage(url);
-      setUrlError(null);
-    } catch (err) {
-      alert("Erreur lors de l'upload de l'image.");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4">
       <div className="bg-[#1c1411] border border-amber-900/40 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl text-amber-50">
@@ -116,38 +99,14 @@ export function BookEditModal({ isOpen, onClose, book, onBookUpdated }: BookEdit
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-serif uppercase tracking-wider text-amber-200/60 mb-1">
-              Image de couverture
-            </label>
-            
-            <div className="flex gap-2 items-center">
-              <input 
-                type="url" 
-                value={coverImage}
-                onChange={(e) => {
-                  setCoverImage(e.target.value);
-                  if (urlError) setUrlError(null);
-                }}
-                placeholder="https://... ou uploadez un fichier"
-                className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 text-amber-100 placeholder-amber-200/30 focus:outline-none font-sans text-sm ${
-                  urlError ? 'border-red-500 ring-1 ring-red-500' : 'border-amber-900/40 focus:ring-1 focus:ring-amber-500'
-                }`}
-              />
-
-              <label className="bg-amber-950 hover:bg-amber-900 text-amber-200 px-4 py-2.5 rounded-xl text-xs font-medium transition cursor-pointer shrink-0 border border-amber-800/50 flex items-center gap-1">
-                {isUploading ? "Envoi..." : "Parcourir"}
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  onChange={handleFileChange}
-                  disabled={isUploading}
-                />
-              </label>
-            </div>
-            {urlError && <p className="text-red-400 text-xs mt-1 font-sans">{urlError}</p>}
-          </div>
+          <CoverImageField
+            value={coverImage}
+            onChange={(value) => {
+              setCoverImage(value);
+              if (urlError) setUrlError(null);
+            }}
+            error={urlError}
+          />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-amber-900/30">
             <button 

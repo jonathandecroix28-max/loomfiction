@@ -1,5 +1,10 @@
 import { useState } from 'react';
 import { isValidCoverUrl } from '../utils/validation';
+import { isDataImageUrl } from '../utils/imageProcessing';
+
+const URL_ERROR = "L'URL doit commencer par http:// ou https://";
+
+const isValidCover = (value: string): boolean => isDataImageUrl(value) || isValidCoverUrl(value);
 
 export function useCoverImage(initialValue: string = '') {
   const [url, setUrl] = useState(initialValue);
@@ -7,16 +12,12 @@ export function useCoverImage(initialValue: string = '') {
 
   const handleChange = (newUrl: string) => {
     setUrl(newUrl);
-    if (isValidCoverUrl(newUrl)) {
-      setError('');
-    } else {
-      setError("L'URL doit commencer par http:// ou https://");
-    }
+    setError(isValidCover(newUrl) ? '' : URL_ERROR);
   };
 
   const validate = (): boolean => {
-    if (!isValidCoverUrl(url)) {
-      setError("L'URL doit commencer par http:// ou https://");
+    if (!isValidCover(url)) {
+      setError(URL_ERROR);
       return false;
     }
     return true;
