@@ -7,6 +7,8 @@ type Props = {
   onTitlePage: (value: boolean) => void;
   chapterNumbers: boolean;
   onChapterNumbers: (value: boolean) => void;
+  spacedParagraphs: boolean;
+  onSpacedParagraphs: (value: boolean) => void;
 };
 
 export function ExportOptions({
@@ -16,6 +18,8 @@ export function ExportOptions({
   onTitlePage,
   chapterNumbers,
   onChapterNumbers,
+  spacedParagraphs,
+  onSpacedParagraphs,
 }: Props) {
   return (
     <section className={sectionClass}>
@@ -42,6 +46,15 @@ export function ExportOptions({
           onChange={(event) => onChapterNumbers(event.target.checked)}
         />
         Afficher les numéros de chapitre
+      </label>
+
+      <label className="flex items-center gap-2 text-sm text-amber-200/80 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={spacedParagraphs}
+          onChange={(event) => onSpacedParagraphs(event.target.checked)}
+        />
+        Espacer les paragraphes (sinon : retrait de première ligne)
       </label>
     </section>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { EXPORT_FORMATS, type ExportFormat } from '../services/exportService';
 import { sectionClass } from '../utils/export/ui';
 import { useExportBooks } from '../hooks/export/useExportBooks';
@@ -29,7 +29,11 @@ export function ExportPage() {
   const [format, setFormat] = useState<ExportFormat>('docx');
   const [titlePage, setTitlePage] = useState(true);
   const [chapterNumbers, setChapterNumbers] = useState(true);
-  const options = useMemo(() => ({ titlePage, chapterNumbers }), [titlePage, chapterNumbers]);
+  const [spacedParagraphs, setSpacedParagraphs] = useState(true);
+  const options = useMemo(
+    () => ({ titlePage, chapterNumbers, spacedParagraphs }),
+    [titlePage, chapterNumbers, spacedParagraphs]
+  );
   const { author, setAuthor, remember } = useStoredAuthor();
 
   useEffect(() => {
@@ -54,7 +58,19 @@ export function ExportPage() {
         ) : booksError ? (
           <div className="rounded-2xl border border-red-900/30 bg-red-950/20 p-6 text-red-200">{booksError}</div>
         ) : books.length === 0 ? (
-          /* bloc "aucun roman" inchangé */ null
+          <div className={`${sectionClass} text-center py-12 space-y-4`}>
+            <p className="text-4xl" aria-hidden>📚</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-amber-100">Aucun roman à exporter</h2>
+            <p className="text-sm text-amber-200/60 max-w-md mx-auto">
+              Crée un roman et écris au moins un chapitre : il apparaîtra ici, prêt à être exporté en Word, PDF, EPUB…
+            </p>
+            <Link
+              to="/books"
+              className="inline-block px-5 py-3 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 text-sm font-medium transition-colors shadow-md"
+            >
+              Aller à mes romans
+            </Link>
+          </div>
         ) : (
           <div className="grid gap-4 lg:gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] items-start">
             <div className="space-y-4">
@@ -65,7 +81,8 @@ export function ExportPage() {
               <FormatPicker value={format} onChange={setFormat} />
               <ExportOptions author={author} onAuthor={setAuthor}
                 titlePage={titlePage} onTitlePage={setTitlePage}
-                chapterNumbers={chapterNumbers} onChapterNumbers={setChapterNumbers} />
+                chapterNumbers={chapterNumbers} onChapterNumbers={setChapterNumbers}
+                spacedParagraphs={spacedParagraphs} onSpacedParagraphs={setSpacedParagraphs} />
               <ExportActions
                 status={bookError ? { type: 'error', text: bookError } : actions.status}
                 busy={actions.busy}
