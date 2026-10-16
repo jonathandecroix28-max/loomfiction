@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { copyBookToClipboard, exportBook, EXPORT_FORMATS, type ExportBook, type ExportFormat } from '../../services/exportService';
+import {
+  copyBookToClipboard,
+  exportBook,
+  EXPORT_FORMATS,
+  type ExportBook,
+  type ExportFormat,
+  type ExportOptions,
+} from '../../services/exportService';
 
 export type Status = { type: 'ok' | 'error'; text: string } | null;
 
@@ -9,7 +16,7 @@ type Args = {
   author: string;
   remember: () => void;
   format: ExportFormat;
-  options: { titlePage: boolean; chapterNumbers: boolean };
+  options: ExportOptions;
   canAct: boolean;
 };
 

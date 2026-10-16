@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { buildPreviewDocument, type ExportBook } from '../../services/exportService';
+import { buildPreviewDocument, type ExportBook, type ExportOptions } from '../../services/exportService';
 import { stepScale } from '../../utils/export/text';
 import { useDebouncedValue } from './useDebouncedValue';
 
@@ -9,7 +9,7 @@ type Args = {
   book: ExportBook | null;
   chapters: ExportBook['chapters'];
   author: string;
-  options: { titlePage: boolean; chapterNumbers: boolean };
+  options: ExportOptions;
 };
 
 export function useExportPreview({ book, chapters, author, options }: Args) {
