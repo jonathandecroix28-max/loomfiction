@@ -8,7 +8,14 @@ export type ExportFormat = 'docx' | 'pdf' | 'epub' | 'md' | 'html' | 'txt';
 
 export type ExportChapter = { number: number; title: string; content: string };
 export type ExportBook = { title: string; author?: string; chapters: ExportChapter[] };
-export type ExportOptions = { titlePage: boolean; chapterNumbers: boolean };
+export type ExportOptions = {
+  titlePage: boolean;
+  chapterNumbers: boolean;
+  /** true (défaut) : paragraphes espacés ; false : retrait de première ligne, façon livre imprimé. */
+  spacedParagraphs?: boolean;
+};
+
+const isSpaced = (options: ExportOptions): boolean => options.spacedParagraphs ?? true;
 export type ExportProgress = (done: number, total: number) => void;
 export type PreviewView = { fontScale?: number; dark?: boolean };
 
@@ -66,50 +73,26 @@ export const EXPORT_FORMATS: {
 /* ───────────────────────── Chargement des données ───────────────────────── */
 
 export async function loadBookForExport(bookId: number, author?: string): Promise<ExportBook> {
-  const bookService: any = offlineBookService;
-  const chapterService: any = offlineChapterService;
-
-  const book = await bookService.getById(bookId);
-
-  const rawChapters: any[] =
-    typeof chapterService.getByBookId === 'function'
-      ? await chapterService.getByBookId(bookId)
-      : await chapterService.getAll();
-
-  const ofThisBook = rawChapters
-    .filter((chapter) => Number(chapter.book_id ?? chapter.bookId) === bookId)
-    .sort(
-      (a, b) =>
-        Number(a.chapter_number ?? a.chapterNumber ?? 0) - Number(b.chapter_number ?? b.chapterNumber ?? 0)
-    );
-
-  const chapters: ExportChapter[] = await Promise.all(
-    ofThisBook.map(async (chapter) => {
-      // Certaines listes ne renvoient pas le contenu : on le récupère à la demande
-      const full = typeof chapter.content === 'string' ? chapter : await chapterService.getById(chapter.id);
-      const number = Number(chapter.chapter_number ?? chapter.chapterNumber ?? 0);
-      return {
-        number,
-        title: full.title ?? full.name ?? `Chapitre ${number}`,
-        content: full.content ?? '',
-      };
-    })
-  );
+  const book = await offlineBookService.getById(bookId);
+  const chapters = await offlineChapterService.getByBookId(bookId);
 
   return {
-    title: book?.title ?? book?.name ?? 'Sans titre',
+    title: book.title || 'Sans titre',
     author,
-    chapters,
+    chapters: chapters.map((chapter) => ({
+      number: Number(chapter.chapter_number),
+      title: chapter.title || `Chapitre ${chapter.chapter_number}`,
+      content: chapter.content ?? '',
+    })),
   };
 }
 
 /** Liste des romans disponibles pour l'export (id + titre). */
 export async function loadBooksForExport(): Promise<{ id: number; title: string }[]> {
-  const bookService: any = offlineBookService;
-  const books: any[] = await bookService.getAll();
+  const books = await offlineBookService.getAll();
   return books.map((book) => ({
     id: Number(book.id),
-    title: book.title ?? book.name ?? `Roman #${book.id}`,
+    title: book.title || `Roman #${book.id}`,
   }));
 }
 
@@ -125,9 +108,11 @@ function escapeHtml(text: string): string {
 }
 
 // XML : on retire aussi les caractères de contrôle interdits (sinon Word refuse d'ouvrir le fichier)
+const XML_INVALID_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
+
 function escapeXml(text: string): string {
   return text
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+    .replace(XML_INVALID_CHARS, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -180,10 +165,15 @@ function remember<T>(cache: Map<string, T>, key: string, compute: () => T): T {
 }
 
 // HTML nettoyé (le contenu vient de l'éditeur, on ne lui fait jamais confiance aveuglément)
+// L'éditeur écrit une ligne blanche <p></p> : sans hauteur, elle disparaît à l'export. On lui donne une ligne.
+const BLANK_PARAGRAPH = /<p(?:\s[^>]*)?>(?:\s|&nbsp;|<br(?:\s[^>]*)?\/?>)*<\/p>/gi;
+
 function normalizeContent(raw: string): string {
   return remember(htmlCache, raw || '', () => {
     const text = raw || '';
-    if (looksLikeHtml(text)) return DOMPurify.sanitize(text);
+    if (looksLikeHtml(text)) {
+      return DOMPurify.sanitize(text).replace(BLANK_PARAGRAPH, '<p class="blank"><br /></p>');
+    }
 
     return text
       .split(/\n{2,}/)
@@ -385,12 +375,24 @@ h1 { font-size: 28pt; text-align: center; margin: 0 0 0.4em; }
 .chapter header { text-align: center; margin: 2em 0 1.5em; }
 .kicker { text-transform: uppercase; letter-spacing: 0.2em; font-size: 9pt; color: #666; margin: 0 0 0.4em; }
 h2 { font-size: 20pt; margin: 0; }
-.chapter p { margin: 0; text-indent: 1.4em; text-align: justify; }
-.chapter header + p, .chapter hr + p { text-indent: 0; }
 .chapter hr { border: 0; text-align: center; margin: 1.2em 0; }
 .chapter hr::after { content: '* * *'; color: #666; }
 blockquote { margin: 1em 2em; font-style: italic; }
 `;
+
+// Mise en forme des paragraphes : espacés (défaut) ou avec retrait de première ligne
+function paragraphCss(options: ExportOptions): string {
+  const common = `
+.chapter p:not(.kicker) { orphans: 3; widows: 3; text-align: justify; }
+.chapter p.blank { margin: 0; text-indent: 0; }
+.chapter li > p, .chapter blockquote p { margin: 0; text-indent: 0; }
+.chapter h2 { break-after: avoid; page-break-after: avoid; }`;
+  return isSpaced(options)
+    ? `${common}\n.chapter p:not(.kicker):not(.blank) { margin: 0 0 0.8em; text-indent: 0; }`
+    : `${common}\n.chapter p:not(.kicker):not(.blank) { margin: 0; text-indent: 1.4em; }\n.chapter header + p, .chapter hr + p, .chapter p.blank + p { text-indent: 0; }`;
+}
+
+const bookCss = (options: ExportOptions): string => `${BOOK_CSS}${paragraphCss(options)}\n`;
 
 function titlePageHtml(book: ExportBook): string {
   return `<section class="title-page"><h1>${escapeHtml(book.title)}</h1>${
@@ -417,14 +419,16 @@ function bookBodyHtml(book: ExportBook, options: ExportOptions): string {
 function buildPrintableDocument(book: ExportBook, options: ExportOptions): string {
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${escapeHtml(
     book.title
-  )}</title><style>@page { margin: 2.5cm; } ${BOOK_CSS}</style></head><body>${bookBodyHtml(book, options)}</body></html>`;
+  )}</title><style>@page { margin: 2.5cm; } ${bookCss(options)}</style></head><body>${bookBodyHtml(book, options)}</body></html>`;
 }
 
 function printHtml(html: string, title: string): Promise<void> {
   return new Promise((resolve) => {
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    // Cadre de la taille d'une page A4, simplement hors écran : un cadre 0×0 masqué est mal mis en page
+    // (voire tronqué) par certains navigateurs à l'impression.
+    iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;height:297mm;border:0;pointer-events:none';
     document.body.appendChild(iframe);
 
     const previousTitle = document.title;
@@ -433,12 +437,19 @@ function printHtml(html: string, title: string): Promise<void> {
       iframe.remove();
     };
 
-    iframe.onload = () => {
+    iframe.onload = async () => {
       const win = iframe.contentWindow;
       if (!win) {
         cleanup();
         resolve();
         return;
+      }
+
+      // On attend les polices : sinon la pagination est calculée avec une police de secours
+      try {
+        await win.document.fonts?.ready;
+      } catch {
+        /* polices indisponibles : on imprime quand même */
       }
 
       // Le titre de la page sert souvent de nom de fichier suggéré pour le PDF
@@ -475,7 +486,7 @@ function buildHtmlFile(book: ExportBook, options: ExportOptions): Blob {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(book.title)}</title>${book.author ? `\n<meta name="author" content="${escapeHtml(book.author)}">` : ''}
-<style>${BOOK_CSS}
+<style>${bookCss(options)}
 body { max-width: 40rem; margin: 0 auto; padding: 2rem 1.25rem 4rem; font-size: 1.1rem; }
 .title-page { padding: 4rem 0; }
 .chapter { page-break-before: auto; break-before: auto; margin-top: 4rem; }
@@ -600,7 +611,7 @@ async function buildEpub(book: ExportBook, options: ExportOptions, onProgress?: 
   <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
 </container>`
   );
-  zip.file('OEBPS/style.css', BOOK_CSS);
+  zip.file('OEBPS/style.css', bookCss(options));
 
   const pages: { id: string; href: string; title: string }[] = [];
 
@@ -727,6 +738,15 @@ const DOCX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:ind w:left="720" w:right="720" w:firstLine="0"/></w:pPr><w:rPr><w:i/></w:rPr></w:style>
 <w:style w:type="paragraph" w:customStyle="1" w:styleId="ListPara"><w:name w:val="List Item"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:ind w:left="720" w:hanging="360"/><w:jc w:val="left"/></w:pPr></w:style>
 </w:styles>`;
+
+// Paragraphes espacés : espace après chaque paragraphe et pas de retrait de première ligne
+const docxStyles = (options: ExportOptions): string =>
+  isSpaced(options)
+    ? DOCX_STYLES.replace(
+        '<w:name w:val="Normal"/><w:qFormat/><w:pPr><w:ind w:firstLine="567"/><w:jc w:val="both"/></w:pPr>',
+        '<w:name w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="160"/><w:ind w:firstLine="0"/><w:jc w:val="both"/></w:pPr>'
+      )
+    : DOCX_STYLES;
 
 const DOCX_FOOTER = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:ftr xmlns:w="${W_NS}" xmlns:r="${R_NS}"><w:p><w:pPr><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>`;
@@ -930,7 +950,7 @@ async function buildDocx(book: ExportBook, options: ExportOptions, onProgress?: 
   zip.file('[Content_Types].xml', DOCX_CONTENT_TYPES);
   zip.file('_rels/.rels', DOCX_ROOT_RELS);
   zip.file('word/_rels/document.xml.rels', DOCX_DOC_RELS);
-  zip.file('word/styles.xml', DOCX_STYLES);
+  zip.file('word/styles.xml', docxStyles(options));
   zip.file('word/footer1.xml', DOCX_FOOTER);
   zip.file(
     'word/document.xml',
@@ -955,10 +975,6 @@ async function buildDocx(book: ExportBook, options: ExportOptions, onProgress?: 
 
 /* ───────────────────────── Aperçu à l'écran ───────────────────────── */
 
-/**
- * Document HTML complet pour l'aperçu (à afficher dans une iframe isolée).
- * fontScale : taille du texte (1 = normal). dark : papier sombre pour lire le soir.
- */
 export function buildPreviewDocument(book: ExportBook, options: ExportOptions, view: PreviewView = {}): string {
   const scale = view.fontScale ?? 1;
   const dark = view.dark ?? false;
@@ -966,7 +982,7 @@ export function buildPreviewDocument(book: ExportBook, options: ExportOptions, v
     ? '--bg:#120d0a;--paper:#241a15;--ink:#f1e6d3;--muted:#a8987f;--rule:#4a3a2e;--shadow:0 2px 12px rgba(0,0,0,.6)'
     : '--bg:#e7e0d2;--paper:#fff;--ink:#1b1b1b;--muted:#666;--rule:#ccc;--shadow:0 2px 12px rgba(0,0,0,.25)';
 
-  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${BOOK_CSS}
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${bookCss(options)}
 :root { ${palette}; }
 html { background: var(--bg); -webkit-text-size-adjust: 100%; }
 body { font-size: ${(16 * scale).toFixed(1)}px; line-height: 1.7; color: var(--ink); background: var(--paper); max-width: 42rem; margin: 1rem auto; padding: 2.5rem 2rem; box-shadow: var(--shadow); hyphens: auto; -webkit-hyphens: auto; overflow-wrap: break-word; }
