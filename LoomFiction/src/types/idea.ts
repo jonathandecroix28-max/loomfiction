@@ -6,6 +6,8 @@ export interface IdeaResponse {
     description?: string;
     bookId: number | null;
     categoryId: number;
+    sheetId?: number | null; 
+    sortOrder?: number;     
     status?: IdeaStatus;
     createdAt: string;
     updatedAt: string;
@@ -16,5 +18,7 @@ export interface IdeaUpsertRequest {
     description?: string;
     bookId: number | null;
     categoryId: number;
+    sheetId?: number | null;
+    sortOrder?: number;
     status?: IdeaStatus;
 }

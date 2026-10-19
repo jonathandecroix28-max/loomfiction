@@ -2,6 +2,7 @@ export interface CategoryResponse {
     id: number;
     name: string;
     color?: string;
+    template?: string[];
     createdAt: string;
     updatedAt: string;
 }
@@ -9,4 +10,5 @@ export interface CategoryResponse {
 export interface CategoryUpsertRequest {
     name: string;
     color?: string;
+    template?: string[];
 }
