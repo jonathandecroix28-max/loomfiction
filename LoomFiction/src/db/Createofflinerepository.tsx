@@ -53,7 +53,8 @@ export type StoreName =
   | 'chapterVersions'
   | 'ideas'
   | 'ideaVersions'
-  | 'categories';
+  | 'categories'
+  | 'sheets';
 
 export interface RepositoryConfig<T extends { id: number }, P> {
   entity: Entity;
@@ -290,7 +291,6 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
 
     const d = await db();
 
-    // 1. suppressions en attente
     for (const op of await getOps(cfg.entity, 'delete')) {
       try {
         await net(() => cfg.remote.delete(op.entityId));
@@ -302,7 +302,6 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
       }
     }
 
-    // 2. mises à jour en attente
     for (const op of await getOps(cfg.entity, 'update')) {
       const local: T | undefined = await d.get(cfg.store, op.entityId);
       if (!local) {
@@ -321,7 +320,6 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
       }
     }
 
-    // 3. créations en attente (ids temporaires)
     const pendingIds: number[] = (await d.getAll(cfg.store))
       .filter((r: T) => isTempId(r.id))
       .map((r: T) => r.id);

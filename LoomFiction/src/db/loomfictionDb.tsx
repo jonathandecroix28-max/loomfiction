@@ -8,6 +8,7 @@ import type { BookResponse } from '../types/book';
 import type { ChapterResponse } from '../types/chapter';
 import type { IdeaResponse } from '../types/idea';
 import type { CategoryResponse } from '../types/category';
+import type { SheetResponse } from '../types/sheet';
 import type { ChapterVersionResponse } from '../types/chapterVersion';
 import type { IdeaVersionResponse } from '../types/ideaVersion';
 
@@ -33,7 +34,14 @@ export function newTempId(): number {
 /*  Schéma                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export type Entity = 'book' | 'chapter' | 'idea' | 'category' | 'chapterVersion' | 'ideaVersion';
+export type Entity =
+  | 'book'
+  | 'chapter'
+  | 'idea'
+  | 'category'
+  | 'sheet'
+  | 'chapterVersion'
+  | 'ideaVersion';
 
 export interface OutboxOp {
   key?: number; // autoIncrement
@@ -54,7 +62,7 @@ interface LoomFictionDB extends DBSchema {
   ideas: {
     key: number;
     value: IdeaResponse;
-    indexes: { by_book: number; by_category: number };
+    indexes: { by_book: number; by_category: number; by_sheet: number };
   };
   ideaVersions: {
     key: number;
@@ -62,10 +70,20 @@ interface LoomFictionDB extends DBSchema {
     indexes: { by_idea: number };
   };
   categories: { key: number; value: CategoryResponse };
+  sheets: { key: number; value: SheetResponse; indexes: { by_category: number } };
   outbox: { key: number; value: OutboxOp; indexes: { by_entity: Entity } };
 }
 
-const ALL_STORES = ['books', 'chapters', 'chapterVersions', 'ideas', 'ideaVersions', 'categories', 'outbox'] as const;
+const ALL_STORES = [
+  'books',
+  'chapters',
+  'chapterVersions',
+  'ideas',
+  'ideaVersions',
+  'categories',
+  'sheets',
+  'outbox',
+] as const;
 export type RwTx = IDBPTransaction<LoomFictionDB, typeof ALL_STORES, 'readwrite'>;
 
 let dbPromise: Promise<IDBPDatabase<LoomFictionDB>> | null = null;
@@ -73,8 +91,8 @@ let dbPromise: Promise<IDBPDatabase<LoomFictionDB>> | null = null;
 export function getDb(): Promise<IDBPDatabase<LoomFictionDB>> {
   if (!dbPromise) {
     dbPromise = (async () => {
-      const db = await openDB<LoomFictionDB>('LoomFiction', 2, {
-        upgrade(db) {
+      const db = await openDB<LoomFictionDB>('LoomFiction', 3, {
+        upgrade(db, _oldVersion, _newVersion, transaction) {
           if (!db.objectStoreNames.contains('books')) {
             db.createObjectStore('books', { keyPath: 'id' });
           }
@@ -110,6 +128,17 @@ export function getDb(): Promise<IDBPDatabase<LoomFictionDB>> {
               autoIncrement: true,
             });
             outbox.createIndex('by_entity', 'entity');
+          }
+
+          // v3 : fiches (store `sheets` + index `by_sheet` sur les idées)
+          if (!db.objectStoreNames.contains('sheets')) {
+            const sheets = db.createObjectStore('sheets', { keyPath: 'id' });
+            sheets.createIndex('by_category', 'categoryId');
+          }
+
+          const ideasStore = transaction.objectStore('ideas');
+          if (!ideasStore.indexNames.contains('by_sheet')) {
+            ideasStore.createIndex('by_sheet', 'sheetId');
           }
         },
 
@@ -321,6 +350,17 @@ export async function remapCategoryId(tx: RwTx, from: number, to: number): Promi
   for (const i of await ideas.index('by_category').getAll(from)) {
     await ideas.put({ ...i, categoryId: to });
   }
+  const sheets = tx.objectStore('sheets');
+  for (const s of await sheets.index('by_category').getAll(from)) {
+    await sheets.put({ ...s, categoryId: to });
+  }
+}
+
+export async function remapSheetId(tx: RwTx, from: number, to: number): Promise<void> {
+  const ideas = tx.objectStore('ideas');
+  for (const i of await ideas.index('by_sheet').getAll(from)) {
+    await ideas.put({ ...i, sheetId: to });
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -334,6 +374,7 @@ const ENTITY_STORE = {
   idea: 'ideas',
   ideaVersion: 'ideaVersions',
   category: 'categories',
+  sheet: 'sheets',
 } as const;
 
 interface AnyStore<T> {
