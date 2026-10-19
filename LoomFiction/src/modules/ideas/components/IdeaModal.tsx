@@ -24,17 +24,17 @@ interface IdeaModalProps {
 
 const templates = {
   personnage: {
-    label: "👤 Personnage",
-    text: "Nom:\nÂge:\nObjectif:\nSecret:\nApparence:\nTraits de caractère:\n"
+    label: '👤 Personnage',
+    text: 'Nom:\nÂge:\nObjectif:\nSecret:\nApparence:\nTraits de caractère:\n',
   },
   intrigue: {
-    label: "⚡ Rebondissement",
-    text: "Situation initiale:\nL'élément perturbateur:\nAction(s) entreprise(s):\nConséquence:\n"
+    label: '⚡ Rebondissement',
+    text: "Situation initiale:\nL'élément perturbateur:\nAction(s) entreprise(s):\nConséquence:\n",
   },
   univers: {
-    label: "🌍 Lieu / Lore",
-    text: "Nom du lieu:\nAtmosphère/Ambiance:\nParticularité/Règle magique:\nDanger potentiel:\n"
-  }
+    label: '🌍 Lieu / Lore',
+    text: 'Nom du lieu:\nAtmosphère/Ambiance:\nParticularité/Règle magique:\nDanger potentiel:\n',
+  },
 };
 
 export function IdeaModal({
@@ -50,10 +50,10 @@ export function IdeaModal({
 }: IdeaModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState<number>(0); 
+  const [categoryId, setCategoryId] = useState<number>(0);
   const [status, setStatus] = useState<IdeaStatus>('draft');
   const [selectedBookId, setSelectedBookId] = useState<number>(bookId || 0);
-  
+
   const [books, setBooks] = useState<BookResponse[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [isListening, setIsListening] = useState(false);
@@ -62,20 +62,23 @@ export function IdeaModal({
   const { updateIdea, isUpdating } = useUpdateIdea();
 
   // Une carte de fiche garde la catégorie de sa fiche
-  const categoryLocked = lockedCategoryId != null || ideaToEdit?.sheetId != null;
+  const categoryLocked =
+    lockedCategoryId != null || ideaToEdit?.sheetId != null;
   const isCard = !!sheetId || ideaToEdit?.sheetId != null;
 
   useEffect(() => {
     if (isOpen) {
       Promise.all([
         offlineBookService.getAll().catch(() => []),
-        offlineCategoryService.getAll().catch(() => [])
+        offlineCategoryService.getAll().catch(() => []),
       ]).then(([booksData, catsData]) => {
         setBooks(booksData || []);
         setCategories(catsData || []);
 
         if (catsData && catsData.length > 0 && categoryId === 0 && !ideaToEdit) {
-          setCategoryId(lockedCategoryId ?? defaultCategoryId ?? catsData[0].id);
+          setCategoryId(
+            lockedCategoryId ?? defaultCategoryId ?? catsData[0].id,
+          );
         }
       });
     }
@@ -93,17 +96,30 @@ export function IdeaModal({
       setDescription('');
       setStatus('draft');
       setSelectedBookId(bookId || 0);
-      const fallback = lockedCategoryId ?? defaultCategoryId ?? categories[0]?.id;
+
+      const fallback =
+        lockedCategoryId ?? defaultCategoryId ?? categories[0]?.id;
+
       if (fallback) {
         setCategoryId(fallback);
       }
     }
-  }, [ideaToEdit, isOpen, bookId, categories, lockedCategoryId, defaultCategoryId]);
+  }, [
+    ideaToEdit,
+    isOpen,
+    bookId,
+    categories,
+    lockedCategoryId,
+    defaultCategoryId,
+  ]);
 
   if (!isOpen) return null;
 
   const handleVoiceDictation = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
     if (!SpeechRecognition) {
       alert("La dictée vocale n'est pas supportée par votre navigateur.");
       return;
@@ -115,10 +131,12 @@ export function IdeaModal({
 
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
-    
+
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
-      setDescription((prev) => (prev ? prev + ' ' + transcript : transcript));
+      setDescription((prev) =>
+        prev ? `${prev} ${transcript}` : transcript,
+      );
     };
 
     recognition.start();
@@ -126,22 +144,27 @@ export function IdeaModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!name.trim()) return;
 
     if (!categoryId || categoryId === 0) {
-      alert("Veuillez sélectionner une catégorie valide.");
+      alert('Veuillez sélectionner une catégorie valide.');
       return;
     }
 
-    const targetBookId = (bookId && bookId !== 0) ? bookId : selectedBookId;
+    const targetBookId =
+      bookId && bookId !== 0 ? bookId : selectedBookId;
 
     const data: IdeaUpsertRequest = {
       name,
       description,
-      bookId: targetBookId && targetBookId !== 0 ? Number(targetBookId) : null,
+      bookId:
+        targetBookId && targetBookId !== 0
+          ? Number(targetBookId)
+          : null,
       categoryId: Number(categoryId),
       status,
-      // À la création seulement : une modification laisse la fiche et l'ordre inchangés
+
       ...(ideaToEdit ? {} : { sheetId: sheetId ?? undefined, sortOrder }),
     };
 
@@ -162,53 +185,66 @@ export function IdeaModal({
   };
 
   const isLoading = isCreating || isUpdating;
-  const lockedCategoryName = categories.find((cat) => cat.id === categoryId)?.name;
+  const lockedCategoryName = categories.find(
+    (cat) => cat.id === categoryId,
+  )?.name;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex justify-center items-center z-50 p-4 overflow-y-auto">
-      <div className="bg-[#1c1411] border border-amber-900/40 rounded-3xl p-8 max-w-lg w-full shadow-2xl my-8 text-amber-50">
-        <h2 className="text-2xl font-serif font-bold text-amber-100 mb-6">
-          {ideaToEdit ? "Modifier la note" : isCard ? "Nouvelle caractéristique" : "Nouvelle idée de grimoire"}
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-2 backdrop-blur-xs sm:items-center sm:p-4">
+      <div className="my-2 max-h-[calc(100dvh-1rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-amber-900/40 bg-[#1c1411] p-4 text-amber-50 shadow-2xl sm:my-8 sm:max-h-[calc(100dvh-4rem)] sm:rounded-3xl sm:p-8">
+        <h2 className="mb-6 font-serif text-2xl font-bold text-amber-100">
+          {ideaToEdit
+            ? 'Modifier la note'
+            : isCard
+              ? 'Nouvelle caractéristique'
+              : 'Nouvelle idée de grimoire'}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-5 font-sans">
           {(!bookId || bookId === 0) && (
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/60 mb-2">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-amber-200/60">
                 Roman associé (optionnel)
               </label>
+
               <select
                 value={selectedBookId}
                 onChange={(e) => setSelectedBookId(Number(e.target.value))}
-                className="w-full bg-neutral-900 border border-amber-900/40 rounded-xl px-4 py-3 text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-serif"
+                className="w-full rounded-xl border border-amber-900/40 bg-neutral-900 px-4 py-3 font-serif text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
               >
                 <option value={0}>-- Aucun roman associé (Global) --</option>
                 {books.map((book) => (
-                  <option key={book.id} value={book.id}>{book.title}</option>
+                  <option key={book.id} value={book.id}>
+                    {book.title}
+                  </option>
                 ))}
               </select>
             </div>
           )}
 
-          {/* Sélecteur de Catégorie Globale (figé pour les cartes d'une fiche) */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/60 mb-2">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-amber-200/60">
               Type de note / Catégorie
             </label>
+
             {categoryLocked ? (
-              <div className="w-full bg-neutral-900/60 border border-amber-900/30 rounded-xl px-4 py-3 text-amber-100/80 font-serif text-sm">
+              <div className="w-full rounded-xl border border-amber-900/30 bg-neutral-900/60 px-4 py-3 font-serif text-sm text-amber-100/80">
                 {lockedCategoryName ?? '—'}
-                <span className="ml-2 text-xs text-amber-200/40">(catégorie de la fiche)</span>
+                <span className="ml-2 text-xs text-amber-200/40">
+                  (catégorie de la fiche)
+                </span>
               </div>
             ) : (
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(Number(e.target.value))}
                 required
-                className="w-full bg-neutral-900 border border-amber-900/40 rounded-xl px-4 py-3 text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-serif text-sm cursor-pointer"
+                className="w-full cursor-pointer rounded-xl border border-amber-900/40 bg-neutral-900 px-4 py-3 font-serif text-sm text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
               >
                 {categories.length === 0 ? (
-                  <option value={0} disabled>-- Aucune catégorie disponible --</option>
+                  <option value={0} disabled>
+                    -- Aucune catégorie disponible --
+                  </option>
                 ) : (
                   categories.map((cat) => (
                     <option key={cat.id} value={cat.id}>
@@ -221,68 +257,98 @@ export function IdeaModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/60 mb-2">
-              {isCard ? "Titre de la caractéristique" : "Titre de l'idée"}
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-amber-200/60">
+              {isCard ? 'Titre de la caractéristique' : "Titre de l'idée"}
             </label>
-            <input 
+
+            <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={isCard ? "Ex: Apparence, Passé, Motivation..." : "Ex: Le secret du grimoire maudit..."}
+              placeholder={
+                isCard
+                  ? 'Ex: Apparence, Passé, Motivation...'
+                  : 'Ex: Le secret du grimoire maudit...'
+              }
               required
-              className="w-full bg-neutral-900 border border-amber-900/40 rounded-xl px-4 py-3 text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-serif"
+              className="w-full rounded-xl border border-amber-900/40 bg-neutral-900 px-4 py-3 font-serif text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>
 
           <div>
-            <div className="flex justify-between items-center mb-2">
+            <div className="mb-2 flex items-center justify-between gap-2">
               <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/60">
                 Description / Notes
               </label>
-              
-              <div className="flex gap-2">
+
+              <div className="flex shrink-0 gap-2">
                 <select
+                  defaultValue=""
+                  aria-label="Ajouter un modèle"
                   onChange={(e) => {
                     const val = e.target.value as keyof typeof templates;
-                    if (val) setDescription((prev) => (prev ? `${prev}\n\n${templates[val].text}` : templates[val].text));
+
+                    if (val) {
+                      setDescription((prev) =>
+                        prev
+                          ? `${prev}\n\n${templates[val].text}`
+                          : templates[val].text,
+                      );
+                    }
+
+                    e.target.value = '';
                   }}
-                  className="bg-amber-950/80 text-amber-200 text-[10px] font-medium px-2 py-1.5 rounded-lg border border-amber-800/50 cursor-pointer hover:bg-amber-900"
+                  className="cursor-pointer rounded-lg border border-amber-800/50 bg-amber-950/80 px-2 py-1.5 text-[10px] font-medium text-amber-200 hover:bg-amber-900"
                 >
                   <option value="">+ Modèle</option>
-                  {Object.entries(templates).map(([key, t]) => (
-                    <option key={key} value={key}>{t.label}</option>
+                  {Object.entries(templates).map(([key, template]) => (
+                    <option key={key} value={key}>
+                      {template.label}
+                    </option>
                   ))}
                 </select>
 
                 <button
                   type="button"
                   onClick={handleVoiceDictation}
-                  className={`p-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1.5 px-3 text-xs font-medium ${isListening ? 'bg-red-950 text-red-300 animate-pulse border border-red-800' : 'bg-amber-950 text-amber-200 border border-amber-800/50 hover:bg-amber-900'}`}
+                  className={`flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                    isListening
+                      ? 'animate-pulse border-red-800 bg-red-950 text-red-300'
+                      : 'border-amber-800/50 bg-amber-950 text-amber-200 hover:bg-amber-900'
+                  }`}
                   title="Dicter votre idée par la voix"
+                  aria-label={
+                    isListening ? 'Arrêter la dictée' : 'Dicter votre idée'
+                  }
                 >
-                  <span>🎙️</span>
-                  <span>{isListening ? "Écoute..." : "Dicter"}</span>
+                  <span aria-hidden="true">🎙️</span>
+                  <span>{isListening ? 'Écoute...' : 'Dicter'}</span>
                 </button>
               </div>
             </div>
-            
-            <textarea 
+
+            <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={isListening ? "Je vous écoute..." : "Détails de l'idée, texte long..."}
+              placeholder={
+                isListening
+                  ? 'Je vous écoute...'
+                  : "Détails de l'idée, texte long..."
+              }
               rows={5}
-              className="w-full bg-neutral-900 border border-amber-900/40 rounded-xl px-4 py-3 text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-serif resize-none leading-relaxed"
+              className="w-full resize-y rounded-xl border border-amber-900/40 bg-neutral-900 px-4 py-3 font-serif leading-relaxed text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/60 mb-2">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-amber-200/60">
               Statut
             </label>
+
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as IdeaStatus)}
-              className="w-full bg-neutral-900 border border-amber-900/40 rounded-xl px-3 py-2.5 text-amber-100 focus:outline-none font-serif text-sm"
+              className="w-full rounded-xl border border-amber-900/40 bg-neutral-900 px-3 py-3 font-serif text-sm text-amber-100 focus:outline-none"
             >
               <option value="draft">💡 Brute</option>
               <option value="in-progress">🛠️ En cours</option>
@@ -290,21 +356,26 @@ export function IdeaModal({
             </select>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-amber-900/30">
+          <div className="flex flex-col-reverse gap-2 border-t border-amber-900/30 pt-4 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="px-5 py-2.5 rounded-xl text-amber-200/70 hover:bg-neutral-900 transition text-sm font-medium cursor-pointer"
+              className="min-h-11 w-full cursor-pointer justify-center rounded-xl px-5 py-2.5 text-sm font-medium text-amber-200/70 transition hover:bg-neutral-900 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               Annuler
             </button>
+
             <button
               type="submit"
               disabled={isLoading}
-              className="px-6 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 text-sm font-medium transition shadow-md cursor-pointer disabled:opacity-50"
+              className="min-h-11 w-full cursor-pointer justify-center rounded-xl bg-amber-700 px-6 py-2.5 text-sm font-medium text-amber-50 shadow-md transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
-              {isLoading ? "Enregistrement..." : (ideaToEdit ? "Mettre à jour" : "Créer la note")}
+              {isLoading
+                ? 'Enregistrement...'
+                : ideaToEdit
+                  ? 'Mettre à jour'
+                  : 'Créer la note'}
             </button>
           </div>
         </form>

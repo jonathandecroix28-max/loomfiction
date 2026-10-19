@@ -1,4 +1,5 @@
 
+import { useEffect, useState } from 'react';
 import type { IdeaResponse } from '../../../types/idea';
 
 interface SheetCardItemProps {
@@ -9,6 +10,10 @@ interface SheetCardItemProps {
   onEdit: (card: IdeaResponse) => void;
   onVersions: (card: IdeaResponse) => void;
   onDelete: (card: IdeaResponse) => void;
+  onSaveDescription: (
+    card: IdeaResponse,
+    description: string,
+  ) => Promise<boolean>;
 }
 
 const btn =
@@ -22,8 +27,37 @@ export function SheetCardItem({
   onEdit,
   onVersions,
   onDelete,
+  onSaveDescription,
 }: SheetCardItemProps) {
-  const hasText = !!card.description?.trim();
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [draftDescription, setDraftDescription] = useState(card.description || '');
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
+
+  useEffect(() => {
+    setDraftDescription(card.description || '');
+  }, [card.description]);
+
+  const startEditing = () => {
+    setDraftDescription(card.description || '');
+    setIsEditingDescription(true);
+  };
+
+  const cancelEditing = () => {
+    setDraftDescription(card.description || '');
+    setIsEditingDescription(false);
+  };
+
+  const saveDescription = async () => {
+    if (isSavingDescription) return;
+
+    setIsSavingDescription(true);
+    try {
+      const saved = await onSaveDescription(card, draftDescription);
+      if (saved) setIsEditingDescription(false);
+    } finally {
+      setIsSavingDescription(false);
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-amber-900/25 bg-neutral-950/70 p-4 shadow-xl sm:p-5">
@@ -88,16 +122,68 @@ export function SheetCardItem({
       </div>
 
       <div className="mt-3 border-t border-amber-900/20 pt-3">
-        {hasText ? (
-          <div className="whitespace-pre-wrap break-words leading-relaxed text-amber-200/80">
-            {card.description}
+        {isEditingDescription ? (
+          <div className="space-y-3">
+            <textarea
+              autoFocus
+              value={draftDescription}
+              onChange={(event) => setDraftDescription(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  cancelEditing();
+                }
+                if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                  event.preventDefault();
+                  void saveDescription();
+                }
+              }}
+              aria-label={`Modifier la description de ${card.name}`}
+              placeholder="Écrire la description..."
+              rows={5}
+              className="min-h-32 w-full resize-y rounded-xl border border-amber-800/50 bg-neutral-900 px-3 py-3 font-sans text-sm leading-relaxed text-amber-100 outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600"
+            />
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={cancelEditing}
+                disabled={isSavingDescription}
+                className="min-h-10 cursor-pointer rounded-lg border border-amber-900/30 px-4 py-2 text-sm text-amber-200/80 hover:bg-neutral-900 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void saveDescription()}
+                disabled={isSavingDescription}
+                className="min-h-10 cursor-pointer rounded-lg border border-amber-700 bg-amber-800 px-4 py-2 text-sm font-medium text-amber-50 hover:bg-amber-700 disabled:cursor-wait disabled:opacity-50"
+              >
+                {isSavingDescription ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
+            </div>
+
+            <p className="text-xs text-amber-200/40">
+              Astuce : Ctrl + Entrée pour enregistrer, Échap pour annuler.
+            </p>
           </div>
         ) : (
           <button
-            onClick={() => onEdit(card)}
-            className="min-h-10 cursor-pointer italic text-amber-200/50 hover:text-amber-200/80"
+            type="button"
+            onClick={startEditing}
+            aria-label={`Toucher pour modifier la description de ${card.name}`}
+            className="block min-h-10 w-full cursor-text rounded-lg text-left transition hover:bg-amber-950/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-700"
           >
-            À compléter… (toucher pour écrire)
+            {card.description?.trim() ? (
+              <span className="block whitespace-pre-wrap break-words py-1 leading-relaxed text-amber-200/80">
+                {card.description}
+              </span>
+            ) : (
+              <span className="block py-1 italic text-amber-200/50">
+                À compléter… (toucher pour écrire)
+              </span>
+            )}
           </button>
         )}
       </div>
