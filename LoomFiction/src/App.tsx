@@ -10,6 +10,8 @@ import { NotFound } from './pages/404';
 import { IdeasPage } from './modules/ideas/pages/IdeasPage';
 import { IdeaVersionsPage } from './modules/ideas/pages/IdeaVersionsPage';
 import VersionsHubPage from './pages/VersionsHubPage';
+//import { ImportPage } from './pages/ImportPage';
+import { SheetPage } from './modules/sheets/pages/SheetPage';
 // import DonatePage from './pages/DonatePage';
 import ExportPage from './pages/ExportPage';
 //import { TermsPage } from './pages/TermsPage';
@@ -44,6 +46,8 @@ function AppContent() {
           <Route path="/ideas/:ideaId/versions" element={<IdeaVersionsPage />} />
           <Route path="/ideas/:ideaId/versions/:versionId" element={<IdeaVersionsPage />} />
           <Route path="/export" element={<ExportPage />} />
+          {/* <Route path="/import" element={<ImportPage />} /> */}
+          <Route path="/ideas/fiches/:sheetId" element={<SheetPage />} />
           {/* <Route path="/terms" element={<TermsPage />} /> */}
           {/* <Route path="/privacy" element={<PrivacyPage />} /> */}
           {/* <Route path="/support" element={<SupportPage />} /> */}

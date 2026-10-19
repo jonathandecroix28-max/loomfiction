@@ -101,6 +101,74 @@ body,
   background: var(--c-a900);
   color: var(--c-heading);
 }
+@page {
+  size: A4;
+  margin: 18mm 17mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    print-color-adjust: economy !important;
+    -webkit-print-color-adjust: economy !important;
+  }
+
+  nav,
+  .print-hidden,
+  button {
+    display: none !important;
+  }
+
+  .sheet-document,
+  .sheet-document * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .sheet-document {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  .sheet-document header {
+    background: #fff !important;
+    border-bottom: 1.5pt solid #222 !important;
+  }
+
+  .sheet-document h1,
+  .sheet-document h2,
+  .sheet-document p,
+  .sheet-document span,
+  .sheet-document div {
+    color: #111 !important;
+  }
+
+  .sheet-characteristic {
+    background: #fff !important;
+    border: 0 !important;
+    border-bottom: 0.5pt solid #ddd !important;
+    border-radius: 0 !important;
+    padding: 12pt 0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .sheet-characteristic h2 {
+    font-size: 12pt !important;
+  }
+
+  .sheet-characteristic div {
+    font-size: 10.5pt;
+    line-height: 1.6;
+  }
+}
 
 img,
 video,
