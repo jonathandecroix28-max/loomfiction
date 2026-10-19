@@ -2,7 +2,7 @@ import type { IdeaResponse, IdeaStatus } from '../../../types/idea';
 import { formatDate } from '../../../utils/date/dateFormatter';
 
 interface IdeaCardProps {
-  idea: IdeaResponse & { bookTitle?: string };
+  idea: IdeaResponse & { bookTitle?: string; sheetName?: string };
   onEdit: (idea: IdeaResponse) => void;
   onDelete: (id: number, e: React.MouseEvent) => void;
   onVersions: (idea: IdeaResponse) => void;
@@ -25,13 +25,19 @@ export function IdeaCard({ idea, onEdit, onDelete, onVersions }: IdeaCardProps) 
             <span className={`text-xs font-medium px-3 py-1 rounded-full border ${currentStatus.bg} ${currentStatus.text} ${currentStatus.border}`}>
               {currentStatus.label}
             </span>
-            
-            {/* 💡 C'est ici qu'on ajoute l'affichage du titre du roman ! */}
+
             <span className="text-xs font-serif text-amber-400 font-medium">
               📚 {idea.bookTitle || 'Roman non rattaché'}
             </span>
+
+            {/* Carte appartenant à une fiche */}
+            {idea.sheetName && (
+              <span className="text-xs font-serif text-amber-300/80 font-medium">
+                🗂️ {idea.sheetName}
+              </span>
+            )}
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-2 opacity-70 group-hover:opacity-100 transition-opacity shrink-0 w-full sm:w-auto">
             <button
               onClick={() => onVersions(idea)}

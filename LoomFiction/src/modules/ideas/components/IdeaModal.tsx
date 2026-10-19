@@ -12,6 +12,13 @@ interface IdeaModalProps {
   onClose: () => void;
   bookId?: number | null;
   ideaToEdit?: IdeaResponse | null;
+  /** Création d'une carte dans une fiche */
+  sheetId?: number | null;
+  sortOrder?: number;
+  /** Catégorie imposée (celle de la fiche) */
+  lockedCategoryId?: number | null;
+  /** Catégorie présélectionnée pour une nouvelle note libre */
+  defaultCategoryId?: number | null;
   onSuccess: (updatedIdeas: IdeaResponse[]) => void;
 }
 
@@ -30,7 +37,17 @@ const templates = {
   }
 };
 
-export function IdeaModal({ isOpen, onClose, bookId, ideaToEdit, onSuccess }: IdeaModalProps) {
+export function IdeaModal({
+  isOpen,
+  onClose,
+  bookId,
+  ideaToEdit,
+  sheetId,
+  sortOrder,
+  lockedCategoryId,
+  defaultCategoryId,
+  onSuccess,
+}: IdeaModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState<number>(0); 
@@ -44,6 +61,10 @@ export function IdeaModal({ isOpen, onClose, bookId, ideaToEdit, onSuccess }: Id
   const { createIdea, isCreating } = useCreateIdea();
   const { updateIdea, isUpdating } = useUpdateIdea();
 
+  // Une carte de fiche garde la catégorie de sa fiche
+  const categoryLocked = lockedCategoryId != null || ideaToEdit?.sheetId != null;
+  const isCard = !!sheetId || ideaToEdit?.sheetId != null;
+
   useEffect(() => {
     if (isOpen) {
       Promise.all([
@@ -54,7 +75,7 @@ export function IdeaModal({ isOpen, onClose, bookId, ideaToEdit, onSuccess }: Id
         setCategories(catsData || []);
 
         if (catsData && catsData.length > 0 && categoryId === 0 && !ideaToEdit) {
-          setCategoryId(catsData[0].id);
+          setCategoryId(lockedCategoryId ?? defaultCategoryId ?? catsData[0].id);
         }
       });
     }
@@ -72,11 +93,12 @@ export function IdeaModal({ isOpen, onClose, bookId, ideaToEdit, onSuccess }: Id
       setDescription('');
       setStatus('draft');
       setSelectedBookId(bookId || 0);
-      if (categories.length > 0) {
-        setCategoryId(categories[0].id);
+      const fallback = lockedCategoryId ?? defaultCategoryId ?? categories[0]?.id;
+      if (fallback) {
+        setCategoryId(fallback);
       }
     }
-  }, [ideaToEdit, isOpen, bookId, categories]);
+  }, [ideaToEdit, isOpen, bookId, categories, lockedCategoryId, defaultCategoryId]);
 
   if (!isOpen) return null;
 
@@ -119,6 +141,8 @@ export function IdeaModal({ isOpen, onClose, bookId, ideaToEdit, onSuccess }: Id
       bookId: targetBookId && targetBookId !== 0 ? Number(targetBookId) : null,
       categoryId: Number(categoryId),
       status,
+      // À la création seulement : une modification laisse la fiche et l'ordre inchangés
+      ...(ideaToEdit ? {} : { sheetId: sheetId ?? undefined, sortOrder }),
     };
 
     let result: IdeaResponse[] | null = null;
@@ -138,12 +162,13 @@ export function IdeaModal({ isOpen, onClose, bookId, ideaToEdit, onSuccess }: Id
   };
 
   const isLoading = isCreating || isUpdating;
+  const lockedCategoryName = categories.find((cat) => cat.id === categoryId)?.name;
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex justify-center items-center z-50 p-4 overflow-y-auto">
       <div className="bg-[#1c1411] border border-amber-900/40 rounded-3xl p-8 max-w-lg w-full shadow-2xl my-8 text-amber-50">
         <h2 className="text-2xl font-serif font-bold text-amber-100 mb-6">
-          {ideaToEdit ? "Modifier la note" : "Nouvelle idée de grimoire"}
+          {ideaToEdit ? "Modifier la note" : isCard ? "Nouvelle caractéristique" : "Nouvelle idée de grimoire"}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-5 font-sans">
@@ -165,38 +190,45 @@ export function IdeaModal({ isOpen, onClose, bookId, ideaToEdit, onSuccess }: Id
             </div>
           )}
 
-          {/* Sélecteur de Catégorie Globale */}
+          {/* Sélecteur de Catégorie Globale (figé pour les cartes d'une fiche) */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/60 mb-2">
               Type de note / Catégorie
             </label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(Number(e.target.value))}
-              required
-              className="w-full bg-neutral-900 border border-amber-900/40 rounded-xl px-4 py-3 text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-serif text-sm cursor-pointer"
-            >
-              {categories.length === 0 ? (
-                <option value={0} disabled>-- Aucune catégorie disponible --</option>
-              ) : (
-                categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))
-              )}
-            </select>
+            {categoryLocked ? (
+              <div className="w-full bg-neutral-900/60 border border-amber-900/30 rounded-xl px-4 py-3 text-amber-100/80 font-serif text-sm">
+                {lockedCategoryName ?? '—'}
+                <span className="ml-2 text-xs text-amber-200/40">(catégorie de la fiche)</span>
+              </div>
+            ) : (
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(Number(e.target.value))}
+                required
+                className="w-full bg-neutral-900 border border-amber-900/40 rounded-xl px-4 py-3 text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-serif text-sm cursor-pointer"
+              >
+                {categories.length === 0 ? (
+                  <option value={0} disabled>-- Aucune catégorie disponible --</option>
+                ) : (
+                  categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-amber-200/60 mb-2">
-              Titre de l'idée
+              {isCard ? "Titre de la caractéristique" : "Titre de l'idée"}
             </label>
             <input 
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Le secret du grimoire maudit..."
+              placeholder={isCard ? "Ex: Apparence, Passé, Motivation..." : "Ex: Le secret du grimoire maudit..."}
               required
               className="w-full bg-neutral-900 border border-amber-900/40 rounded-xl px-4 py-3 text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 font-serif"
             />
