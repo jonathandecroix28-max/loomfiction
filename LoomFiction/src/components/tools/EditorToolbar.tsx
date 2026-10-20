@@ -44,19 +44,19 @@ export function EditorToolbar({ editor, onImageError }: EditorToolbarProps) {
   };
 
   const baseBtn =
-    'px-3 py-1.5 rounded text-xs font-sans font-medium transition-colors cursor-pointer flex items-center justify-center min-w-[32px] touch-target bg-[#fef3c7] hover:bg-[#fde68a] text-[#78350f] border border-[#fde68a]';
+    'px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-sans font-medium transition-colors cursor-pointer flex items-center justify-center min-w-[28px] sm:min-w-[32px] h-8 shrink-0 bg-neutral-900 hover:bg-neutral-800 text-amber-200/80 hover:text-amber-100 border border-amber-900/30';
 
   const activeBtn =
-    'px-3 py-1.5 rounded text-xs font-sans font-medium transition-colors cursor-pointer flex items-center justify-center min-w-[32px] touch-target bg-[#fcd34d] text-[#451a03] border border-[#fbbf24] shadow-xs';
+    'px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-sans font-medium transition-colors cursor-pointer flex items-center justify-center min-w-[28px] sm:min-w-[32px] h-8 shrink-0 bg-amber-700 text-amber-50 border border-amber-600 shadow-xs font-bold';
 
   const btnClass = (isActive: boolean) => (isActive ? activeBtn : baseBtn);
 
-  const plainBtn = `${baseBtn} disabled:opacity-40 disabled:cursor-not-allowed`;
+  const plainBtn = `${baseBtn} disabled:opacity-30 disabled:cursor-not-allowed`;
 
-  const separator = <span className="text-[#fcd34d] mx-1">|</span>;
+  const separator = <div className="h-4 w-[1px] bg-amber-900/40 mx-0.5 shrink-0" />;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 pb-4 mb-4 border-b border-[#fde68a] text-[#451a03] bg-[#fffbeb] p-2 rounded-lg overflow-x-auto">
+    <div className="flex flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap p-1.5 rounded-xl bg-neutral-950/80 border border-amber-900/40 text-amber-200 w-full no-scrollbar shrink-0 shadow-md">
 
       {/* Historique */}
       <button
@@ -130,10 +130,10 @@ export function EditorToolbar({ editor, onImageError }: EditorToolbarProps) {
 
       {/* Listes & Citations */}
       <button type="button" onClick={() => chain().toggleBulletList().run()} className={btnClass(editor.isActive('bulletList'))} title="Liste à puces">
-        • List
+        •≡
       </button>
       <button type="button" onClick={() => chain().toggleOrderedList().run()} className={btnClass(editor.isActive('orderedList'))} title="Liste numérotée">
-        1. List
+        1.
       </button>
       <button type="button" onClick={() => chain().toggleBlockquote().run()} className={btnClass(editor.isActive('blockquote'))} title="Citation">
         “ ”
@@ -152,7 +152,7 @@ export function EditorToolbar({ editor, onImageError }: EditorToolbarProps) {
         className={plainBtn}
         title="Insérer une image"
       >
-        {imageBusy ? '…' : '🖼 Image'}
+        {imageBusy ? '…' : '🖼'}
       </button>
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageFiles} />
 
