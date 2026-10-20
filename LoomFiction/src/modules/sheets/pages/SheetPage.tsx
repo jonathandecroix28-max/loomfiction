@@ -330,7 +330,7 @@ export function SheetPage() {
                 onClick={openCreate}
                 className={`${toolbarBtn} border-amber-600 bg-amber-700 text-amber-50 shadow-md hover:bg-amber-600`}
               >
-                + Ajouter une characteristic
+                + Ajouter une characteristique
               </button>
             ) : (
               <button
