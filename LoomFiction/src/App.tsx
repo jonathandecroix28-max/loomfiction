@@ -10,7 +10,7 @@ import { NotFound } from './pages/404';
 import { IdeasPage } from './modules/ideas/pages/IdeasPage';
 import { IdeaVersionsPage } from './modules/ideas/pages/IdeaVersionsPage';
 import VersionsHubPage from './pages/VersionsHubPage';
-//import { ImportPage } from './pages/ImportPage';
+import { ImportPage } from './pages/ImportPage';
 import { SheetPage } from './modules/sheets/pages/SheetPage';
 // import DonatePage from './pages/DonatePage';
 import ExportPage from './pages/ExportPage';
@@ -22,14 +22,15 @@ function AppContent() {
   const location = useLocation();
   
   const hideNavbar = ['/', '/terms', '/privacy', '/support'].includes(location.pathname);
-
+  const hideNavbarWhenReading = location.pathname.includes('/read');
+  
   return (
     <div className="min-h-dvh bg-[#fcf9f2] flex flex-col">
-      {!hideNavbar && <Navbar />}
+      {!hideNavbar  && !hideNavbarWhenReading && <Navbar />}
 
       <main
         className={`grow flex flex-col ${
-          !hideNavbar ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0' : ''
+          !hideNavbar && !hideNavbarWhenReading ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0' : ''
         }`}
       >
         <Routes>
@@ -46,7 +47,7 @@ function AppContent() {
           <Route path="/ideas/:ideaId/versions" element={<IdeaVersionsPage />} />
           <Route path="/ideas/:ideaId/versions/:versionId" element={<IdeaVersionsPage />} />
           <Route path="/export" element={<ExportPage />} />
-          {/* <Route path="/import" element={<ImportPage />} /> */}
+          <Route path="/import" element={<ImportPage />} />
           <Route path="/ideas/fiches/:sheetId" element={<SheetPage />} />
           {/* <Route path="/terms" element={<TermsPage />} /> */}
           {/* <Route path="/privacy" element={<PrivacyPage />} /> */}

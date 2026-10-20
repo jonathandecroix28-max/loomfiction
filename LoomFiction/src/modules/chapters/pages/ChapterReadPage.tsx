@@ -55,7 +55,7 @@ export function ChapterReadPage() {
 
   return (
     <div className="min-h-screen bg-[#1c1411] text-[#fcf9f2] flex flex-col font-serif overflow-x-hidden">
-      <header className="border-b border-amber-900/40 bg-neutral-950/80 px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shadow-md sticky top-0 z-10 backdrop-blur-xs">
+      <header className="border-b border-amber-900/40 bg-transparent px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shadow-md sticky top-0 z-10 backdrop-blur-xs">
         <button
           onClick={() => navigate(`/books/${bookId}`)}
           className="text-amber-200/60 hover:text-amber-100 transition-colors text-sm cursor-pointer flex items-center gap-1 font-sans touch-target"
@@ -73,27 +73,27 @@ export function ChapterReadPage() {
 
         <ChapterContent html={chapter.content || ''} />
 
-        <div className="border-t border-amber-900/30 pt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 font-sans">
-          {prevChapter ? (
-            <button
-              onClick={() => goToChapter(prevChapter.id)}
-              className="px-5 py-2.5 rounded-xl border border-amber-900/30 hover:bg-neutral-900 text-amber-200 text-sm font-medium transition-colors cursor-pointer flex items-center justify-center gap-2 w-full sm:w-auto touch-target"
-            >
-              &larr; Chapitre précédent
-            </button>
-          ) : (
-            <div></div>
-          )}
+      <div className="hidden sm:flex border-t border-amber-900/30 pt-6 flex-row items-center justify-between gap-3 font-sans">
+      {prevChapter ? (
+      <button
+      onClick={() => goToChapter(prevChapter.id)}
+      className="px-5 py-2.5 rounded-xl border border-amber-900/30 hover:bg-neutral-900 text-amber-200 text-sm font-medium transition-colors cursor-pointer flex items-center justify-center gap-2 touch-target"
+      >
+      &larr; Chapitre précédent
+    </button>
+  ) : (
+    <div />
+  )}
 
-          {nextChapter && (
-            <button
-              onClick={() => goToChapter(nextChapter.id)}
-              className="px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 text-sm font-medium transition-colors shadow-md cursor-pointer flex items-center justify-center gap-2 w-full sm:w-auto sm:ml-auto touch-target"
-            >
-              Chapitre suivant &rarr;
-            </button>
-          )}
-        </div>
+  {nextChapter && (
+    <button
+      onClick={() => goToChapter(nextChapter.id)}
+      className="px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 text-sm font-medium transition-colors shadow-md cursor-pointer flex items-center justify-center gap-2 ml-auto touch-target"
+    >
+      Chapitre suivant &rarr;
+    </button>
+  )}
+      </div>
       </main>
 
       <EdgeSwipeHint
