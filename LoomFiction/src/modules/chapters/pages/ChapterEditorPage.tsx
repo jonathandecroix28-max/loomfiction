@@ -32,7 +32,6 @@ export function ChapterEditorPage() {
   const editor = useEditor({
     extensions: [
       StarterKit,
-      // allowBase64 : les images sont stockées dans le texte du chapitre (data URL), donc hors-ligne
       Image.configure({ allowBase64: true }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
@@ -43,16 +42,13 @@ export function ChapterEditorPage() {
       attributes: {
         class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] text-lg leading-relaxed text-amber-100/90 font-serif',
       },
-      // Coller une image (capture d'écran, « copier l'image »…)
       handlePaste: (view, event) => {
         const files = imageFilesFrom(event.clipboardData?.files);
-        // un collage Word / web contient aussi du texte : on le laisse suivre son cours normal
         if (files.length === 0 || event.clipboardData?.getData('text/plain')) return false;
         event.preventDefault();
         void insertImageFiles(view, files).then(setImageError);
         return true;
       },
-      // Glisser-déposer un fichier image depuis l'ordinateur
       handleDrop: (view, event, _slice, moved) => {
         if (moved) return false;
         const files = imageFilesFrom(event.dataTransfer?.files);
@@ -65,7 +61,6 @@ export function ChapterEditorPage() {
     },
   });
 
-  // le message d'erreur d'image disparaît tout seul
   useEffect(() => {
     if (!imageError) return;
     const timer = setTimeout(() => setImageError(null), 6000);
@@ -115,10 +110,10 @@ export function ChapterEditorPage() {
 
     if (updated) {
       setChapter(updated);
-      setSaveMessage('Modifications enregistrées ! ✨');
+      setSaveMessage('Enregistré ! ✨');
       setTimeout(() => setSaveMessage(''), 3000);
     } else if (updateError) {
-      setSaveMessage('Erreur lors de la sauvegarde.');
+      setSaveMessage('Erreur sauvegarde.');
     }
   };
 
@@ -137,11 +132,11 @@ export function ChapterEditorPage() {
         content: editor.getHTML(),
       });
       await refetchChapterVersions();
-      setSaveMessage(`Version ${nextVersionNumber} créée.`);
+      setSaveMessage(`v${nextVersionNumber} créée.`);
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
       console.error('Erreur lors de la création de version :', error);
-      setSaveMessage('Impossible de créer la version.');
+      setSaveMessage('Erreur version.');
     }
   };
 
@@ -160,69 +155,48 @@ export function ChapterEditorPage() {
   return (
     <div className="min-h-screen bg-[#1c1411] text-[#fcf9f2] flex flex-col font-serif overflow-x-hidden">
       
-      {/* Barre de navigation supérieure */}
-      <header className="border-b border-amber-900/40 bg-neutral-950/80 px-4 sm:px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shadow-md sticky top-0 z-10 backdrop-blur-xs">
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+      {/* HEADER FIXE (Navigation seule) */}
+      <header className="sticky top-0 z-20 bg-[#1c1411]/95 backdrop-blur-md border-b border-amber-900/40 px-3 sm:px-6 py-2.5 flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="text-amber-200/60 hover:text-amber-100 transition-colors text-sm cursor-pointer flex items-center gap-1 font-sans"
+            title="Retour"
+            className="h-9 px-2 sm:px-2.5 rounded-lg text-amber-200/70 hover:text-amber-100 hover:bg-neutral-900 text-xs sm:text-sm font-sans flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
           >
-            &larr; Retour
+            &larr; <span className="hidden sm:inline">Retour</span>
           </button>
-          <span className="hidden sm:inline text-amber-900/50">|</span>
-          <span className="text-sm font-sans text-amber-200/70">
-            Chapitre {chapterNum}
+          
+          <span className="text-amber-900/50 text-xs">|</span>
+          
+          <span className="text-xs sm:text-sm font-sans text-amber-200/80 font-medium whitespace-nowrap">
+            Ch. {chapterNum}
           </span>
-          <button
-            onClick={() => navigate(`/books/${bookId}/chapters/${chapterId}/versions`)}
-            className="px-3 py-1.5 rounded-lg border border-amber-900/30 bg-neutral-900 hover:bg-neutral-800 text-amber-200 text-xs font-medium transition-colors cursor-pointer"
-          >
-            Versions
-          </button>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={handleCreateVersion}
-            disabled={isUpdating || isPreview}
-            className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-200 font-sans text-sm font-medium transition-colors cursor-pointer border border-amber-900/30 disabled:opacity-50 touch-target"
-          >
-            Nouvelle version
-          </button>
-
-          <button
-            onClick={() => setIsPreview(!isPreview)}
-            className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-200 font-sans text-sm font-medium transition-colors cursor-pointer border border-amber-900/30 touch-target"
-          >
-            {isPreview ? "Modifier" : "Aperçu lecture"}
-          </button>
-
-          {saveMessage && (
-            <span className="text-xs font-sans text-emerald-400 font-medium animate-pulse">
-              {saveMessage}
-            </span>
-          )}
           
           <button
-            onClick={handleSave}
-            disabled={isUpdating || isPreview}
-            className="px-5 py-2 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 font-sans text-sm font-medium transition-colors shadow-md cursor-pointer disabled:opacity-50 touch-target"
+            onClick={() => navigate(`/books/${bookId}/chapters/${chapterId}/versions`)}
+            title="Historique des versions"
+            className="h-9 px-2 sm:px-3 rounded-lg border border-amber-900/30 bg-neutral-900 hover:bg-neutral-800 text-amber-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
           >
-            {isUpdating ? "Enregistrement..." : "Enregistrer"}
+            <span>📜</span>
+            <span className="hidden sm:inline">Versions</span>
           </button>
         </div>
+
+        {saveMessage && (
+          <span className="text-[11px] font-sans text-emerald-400 font-medium animate-pulse truncate max-w-[120px] sm:max-w-none">
+            {saveMessage}
+          </span>
+        )}
       </header>
 
-      {/* Zone de rédaction ou d'aperçu */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10 flex flex-col">
-        
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 pt-6 pb-28 sm:pb-36 flex flex-col">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           disabled={isPreview}
           placeholder="Titre du chapitre..."
-          className="text-2xl sm:text-3xl md:text-4xl font-bold font-serif text-amber-100 bg-transparent border-b border-amber-900/30 pb-4 mb-6 focus:outline-none focus:border-amber-600 placeholder:text-amber-200/30 disabled:border-transparent"
+          className="text-2xl sm:text-3xl md:text-4xl font-bold font-serif text-amber-100 bg-transparent border-b border-amber-900/30 pb-3 mb-4 focus:outline-none focus:border-amber-600 placeholder:text-amber-200/30 disabled:border-transparent"
         />
 
         {isPreview ? (
@@ -234,19 +208,60 @@ export function ChapterEditorPage() {
           />
         ) : (
           <>
-            <EditorToolbar editor={editor} onImageError={setImageError} />
             {imageError && (
-              <p role="alert" className="text-sm font-sans text-red-400 mt-3">
+              <p role="alert" className="text-sm font-sans text-red-400 mb-3">
                 {imageError}
               </p>
             )}
-            <div className="flex-1 w-full bg-transparent cursor-text mt-4">
+            <div className="flex-1 w-full bg-transparent cursor-text mt-2">
               <EditorContent editor={editor} />
             </div>
           </>
         )}
-
       </main>
+
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#1c1411]/95 backdrop-blur-md border-t border-amber-900/40 p-2 sm:p-3 shadow-2xl space-y-2">
+        
+        {!isPreview && (
+          <div className="max-w-4xl mx-auto overflow-x-auto no-scrollbar">
+            <EditorToolbar editor={editor} onImageError={setImageError} />
+          </div>
+        )}
+
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2 pt-1 border-t border-amber-900/20">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCreateVersion}
+              disabled={isUpdating || isPreview}
+              title="Créer une nouvelle version"
+              className="h-9 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-200 font-sans text-xs sm:text-sm font-medium transition-colors cursor-pointer border border-amber-900/30 disabled:opacity-40 flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <span>➕</span>
+              <span className="hidden sm:inline">Nouvelle version</span>
+            </button>
+
+            <button
+              onClick={() => setIsPreview(!isPreview)}
+              title={isPreview ? "Passer en mode édition" : "Passer en mode aperçu"}
+              className="h-9 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-200 font-sans text-xs sm:text-sm font-medium transition-colors cursor-pointer border border-amber-900/30 flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <span>{isPreview ? "✏️" : "👁️"}</span>
+              <span className="hidden sm:inline">{isPreview ? "Modifier" : "Aperçu"}</span>
+            </button>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={isUpdating || isPreview}
+            title="Enregistrer les modifications"
+            className="h-9 px-4 sm:px-6 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 font-sans text-xs sm:text-sm font-medium transition-colors shadow-md cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5 shrink-0"
+          >
+            <span>💾</span>
+            <span>{isUpdating ? "Enregistrement..." : "Enregistrer"}</span>
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }
