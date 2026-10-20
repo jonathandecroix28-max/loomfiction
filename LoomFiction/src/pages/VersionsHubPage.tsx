@@ -20,7 +20,6 @@ interface VersionRow {
   versionName: string;
   updatedAt: string;
   parentTitle: string;
-  /** Parent supprimé : on ne sait plus à quoi la version se rattachait. */
   missing: boolean;
   bookId: number | null;
   chapterNumber?: number;
