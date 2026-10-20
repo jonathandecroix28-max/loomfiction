@@ -39,8 +39,6 @@ export function IdeaVersionsPage() {
 
   const { versions, selectedVersion, isLoading, error, refetch } = useIdeaVersions(numIdeaId, numVersionId);
 
-  // L'idée se charge en parallèle des versions : on suit les deux chargements,
-  // sinon la page redirige vers /404 avant que l'idée soit arrivée.
   const { item: idea, loading: ideaLoading } = useParentItem(numIdeaId, offlineIdeaService.getById);
 
   const compare = useVersionCompare({
@@ -53,6 +51,9 @@ export function IdeaVersionsPage() {
   const [mergeFields, setMergeFields] = useState({ name: true, description: true });
   const [isRestoring, setIsRestoring] = useState(false);
   const [feedback, setFeedback] = useState('');
+
+  const [hideEqualLines, setHideEqualLines] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !ideaLoading && (error || !idea)) {
@@ -118,6 +119,10 @@ export function IdeaVersionsPage() {
 
   const { versionToCompare } = compare;
 
+  const displayRows = hideEqualLines 
+    ? compare.rows.filter(row => row.kind !== 'equal') 
+    : compare.rows;
+
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif">
       <VersionsHeader
@@ -138,11 +143,9 @@ export function IdeaVersionsPage() {
           onSearch={compare.setSearch}
           sortBy={compare.sortBy}
           onSort={compare.setSortBy}
-          actionsClassName="grid grid-cols-3 gap-2 lg:flex"
+          actionsClassName="flex justify-end"
         >
           <ToolbarButton accent onClick={handleSnapshot}>Snapshot</ToolbarButton>
-          <ToolbarButton onClick={() => setMergeFields({ name: true, description: true })}>Tout reprendre</ToolbarButton>
-          <ToolbarButton onClick={() => setMergeFields({ name: false, description: false })}>Garder l’actuelle</ToolbarButton>
         </VersionsFilterBar>
 
         <div className="flex flex-col gap-4 sm:gap-6">
@@ -168,13 +171,57 @@ export function IdeaVersionsPage() {
                 renderBody={renderText}
                 bodyClassName={BODY_CLASS}
               />
-              <LineDiffView
-                rows={compare.rows}
-                choices={compare.choices}
-                onChoose={compare.choose}
-                help="Choisis pour chaque ligne modifiée celle à conserver."
-                emptyMessage="Aucune ligne de description à comparer."
-              />
+
+              <div className="border-t border-amber-900/30 pt-6 mt-2 flex flex-col gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-4 font-sans">
+                  <div className="flex p-1 bg-neutral-950/50 rounded-lg border border-amber-900/30">
+                    <button
+                      onClick={() => setShowPreview(false)}
+                      className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${!showPreview ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'}`}
+                    >
+                      Comparatif par ligne
+                    </button>
+                    <button
+                      onClick={() => setShowPreview(true)}
+                      className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${showPreview ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'}`}
+                    >
+                      Aperçu de la fusion
+                    </button>
+                  </div>
+
+                  {!showPreview && (
+                    <label className="flex items-center gap-2 text-sm text-amber-200/80 cursor-pointer hover:text-amber-100 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={hideEqualLines}
+                        onChange={(e) => setHideEqualLines(e.target.checked)}
+                        className="rounded border-amber-900/50 bg-neutral-900 text-amber-600 focus:ring-amber-600/50 w-4 h-4 cursor-pointer"
+                      />
+                      Masquer les lignes identiques
+                    </label>
+                  )}
+                </div>
+
+                {showPreview ? (
+                  <div className="p-5 rounded-xl border border-amber-900/30 bg-neutral-900/40">
+                    <h4 className="text-xs font-sans font-semibold text-amber-200/50 uppercase tracking-widest mb-4">
+                      Rendu final de la description
+                    </h4>
+                    <div className={BODY_CLASS}>
+                      {renderText(compare.mergeFor(versionToCompare))}
+                    </div>
+                  </div>
+                ) : (
+                  <LineDiffView
+                    rows={displayRows}
+                    choices={compare.choices}
+                    onChoose={compare.choose}
+                    help="Choisis pour chaque ligne modifiée celle à conserver."
+                    emptyMessage={hideEqualLines ? "Aucune différence trouvée (toutes les lignes identiques sont masquées)." : "Aucune ligne de description à comparer."}
+                  />
+                )}
+              </div>
+
               <MergeOptions
                 fields={MERGE_FIELDS}
                 value={mergeFields}
