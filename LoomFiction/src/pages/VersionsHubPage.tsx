@@ -15,6 +15,7 @@ import type { IdeaVersionResponse } from '../types/ideaVersion';
 
 interface VersionRow {
   key: string;
+  versionId: number;
   kind: 'chapter' | 'idea';
   versionNumber: number | string;
   versionName: string;
@@ -56,17 +57,37 @@ type VersionsSectionProps = {
   rows: VersionRow[];
   renderContext: (row: VersionRow) => ReactNode;
   onOpen: (path: string) => void;
+  onDelete: (row: VersionRow) => void;
 };
 
-function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows, renderContext, onOpen }: VersionsSectionProps) {
-  const openButton = (row: VersionRow, className = '') => (
-    <button
-      onClick={() => row.openPath && onOpen(row.openPath)}
-      disabled={!row.openPath}
-      className={`px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-50 text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap ${className}`}
-    >
-      {row.openPath ? 'Ouvrir' : 'Manquant'}
-    </button>
+function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows, renderContext, onOpen, onDelete }: VersionsSectionProps) {
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const totalPages = Math.ceil(rows.length / pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rows]);
+
+  const paginatedRows = rows.slice((page - 1) * pageSize, page * pageSize);
+
+  const actionButtons = (row: VersionRow, className = '') => (
+    <div className={`flex items-center gap-2 ${className}`}>
+      <button
+        onClick={() => row.openPath && onOpen(row.openPath)}
+        disabled={!row.openPath}
+        className="px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-50 text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+      >
+        {row.openPath ? 'Ouvrir' : 'Introuvable'}
+      </button>
+      <button
+        onClick={() => onDelete(row)}
+        className="px-2.5 py-2 rounded-lg bg-red-950/40 hover:bg-red-900/80 text-red-400 border border-red-900/30 text-xs transition-colors cursor-pointer"
+        title="Supprimer cette version"
+      >
+        🗑️
+      </button>
+    </div>
   );
 
   return (
@@ -83,27 +104,27 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
         <div className="px-5 py-10 text-center text-amber-200/60">{emptyLabel}</div>
       ) : (
         <>
-          {/* Mobile : une carte compacte par version, tout est visible sans scroll horizontal */}
           <ul className="md:hidden divide-y divide-amber-900/10">
-            {rows.map((row) => (
-              <li key={row.key} className="p-3 flex items-start gap-3">
-                <span className="mt-0.5 inline-flex h-9 min-w-9 px-1.5 shrink-0 items-center justify-center rounded-full border border-amber-800/40 bg-amber-950 text-amber-300 text-xs font-bold">
-                  v{row.versionNumber}
-                </span>
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="font-semibold text-amber-100 truncate">{row.parentTitle}</div>
-                  <div className="flex flex-wrap gap-1.5">{renderContext(row)}</div>
-                  <div className="text-[11px] text-amber-200/50">
-                    {new Date(row.updatedAt).toLocaleDateString()}
-                    {row.versionName && ` · ${row.versionName}`}
+            {paginatedRows.map((row) => (
+              <li key={row.key} className="p-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <span className="mt-0.5 inline-flex h-9 min-w-9 px-1.5 shrink-0 items-center justify-center rounded-full border border-amber-800/40 bg-amber-950 text-amber-300 text-xs font-bold">
+                    v{row.versionNumber}
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="font-semibold text-amber-100 truncate">{row.parentTitle}</div>
+                    <div className="flex flex-wrap gap-1.5">{renderContext(row)}</div>
+                    <div className="text-[11px] text-amber-200/50">
+                      {new Date(row.updatedAt).toLocaleDateString()}
+                      {row.versionName && ` · ${row.versionName}`}
+                    </div>
                   </div>
                 </div>
-                {openButton(row, 'shrink-0')}
+                {actionButtons(row, 'shrink-0 self-end sm:self-auto')}
               </li>
             ))}
           </ul>
 
-          {/* Desktop / tablette : tableau */}
           <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-amber-900/20">
               <thead className="bg-neutral-950/80">
@@ -116,7 +137,7 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
                 </tr>
               </thead>
               <tbody className="divide-y divide-amber-900/10">
-                {rows.map((row) => (
+                {paginatedRows.map((row) => (
                   <tr key={row.key} className="hover:bg-neutral-900/50 transition-colors">
                     <td className="px-5 py-4 max-w-xs">
                       <div className="font-semibold text-amber-100 truncate">{row.parentTitle}</div>
@@ -131,12 +152,36 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
                     <td className="px-5 py-4 text-amber-200/70 text-sm whitespace-nowrap">
                       {new Date(row.updatedAt).toLocaleString()}
                     </td>
-                    <td className="px-5 py-4">{openButton(row)}</td>
+                    <td className="px-5 py-4">{actionButtons(row)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="px-5 py-4 border-t border-amber-900/20 flex items-center justify-between">
+              <span className="text-xs text-amber-200/50">
+                Page {page} sur {totalPages} ({rows.length} résultats)
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-200/80 text-xs disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  Précédent
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-200/80 text-xs disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  Suivant
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </section>
@@ -153,7 +198,7 @@ export function VersionsHubPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
-  const [bookFilter, setBookFilter] = useState('all'); // 'all' | 'none' | id du roman
+  const [bookFilter, setBookFilter] = useState('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -204,6 +249,31 @@ export function VersionsHubPage() {
     };
   }, []);
 
+  const handleDeleteVersion = async (row: VersionRow) => {
+    if (!window.confirm('Voulez-vous vraiment supprimer définitivement cette version ? Cette action est irréversible.')) {
+      return;
+    }
+
+    try {
+      if (row.kind === 'chapter') {
+        await offlineChapterVersionService.remove(row.versionId);
+        setLoaded((prev) => ({
+          ...prev,
+          chapters: prev.chapters.filter((c) => c.version.id !== row.versionId),
+        }));
+      } else {
+        await offlineIdeaVersionService.remove(row.versionId);
+        setLoaded((prev) => ({
+          ...prev,
+          ideas: prev.ideas.filter((i) => i.version.id !== row.versionId),
+        }));
+      }
+    } catch (err) {
+      console.error('Erreur lors de la suppression de la version :', err);
+      alert('Impossible de supprimer la version.');
+    }
+  };
+
   const bookTitleById = useMemo(() => new Map(loaded.books.map((book) => [book.id, book.title] as const)), [loaded.books]);
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category] as const)), [categories]);
   const sheetNameById = useMemo(() => new Map(sheets.map((sheet) => [sheet.id, sheet.name] as const)), [sheets]);
@@ -215,6 +285,7 @@ export function VersionsHubPage() {
       loaded.chapters
         .map(({ version, chapter }): VersionRow => ({
           key: `chapter-${version.id}`,
+          versionId: version.id,
           kind: 'chapter',
           versionNumber: version.versionNumber,
           versionName: version.name ?? '',
@@ -234,6 +305,7 @@ export function VersionsHubPage() {
       loaded.ideas
         .map(({ version, idea }): VersionRow => ({
           key: `idea-${version.id}`,
+          versionId: version.id,
           kind: 'idea',
           versionNumber: version.versionNumber,
           versionName: version.name ?? '',
@@ -343,7 +415,6 @@ export function VersionsHubPage() {
           </div>
         </section>
 
-        {/* 3 stats sur une seule ligne, même sur mobile */}
         <section className="grid grid-cols-3 gap-2 sm:gap-4">
           {stats.map((stat) => (
             <div key={stat.label} className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/60 p-3 sm:p-6 shadow-xl">
@@ -355,7 +426,6 @@ export function VersionsHubPage() {
           ))}
         </section>
 
-        {/* Filtres : retrouver les versions d'un roman, d'une fiche, d'une catégorie… */}
         <section className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/55 p-3 sm:p-5 shadow-xl">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,16rem)_auto] sm:items-end">
             <div>
@@ -414,6 +484,7 @@ export function VersionsHubPage() {
               rows={visibleChapters}
               renderContext={renderContext}
               onOpen={navigate}
+              onDelete={handleDeleteVersion}
             />
 
             <VersionsSection
@@ -425,6 +496,7 @@ export function VersionsHubPage() {
               rows={visibleIdeas}
               renderContext={renderContext}
               onOpen={navigate}
+              onDelete={handleDeleteVersion}
             />
           </>
         )}
