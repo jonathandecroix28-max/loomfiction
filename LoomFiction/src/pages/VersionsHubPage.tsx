@@ -46,7 +46,7 @@ function cached<T>(cache: Map<number, Promise<T | null>>, id: number, fetch: (id
   return promise;
 }
 
-const pill = 'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium';
+const pill = 'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[11px] font-medium';
 
 type VersionsSectionProps = {
   title: string;
@@ -72,17 +72,17 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
   const paginatedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   const actionButtons = (row: VersionRow, className = '') => (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`flex items-center gap-1.5 sm:gap-2 ${className}`}>
       <button
         onClick={() => row.openPath && onOpen(row.openPath)}
         disabled={!row.openPath}
-        className="px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-50 text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+        className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-50 text-[10px] sm:text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
       >
-        {row.openPath ? 'Ouvrir' : 'Introuvable'}
+        {row.openPath ? 'Ouvrir' : 'N/A'}
       </button>
       <button
         onClick={() => onDelete(row)}
-        className="px-2.5 py-2 rounded-lg bg-red-950/40 hover:bg-red-900/80 text-red-400 border border-red-900/30 text-xs transition-colors cursor-pointer"
+        className="px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg bg-red-950/40 hover:bg-red-900/80 text-red-400 border border-red-900/30 text-[10px] sm:text-xs transition-colors cursor-pointer"
         title="Supprimer cette version"
       >
         🗑️
@@ -104,23 +104,22 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
         <div className="px-5 py-10 text-center text-amber-200/60">{emptyLabel}</div>
       ) : (
         <>
+          {/* Mobile : liste extrêmement compacte sur une seule ligne */}
           <ul className="md:hidden divide-y divide-amber-900/10">
             {paginatedRows.map((row) => (
-              <li key={row.key} className="p-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <span className="mt-0.5 inline-flex h-9 min-w-9 px-1.5 shrink-0 items-center justify-center rounded-full border border-amber-800/40 bg-amber-950 text-amber-300 text-xs font-bold">
-                    v{row.versionNumber}
-                  </span>
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <div className="font-semibold text-amber-100 truncate">{row.parentTitle}</div>
-                    <div className="flex flex-wrap gap-1.5">{renderContext(row)}</div>
-                    <div className="text-[11px] text-amber-200/50">
-                      {new Date(row.updatedAt).toLocaleDateString()}
-                      {row.versionName && ` · ${row.versionName}`}
-                    </div>
+              <li key={row.key} className="p-2.5 sm:p-3 flex items-start gap-2.5">
+                <span className="mt-0.5 inline-flex h-7 min-w-7 sm:h-9 sm:min-w-9 px-1 shrink-0 items-center justify-center rounded-full border border-amber-800/40 bg-amber-950 text-amber-300 text-[10px] sm:text-xs font-bold">
+                  v{row.versionNumber}
+                </span>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="font-semibold text-amber-100 truncate text-xs sm:text-sm">{row.parentTitle}</div>
+                  <div className="flex flex-wrap gap-1">{renderContext(row)}</div>
+                  <div className="text-[9px] sm:text-[11px] text-amber-200/50">
+                    {new Date(row.updatedAt).toLocaleDateString()}
+                    {row.versionName && ` · ${row.versionName}`}
                   </div>
                 </div>
-                {actionButtons(row, 'shrink-0 self-end sm:self-auto')}
+                {actionButtons(row, 'shrink-0')}
               </li>
             ))}
           </ul>
@@ -161,21 +160,21 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
 
           {totalPages > 1 && (
             <div className="px-5 py-4 border-t border-amber-900/20 flex items-center justify-between">
-              <span className="text-xs text-amber-200/50">
-                Page {page} sur {totalPages} ({rows.length} résultats)
+              <span className="text-[10px] sm:text-xs text-amber-200/50">
+                Page {page}/{totalPages} ({rows.length})
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-200/80 text-xs disabled:opacity-50 transition-colors cursor-pointer"
+                  className="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-200/80 text-[10px] sm:text-xs disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   Précédent
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-200/80 text-xs disabled:opacity-50 transition-colors cursor-pointer"
+                  className="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-200/80 text-[10px] sm:text-xs disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   Suivant
                 </button>
@@ -256,13 +255,13 @@ export function VersionsHubPage() {
 
     try {
       if (row.kind === 'chapter') {
-        await offlineChapterVersionService.remove(row.versionId);
+        await offlineChapterVersionService.delete(row.versionId);
         setLoaded((prev) => ({
           ...prev,
           chapters: prev.chapters.filter((c) => c.version.id !== row.versionId),
         }));
       } else {
-        await offlineIdeaVersionService.remove(row.versionId);
+        await offlineIdeaVersionService.delete(row.versionId);
         setLoaded((prev) => ({
           ...prev,
           ideas: prev.ideas.filter((i) => i.version.id !== row.versionId),
@@ -345,7 +344,7 @@ export function VersionsHubPage() {
     if (row.missing) {
       return (
         <span className={`${pill} border-red-900/40 bg-red-950/40 text-red-300`}>
-          Parent introuvable : l'origine de cette version est perdue
+          Parent introuvable
         </span>
       );
     }
@@ -369,7 +368,7 @@ export function VersionsHubPage() {
         )}
 
         {row.kind === 'chapter' && row.chapterNumber != null && (
-          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>Chapitre {row.chapterNumber}</span>
+          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>Chap {row.chapterNumber}</span>
         )}
 
         {row.kind === 'idea' && category && (
@@ -400,7 +399,7 @@ export function VersionsHubPage() {
   ];
 
   const inputClass =
-    'w-full rounded-xl border border-amber-900/30 bg-neutral-900 px-3 sm:px-4 py-2.5 sm:py-3 text-amber-100 placeholder:text-amber-200/30 focus:outline-none focus:ring-1 focus:ring-amber-500';
+    'w-full rounded-xl border border-amber-900/30 bg-neutral-900 px-3 sm:px-4 py-2.5 sm:py-3 text-amber-100 placeholder:text-amber-200/30 focus:outline-none focus:ring-1 focus:ring-amber-500 text-sm sm:text-base';
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif overflow-x-hidden">
