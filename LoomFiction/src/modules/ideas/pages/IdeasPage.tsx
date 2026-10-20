@@ -22,6 +22,9 @@ import { CategoryQuickAdd } from '../../categories/components/CategoryQuickAdd';
 import { SheetCard } from '../../sheets/components/SheetCard';
 import { NewSheetModal } from '../../sheets/components/NewSheetModal';
 
+import { AttachToSheetModal } from '../../sheets/components/AttachToSheetModal';
+import { AttachNotesModal } from '../../sheets/components/AttachNotesModal';
+
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n > 1 ? many : one}`;
 
 export function IdeasPage() {
@@ -41,6 +44,9 @@ export function IdeasPage() {
   const [selectedIdea, setSelectedIdea] = useState<IdeaResponse | null>(null);
   const [newSheetCategory, setNewSheetCategory] = useState<CategoryResponse | null>(null);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
+
+  const [ideaToAttach, setIdeaToAttach] = useState<IdeaResponse | null>(null);
+  const [sheetToAttach, setSheetToAttach] = useState<SheetResponse | null>(null);
 
   const [ideaSearch, setIdeaSearch] = useState('');
   const [bookTitleFilter, setBookTitleFilter] = useState('');
@@ -160,15 +166,12 @@ export function IdeasPage() {
   return (
     <div className="min-h-screen bg-[#1c1411] text-[#fcf9f2] flex flex-col font-sans overflow-x-hidden">
       
-      {/* --- SECTION FIXE HAUT DE PAGE --- */}
       <div className="w-full max-w-[1700px] mx-auto px-4 sm:px-6 pt-6 sm:pt-8 md:px-12 shrink-0">
-        
         <IdeasHeader 
           onManageCategories={() => setIsManageCategoriesOpen(true)}
           onNewIdea={() => { setSelectedIdea(null); setIsModalOpen(true); }}
         />
 
-        {/* ONGLETS */}
         <div className="flex items-center gap-4 sm:gap-8 border-b border-amber-900/40 mb-6 overflow-x-auto text-sm font-serif scrollbar-none pb-1">
           {tabs.map((tab) => (
             <button
@@ -206,10 +209,8 @@ export function IdeasPage() {
           bookFilter={bookTitleFilter} onBookFilterChange={setBookTitleFilter}
           statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
         />
-
       </div>
 
-      {/* --- ZONE DE SCROLL HORIZONTAL (ONGLETS) --- */}
       <div
         ref={scrollContainerRef}
         className="flex-1 flex overflow-x-auto snap-x snap-mandatory scroll-smooth w-full no-scrollbar overscroll-x-contain"
@@ -246,7 +247,6 @@ export function IdeasPage() {
                   {tab.label} &bull; {summary}
                 </div>
 
-                {/* --- BLOC DES FICHES --- */}
                 {(category || isAll) && (tabSheets.length > 0 || category) && (
                   <section>
                     <div className="flex items-center justify-between gap-3 mb-3">
@@ -285,6 +285,7 @@ export function IdeasPage() {
                                 const bookId = bookOfSheet(cards);
                                 return bookId == null ? 'Sans roman' : books.find((b) => b.id === bookId)?.title ?? 'Roman inconnu';
                               })()}
+                              onAttach={() => setSheetToAttach(sheet)}
                             />
                           );
                         })}
@@ -293,7 +294,6 @@ export function IdeasPage() {
                   </section>
                 )}
 
-                {/* --- BLOC DES NOTES LIBRES --- */}
                 <section>
                   <h2 className="text-sm font-serif font-bold text-amber-200 mb-3">
                     Notes libres {isAll && '(non rattachées à une fiche)'}
@@ -302,9 +302,6 @@ export function IdeasPage() {
                   {showOnboarding ? (
                     <div className="text-center py-16 bg-neutral-950/40 rounded-3xl border border-amber-900/20 px-6 max-w-2xl mx-auto">
                       <p className="text-amber-200/60 font-serif text-lg mb-2">Commencez par créer une catégorie.</p>
-                      <p className="text-xs text-amber-200/40 font-sans mb-6">
-                        Une catégorie range vos notes : choisissez une suggestion ou tapez un nom.
-                      </p>
                       <div className="text-left">
                         <CategoryQuickAdd existing={categories} onCreate={handleCreateCategory} />
                       </div>
@@ -312,7 +309,6 @@ export function IdeasPage() {
                   ) : tabIdeas.length === 0 ? (
                     <div className="text-center py-12 bg-neutral-950/40 rounded-3xl border border-amber-900/20 px-6 max-w-2xl mx-auto my-6">
                       <p className="text-amber-200/60 font-serif mb-1">Aucune note libre ici.</p>
-                      <p className="text-xs text-amber-200/40 font-sans">Créez une note indépendante via le bouton en haut.</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -323,6 +319,7 @@ export function IdeasPage() {
                           onEdit={(ideaToEdit) => { setSelectedIdea(ideaToEdit); setIsModalOpen(true); }}
                           onDelete={(id, e) => handleDeleteIdea(id, e)}
                           onVersions={(ideaToOpen) => navigate(`/ideas/${ideaToOpen.id}/versions`)}
+                          onAttach={() => setIdeaToAttach(idea)}
                         />
                       ))}
                     </div>
@@ -335,7 +332,6 @@ export function IdeasPage() {
         })}
       </div>
 
-      {/* --- MODALES --- */}
       <IdeaModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -366,6 +362,32 @@ export function IdeasPage() {
           await Promise.all([refreshIdeas(), refreshSheets()]);
         }}
       />
+
+      <AttachToSheetModal
+        idea={ideaToAttach}
+        sheets={sheets}
+        categories={categories}
+        books={books}
+        cardsBySheet={cardsBySheet}
+        onClose={() => setIdeaToAttach(null)}
+        onAttached={async () => {
+          await refreshIdeas();
+          await refreshSheets();
+        }}
+      />
+
+      {sheetToAttach && (
+        <AttachNotesModal
+          isOpen={!!sheetToAttach}
+          sheet={sheetToAttach}
+          cards={cardsBySheet.get(sheetToAttach.id) ?? []}
+          onClose={() => setSheetToAttach(null)}
+          onAttached={async () => {
+            await refreshIdeas();
+            await refreshSheets();
+          }}
+        />
+      )}
     </div>
   );
 }

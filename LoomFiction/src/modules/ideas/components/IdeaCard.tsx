@@ -6,6 +6,7 @@ interface IdeaCardProps {
   onEdit: (idea: IdeaResponse) => void;
   onDelete: (id: number, e: React.MouseEvent) => void;
   onVersions: (idea: IdeaResponse) => void;
+  onAttach?: () => void; // <-- Ajout de la propriété optionnelle
 }
 
 const statusConfig: Record<IdeaStatus, { label: string; bg: string; text: string; border: string }> = {
@@ -14,7 +15,7 @@ const statusConfig: Record<IdeaStatus, { label: string; bg: string; text: string
   integrated: { label: '✅ Intégrée', bg: 'bg-emerald-950/60', text: 'text-emerald-300', border: 'border-emerald-800/40' },
 };
 
-export function IdeaCard({ idea, onEdit, onDelete, onVersions }: IdeaCardProps) {
+export function IdeaCard({ idea, onEdit, onDelete, onVersions, onAttach }: IdeaCardProps) {
   const currentStatus = idea.status ? statusConfig[idea.status] : statusConfig['draft'];
 
   return (
@@ -39,6 +40,17 @@ export function IdeaCard({ idea, onEdit, onDelete, onVersions }: IdeaCardProps) 
           </div>
 
           <div className="flex flex-wrap items-center gap-2 opacity-70 group-hover:opacity-100 transition-opacity shrink-0 w-full sm:w-auto">
+            {/* <-- Nouveau bouton pour rattacher à une fiche --> */}
+            {onAttach && !idea.sheetName && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onAttach(); }}
+                className="text-xs bg-amber-950/80 hover:bg-amber-900 text-amber-200 border border-amber-900/30 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer"
+                title="Rattacher à une fiche"
+              >
+                🔗 Rattacher
+              </button>
+            )}
+
             <button
               onClick={() => onVersions(idea)}
               className="text-xs bg-amber-950/80 hover:bg-amber-900 text-amber-200 border border-amber-900/30 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer"
