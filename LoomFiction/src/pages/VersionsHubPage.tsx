@@ -1,40 +1,65 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { offlineChapterService } from '../services/offlineChapterService';
 import { offlineChapterVersionService } from '../services/offlineChapterVersionService';
 import { offlineIdeaService } from '../services/offlineIdeaService';
 import { offlineIdeaVersionService } from '../services/offlineIdeaVersionService';
+import { offlineBookService } from '../services/offlineBookService';
+import { useCategories } from '../modules/categories/hooks/useCategories';
+import { useSheets } from '../modules/sheets/hooks/useSheets';
+import type { BookResponse } from '../types/book';
+import type { ChapterResponse } from '../types/chapter';
 import type { ChapterVersionResponse } from '../types/chapterVersion';
+import type { IdeaResponse } from '../types/idea';
 import type { IdeaVersionResponse } from '../types/ideaVersion';
 
-type VersionRow =
-  | {
-      kind: 'chapter';
-      id: number;
-      version: ChapterVersionResponse;
-      parentTitle: string;
-      parentSubtitle: string;
-      openPath: string | null;
-    }
-  | {
-      kind: 'idea';
-      id: number;
-      version: IdeaVersionResponse;
-      parentTitle: string;
-      parentSubtitle: string;
-      openPath: string | null;
-    };
+interface VersionRow {
+  key: string;
+  kind: 'chapter' | 'idea';
+  versionNumber: number | string;
+  versionName: string;
+  updatedAt: string;
+  parentTitle: string;
+  /** Parent supprimé : on ne sait plus à quoi la version se rattachait. */
+  missing: boolean;
+  bookId: number | null;
+  chapterNumber?: number;
+  categoryId?: number | null;
+  sheetId?: number | null;
+  openPath: string | null;
+}
+
+interface Loaded {
+  books: BookResponse[];
+  chapters: { version: ChapterVersionResponse; chapter: ChapterResponse | null }[];
+  ideas: { version: IdeaVersionResponse; idea: IdeaResponse | null }[];
+}
+
+const fold = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+function cached<T>(cache: Map<number, Promise<T | null>>, id: number, fetch: (id: number) => Promise<T>) {
+  let promise = cache.get(id);
+  if (!promise) {
+    promise = fetch(id).catch(() => null);
+    cache.set(id, promise);
+  }
+  return promise;
+}
+
+const pill = 'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium';
 
 type VersionsSectionProps = {
   title: string;
   subtitle: string;
   tag: string;
   emptyLabel: string;
+  contextLabel: string;
   rows: VersionRow[];
+  renderContext: (row: VersionRow) => ReactNode;
   onOpen: (path: string) => void;
 };
 
-function VersionsSection({ title, subtitle, tag, emptyLabel, rows, onOpen }: VersionsSectionProps) {
+function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows, renderContext, onOpen }: VersionsSectionProps) {
   const openButton = (row: VersionRow, className = '') => (
     <button
       onClick={() => row.openPath && onOpen(row.openPath)}
@@ -62,15 +87,16 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, rows, onOpen }: Ver
           {/* Mobile : une carte compacte par version, tout est visible sans scroll horizontal */}
           <ul className="md:hidden divide-y divide-amber-900/10">
             {rows.map((row) => (
-              <li key={`${row.kind}-${row.id}`} className="p-3 flex items-center gap-3">
-                <span className="inline-flex h-9 min-w-9 px-1.5 shrink-0 items-center justify-center rounded-full border border-amber-800/40 bg-amber-950 text-amber-300 text-xs font-bold">
-                  v{row.version.versionNumber}
+              <li key={row.key} className="p-3 flex items-start gap-3">
+                <span className="mt-0.5 inline-flex h-9 min-w-9 px-1.5 shrink-0 items-center justify-center rounded-full border border-amber-800/40 bg-amber-950 text-amber-300 text-xs font-bold">
+                  v{row.versionNumber}
                 </span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 space-y-1.5">
                   <div className="font-semibold text-amber-100 truncate">{row.parentTitle}</div>
-                  <div className="text-xs text-amber-200/40 truncate">{row.parentSubtitle}</div>
-                  <div className="text-[11px] text-amber-200/50 mt-0.5">
-                    {new Date(row.version.updatedAt).toLocaleDateString()}
+                  <div className="flex flex-wrap gap-1.5">{renderContext(row)}</div>
+                  <div className="text-[11px] text-amber-200/50">
+                    {new Date(row.updatedAt).toLocaleDateString()}
+                    {row.versionName && ` · ${row.versionName}`}
                   </div>
                 </div>
                 {openButton(row, 'shrink-0')}
@@ -83,7 +109,8 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, rows, onOpen }: Ver
             <table className="min-w-full divide-y divide-amber-900/20">
               <thead className="bg-neutral-950/80">
                 <tr className="text-left text-xs uppercase tracking-[0.22em] text-amber-200/40">
-                  <th className="px-5 py-4 font-medium">Parent</th>
+                  <th className="px-5 py-4 font-medium">Nom</th>
+                  <th className="px-5 py-4 font-medium">{contextLabel}</th>
                   <th className="px-5 py-4 font-medium">Version</th>
                   <th className="px-5 py-4 font-medium">Mise à jour</th>
                   <th className="px-5 py-4 font-medium">Actions</th>
@@ -91,14 +118,19 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, rows, onOpen }: Ver
               </thead>
               <tbody className="divide-y divide-amber-900/10">
                 {rows.map((row) => (
-                  <tr key={`${row.kind}-${row.id}`} className="hover:bg-neutral-900/50 transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="font-semibold text-amber-100">{row.parentTitle}</div>
-                      <div className="text-xs text-amber-200/40">{row.parentSubtitle}</div>
+                  <tr key={row.key} className="hover:bg-neutral-900/50 transition-colors">
+                    <td className="px-5 py-4 max-w-xs">
+                      <div className="font-semibold text-amber-100 truncate">{row.parentTitle}</div>
                     </td>
-                    <td className="px-5 py-4 text-amber-100">v{row.version.versionNumber}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-wrap gap-1.5">{renderContext(row)}</div>
+                    </td>
+                    <td className="px-5 py-4 text-amber-100 whitespace-nowrap">
+                      v{row.versionNumber}
+                      {row.versionName && <div className="max-w-40 truncate text-xs text-amber-200/40">{row.versionName}</div>}
+                    </td>
                     <td className="px-5 py-4 text-amber-200/70 text-sm whitespace-nowrap">
-                      {new Date(row.version.updatedAt).toLocaleString()}
+                      {new Date(row.updatedAt).toLocaleString()}
                     </td>
                     <td className="px-5 py-4">{openButton(row)}</td>
                   </tr>
@@ -114,10 +146,15 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, rows, onOpen }: Ver
 
 export function VersionsHubPage() {
   const navigate = useNavigate();
-  const [chapterRows, setChapterRows] = useState<VersionRow[]>([]);
-  const [ideaRows, setIdeaRows] = useState<VersionRow[]>([]);
+  const { categories } = useCategories();
+  const { sheets } = useSheets();
+
+  const [loaded, setLoaded] = useState<Loaded>({ books: [], chapters: [], ideas: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [search, setSearch] = useState('');
+  const [bookFilter, setBookFilter] = useState('all'); // 'all' | 'none' | id du roman
 
   useEffect(() => {
     let cancelled = false;
@@ -127,64 +164,32 @@ export function VersionsHubPage() {
         setIsLoading(true);
         setError(null);
 
-        const [chapterVersions, ideaVersions] = await Promise.all([
+        const [chapterVersions, ideaVersions, books] = await Promise.all([
           offlineChapterVersionService.getAll(),
           offlineIdeaVersionService.getAll(),
+          offlineBookService.getAll(),
         ]);
 
-        const chapterRowsData = await Promise.all(
-          chapterVersions.map(async (version) => {
-            try {
-              const chapter = await offlineChapterService.getById(version.chapterId);
-              return {
-                kind: 'chapter' as const,
-                id: version.id,
-                version,
-                parentTitle: chapter.title,
-                parentSubtitle: `Chapitre ${chapter.chapter_number} · Livre #${chapter.book_id}`,
-                openPath: `/books/${chapter.book_id}/chapters/${chapter.id}/versions/${version.id}`,
-              };
-            } catch {
-              return {
-                kind: 'chapter' as const,
-                id: version.id,
-                version,
-                parentTitle: 'Chapitre supprimé',
-                parentSubtitle: `Parent introuvable · chapterId ${version.chapterId}`,
-                openPath: null,
-              };
-            }
-          })
-        );
+        const chapterCache = new Map<number, Promise<ChapterResponse | null>>();
+        const ideaCache = new Map<number, Promise<IdeaResponse | null>>();
 
-        const ideaRowsData = await Promise.all(
-          ideaVersions.map(async (version) => {
-            try {
-              const idea = await offlineIdeaService.getById(version.ideaId);
-              return {
-                kind: 'idea' as const,
-                id: version.id,
-                version,
-                parentTitle: idea.name,
-                parentSubtitle: idea.bookId ? `Roman #${idea.bookId}` : 'Carnet global',
-                openPath: `/ideas/${idea.id}/versions/${version.id}`,
-              };
-            } catch {
-              return {
-                kind: 'idea' as const,
-                id: version.id,
-                version,
-                parentTitle: 'Idée supprimée',
-                parentSubtitle: `Parent introuvable · ideaId ${version.ideaId}`,
-                openPath: null,
-              };
-            }
-          })
-        );
+        const [chapters, ideas] = await Promise.all([
+          Promise.all(
+            chapterVersions.map(async (version) => ({
+              version,
+              chapter: await cached(chapterCache, version.chapterId, (id) => offlineChapterService.getById(id)),
+            }))
+          ),
+          Promise.all(
+            ideaVersions.map(async (version) => ({
+              version,
+              idea: await cached(ideaCache, version.ideaId, (id) => offlineIdeaService.getById(id)),
+            }))
+          ),
+        ]);
 
         if (cancelled) return;
-        setChapterRows(chapterRowsData);
-        setIdeaRows(ideaRowsData);
+        setLoaded({ books: books ?? [], chapters, ideas });
       } catch (loadError) {
         console.error('Erreur de chargement du tableau des versions :', loadError);
         if (!cancelled) setError('Impossible de charger les versions.');
@@ -200,13 +205,131 @@ export function VersionsHubPage() {
     };
   }, []);
 
-  const stats = useMemo(() => {
-    return [
-      { label: 'Chapitres', value: chapterRows.length },
-      { label: 'Idées', value: ideaRows.length },
-      { label: 'Total', value: chapterRows.length + ideaRows.length },
-    ];
-  }, [chapterRows.length, ideaRows.length]);
+  const bookTitleById = useMemo(() => new Map(loaded.books.map((book) => [book.id, book.title] as const)), [loaded.books]);
+  const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category] as const)), [categories]);
+  const sheetNameById = useMemo(() => new Map(sheets.map((sheet) => [sheet.id, sheet.name] as const)), [sheets]);
+
+  const byNewest = (a: VersionRow, b: VersionRow) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+
+  const chapterRows = useMemo<VersionRow[]>(
+    () =>
+      loaded.chapters
+        .map(({ version, chapter }): VersionRow => ({
+          key: `chapter-${version.id}`,
+          kind: 'chapter',
+          versionNumber: version.versionNumber,
+          versionName: version.name ?? '',
+          updatedAt: version.updatedAt,
+          parentTitle: chapter ? chapter.title : 'Chapitre supprimé',
+          missing: !chapter,
+          bookId: chapter ? Number(chapter.book_id) : null,
+          chapterNumber: chapter?.chapter_number,
+          openPath: chapter ? `/books/${chapter.book_id}/chapters/${chapter.id}/versions/${version.id}` : null,
+        }))
+        .sort(byNewest),
+    [loaded.chapters]
+  );
+
+  const ideaRows = useMemo<VersionRow[]>(
+    () =>
+      loaded.ideas
+        .map(({ version, idea }): VersionRow => ({
+          key: `idea-${version.id}`,
+          kind: 'idea',
+          versionNumber: version.versionNumber,
+          versionName: version.name ?? '',
+          updatedAt: version.updatedAt,
+          parentTitle: idea ? idea.name : 'Idée supprimée',
+          missing: !idea,
+          bookId: idea?.bookId ?? null,
+          categoryId: idea?.categoryId ?? null,
+          sheetId: idea?.sheetId ?? null,
+          openPath: idea ? `/ideas/${idea.id}/versions/${version.id}` : null,
+        }))
+        .sort(byNewest),
+    [loaded.ideas]
+  );
+
+  const bookLabel = (row: VersionRow): string | null => (row.bookId == null ? null : bookTitleById.get(row.bookId) ?? 'Roman introuvable');
+
+  const query = fold(search.trim());
+  const matches = (row: VersionRow) => {
+    if (bookFilter === 'none') {
+      if (row.missing || row.bookId != null) return false;
+    } else if (bookFilter !== 'all' && String(row.bookId) !== bookFilter) {
+      return false;
+    }
+
+    if (!query) return true;
+    const category = row.categoryId != null ? categoryById.get(row.categoryId)?.name : '';
+    const sheet = row.sheetId != null ? sheetNameById.get(row.sheetId) : '';
+    return fold([row.parentTitle, row.versionName, bookLabel(row) ?? '', category ?? '', sheet ?? ''].join('\n')).includes(query);
+  };
+
+  const visibleChapters = chapterRows.filter(matches);
+  const visibleIdeas = ideaRows.filter(matches);
+  const filtering = bookFilter !== 'all' || query !== '';
+
+  const renderContext = (row: VersionRow): ReactNode => {
+    if (row.missing) {
+      return (
+        <span className={`${pill} border-red-900/40 bg-red-950/40 text-red-300`}>
+          Parent introuvable : l'origine de cette version est perdue
+        </span>
+      );
+    }
+
+    const book = bookLabel(row);
+    const category = row.categoryId != null ? categoryById.get(row.categoryId) : undefined;
+    const sheet = row.sheetId != null ? sheetNameById.get(row.sheetId) : undefined;
+
+    return (
+      <>
+        {book ? (
+          <span className={`${pill} border-amber-800/40 bg-amber-950 text-amber-300`}>
+            <span aria-hidden>📚</span>
+            <span className="truncate">{book}</span>
+          </span>
+        ) : (
+          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200/70`}>
+            <span aria-hidden>🌐</span>
+            {row.kind === 'chapter' ? 'Roman inconnu' : 'Carnet global'}
+          </span>
+        )}
+
+        {row.kind === 'chapter' && row.chapterNumber != null && (
+          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>Chapitre {row.chapterNumber}</span>
+        )}
+
+        {row.kind === 'idea' && category && (
+          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: category.color }} />
+            <span className="truncate">{category.name}</span>
+          </span>
+        )}
+
+        {row.kind === 'idea' && row.sheetId != null && (
+          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>
+            <span aria-hidden>🗂️</span>
+            <span className="truncate">{sheet ?? 'Fiche introuvable'}</span>
+          </span>
+        )}
+
+        {row.kind === 'idea' && row.sheetId == null && (
+          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200/60`}>Note libre</span>
+        )}
+      </>
+    );
+  };
+
+  const stats = [
+    { label: 'Chapitres', value: visibleChapters.length },
+    { label: 'Idées', value: visibleIdeas.length },
+    { label: 'Total', value: visibleChapters.length + visibleIdeas.length },
+  ];
+
+  const inputClass =
+    'w-full rounded-xl border border-amber-900/30 bg-neutral-900 px-3 sm:px-4 py-2.5 sm:py-3 text-amber-100 placeholder:text-amber-200/30 focus:outline-none focus:ring-1 focus:ring-amber-500';
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif overflow-x-hidden">
@@ -233,6 +356,46 @@ export function VersionsHubPage() {
           ))}
         </section>
 
+        {/* Filtres : retrouver les versions d'un roman, d'une fiche, d'une catégorie… */}
+        <section className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/55 p-3 sm:p-5 shadow-xl">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,16rem)_auto] sm:items-end">
+            <div>
+              <label className="block text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-1.5">Rechercher</label>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Titre, roman, catégorie, fiche..."
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-1.5">Roman</label>
+              <select value={bookFilter} onChange={(event) => setBookFilter(event.target.value)} className={`${inputClass} cursor-pointer`}>
+                <option value="all">Tous les romans</option>
+                <option value="none">Sans roman (carnet global)</option>
+                {[...loaded.books]
+                  .sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }))
+                  .map((book) => (
+                    <option key={book.id} value={String(book.id)}>
+                      {book.title}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            {filtering && (
+              <button
+                onClick={() => {
+                  setSearch('');
+                  setBookFilter('all');
+                }}
+                className="rounded-xl border border-amber-900/30 bg-neutral-900 px-4 py-2.5 sm:py-3 text-sm font-medium text-amber-200 transition-colors hover:bg-neutral-800 cursor-pointer"
+              >
+                Réinitialiser
+              </button>
+            )}
+          </div>
+        </section>
+
         {isLoading ? (
           <div className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/55 p-6 sm:p-8 text-amber-200/60 shadow-xl">
             Chargement du tableau des versions...
@@ -247,8 +410,10 @@ export function VersionsHubPage() {
               title="Versions des chapitres"
               subtitle="Accès direct à chaque chapitre et à son historique"
               tag="Chapter versions"
-              emptyLabel="Aucune version de chapitre."
-              rows={chapterRows}
+              emptyLabel={filtering ? 'Aucune version de chapitre ne correspond.' : 'Aucune version de chapitre.'}
+              contextLabel="Roman / chapitre"
+              rows={visibleChapters}
+              renderContext={renderContext}
               onOpen={navigate}
             />
 
@@ -256,8 +421,10 @@ export function VersionsHubPage() {
               title="Versions des idées"
               subtitle="Accès direct à chaque idée et à son historique"
               tag="Idea versions"
-              emptyLabel="Aucune version d’idée."
-              rows={ideaRows}
+              emptyLabel={filtering ? 'Aucune version d’idée ne correspond.' : 'Aucune version d’idée.'}
+              contextLabel="Roman / catégorie / fiche"
+              rows={visibleIdeas}
+              renderContext={renderContext}
               onOpen={navigate}
             />
           </>
