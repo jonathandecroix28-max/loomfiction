@@ -255,13 +255,13 @@ export function VersionsHubPage() {
 
     try {
       if (row.kind === 'chapter') {
-        await offlineChapterVersionService.delete(row.versionId);
+        await offlineChapterVersionService.remove(row.versionId);
         setLoaded((prev) => ({
           ...prev,
           chapters: prev.chapters.filter((c) => c.version.id !== row.versionId),
         }));
       } else {
-        await offlineIdeaVersionService.delete(row.versionId);
+        await offlineIdeaVersionService.remove(row.versionId);
         setLoaded((prev) => ({
           ...prev,
           ideas: prev.ideas.filter((i) => i.version.id !== row.versionId),
