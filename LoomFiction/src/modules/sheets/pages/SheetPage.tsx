@@ -1,12 +1,14 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSheetPage } from '../hooks/useSheetPage';
+import { useCategories } from '../../categories/hooks/useCategories';
 import { SheetCardItem } from '../components/SheetCardItem';
 import { SheetDocument } from '../components/SheetDocument';
 import { IdeaModal } from '../../ideas/components/IdeaModal';
+import { ImportSheetModal } from '../components/ImportSheetModal';
 import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
+import { exportSheetToJson, exportSheetToMarkdownFile } from '../services/sheetExchange';
 import type { IdeaResponse, IdeaUpsertRequest } from '../../../types/idea';
 
 type Mode = 'cards' | 'document';
@@ -38,12 +40,16 @@ export function SheetPage() {
     reload,
   } = useSheetPage(numSheetId);
 
+  const { categories } = useCategories();
+
   const [mode, setMode] = useState<Mode>('cards');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [cardToEdit, setCardToEdit] = useState<IdeaResponse | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (error || !sheet)) {
@@ -318,31 +324,73 @@ export function SheetPage() {
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 font-sans print:hidden">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {mode === 'cards' ? (
               <button
                 onClick={openCreate}
                 className={`${toolbarBtn} border-amber-600 bg-amber-700 text-amber-50 shadow-md hover:bg-amber-600`}
               >
-                + Ajouter une caractéristique
+                + Ajouter une characteristic
               </button>
             ) : (
-              <>
-                <button
-                  onClick={() => void copyMarkdown()}
-                  className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
-                >
-                  📋 Copier en Markdown
-                </button>
-
-                <button
-                  onClick={() => window.print()}
-                  className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
-                >
-                  🖨️ Imprimer / PDF
-                </button>
-              </>
+              <button
+                onClick={() => window.print()}
+                className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
+              >
+                🖨️ Imprimer / PDF
+              </button>
             )}
+
+            {/* Menu d'Exportation */}
+            <div className="relative">
+              <button
+                onClick={() => setIsExportMenuOpen((open) => !open)}
+                className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800 flex items-center gap-1.5`}
+              >
+                <span>💾 Exporter</span>
+                <span className="text-xs">▾</span>
+              </button>
+
+              {isExportMenuOpen && (
+                <div className="absolute left-0 mt-2 w-56 rounded-2xl border border-amber-900/40 bg-[#1c1411] p-2 shadow-2xl z-20 space-y-1">
+                  <button
+                    onClick={() => {
+                      exportSheetToJson(sheet, category, cards);
+                      setIsExportMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-neutral-900 text-amber-100"
+                  >
+                    📄 Fichier JSON (.json)
+                  </button>
+                  <button
+                    onClick={() => {
+                      exportSheetToMarkdownFile(sheet, category, cards);
+                      setIsExportMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-neutral-900 text-amber-100"
+                  >
+                    📝 Fichier Markdown (.md)
+                  </button>
+                  <button
+                    onClick={() => {
+                      void copyMarkdown();
+                      setIsExportMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-neutral-900 text-amber-100"
+                  >
+                    📋 Copier le Markdown
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Bouton d'Importation */}
+            <button
+              onClick={() => setIsImportOpen(true)}
+              className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
+            >
+              📥 Importer une fiche
+            </button>
           </div>
 
           <button
@@ -400,6 +448,16 @@ export function SheetPage() {
         lockedCategoryId={sheet.categoryId}
         sortOrder={cards.length}
         onSuccess={() => void reload()}
+      />
+
+      <ImportSheetModal
+        isOpen={isImportOpen}
+        categories={categories}
+        defaultCategoryId={sheet.categoryId}
+        onClose={() => setIsImportOpen(false)}
+        onImported={(importedSheet) => {
+          navigate(`/ideas/fiches/${importedSheet.id}`);
+        }}
       />
     </div>
   );
