@@ -6,7 +6,7 @@ interface IdeaCardProps {
   onEdit: (idea: IdeaResponse) => void;
   onDelete: (id: number, e: React.MouseEvent) => void;
   onVersions: (idea: IdeaResponse) => void;
-  onAttach?: () => void; // <-- Ajout de la propriété optionnelle
+  onAttach?: () => void;
 }
 
 const statusConfig: Record<IdeaStatus, { label: string; bg: string; text: string; border: string }> = {
@@ -19,71 +19,75 @@ export function IdeaCard({ idea, onEdit, onDelete, onVersions, onAttach }: IdeaC
   const currentStatus = idea.status ? statusConfig[idea.status] : statusConfig['draft'];
 
   return (
-    <div className="bg-neutral-950/70 border border-amber-900/25 rounded-2xl p-5 sm:p-6 md:p-8 shadow-xl hover:border-amber-600/40 transition-all flex flex-col justify-between group">
+    <div className="bg-neutral-950/70 border border-amber-900/25 rounded-2xl p-5 shadow-xl hover:border-amber-600/40 transition-all flex flex-col justify-between group">
       <div>
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
-          <div className="flex flex-wrap items-center gap-2 min-w-0">
-            <span className={`text-xs font-medium px-3 py-1 rounded-full border ${currentStatus.bg} ${currentStatus.text} ${currentStatus.border}`}>
+        <div className="flex items-start justify-between gap-4 mb-4">
+          
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+            <span className={`text-[10px] sm:text-xs font-medium px-2.5 py-1 rounded-full border ${currentStatus.bg} ${currentStatus.text} ${currentStatus.border} whitespace-nowrap`}>
               {currentStatus.label}
             </span>
 
-            <span className="text-xs font-serif text-amber-400 font-medium">
+            <span className="text-[10px] sm:text-xs font-serif text-amber-400 font-medium whitespace-nowrap">
               📚 {idea.bookTitle || 'Roman non rattaché'}
             </span>
 
-            {/* Carte appartenant à une fiche */}
             {idea.sheetName && (
-              <span className="text-xs font-serif text-amber-300/80 font-medium">
+              <span className="text-[10px] sm:text-xs font-serif text-amber-300/80 font-medium whitespace-nowrap">
                 🗂️ {idea.sheetName}
               </span>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 opacity-70 group-hover:opacity-100 transition-opacity shrink-0 w-full sm:w-auto">
-            {/* <-- Nouveau bouton pour rattacher à une fiche --> */}
+          <div className="flex items-center gap-1.5 shrink-0 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
             {onAttach && !idea.sheetName && (
               <button
                 onClick={(e) => { e.stopPropagation(); onAttach(); }}
-                className="text-xs bg-amber-950/80 hover:bg-amber-900 text-amber-200 border border-amber-900/30 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center bg-amber-950/80 hover:bg-amber-900 text-amber-200 border border-amber-900/30 rounded-lg transition cursor-pointer"
                 title="Rattacher à une fiche"
               >
-                🔗 Rattacher
+                🔗
               </button>
             )}
 
             <button
               onClick={() => onVersions(idea)}
-              className="text-xs bg-amber-950/80 hover:bg-amber-900 text-amber-200 border border-amber-900/30 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center bg-neutral-900/80 hover:bg-neutral-800 text-amber-200 border border-amber-900/30 rounded-lg transition cursor-pointer"
+              title="Historique des versions"
             >
-              Versions
+              ⏳
             </button>
+            
             <button
               onClick={() => onEdit(idea)}
-              className="text-xs bg-neutral-900 hover:bg-neutral-800 text-amber-200 border border-amber-900/30 px-3 py-1.5 rounded-lg transition font-medium cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center bg-neutral-900/80 hover:bg-neutral-800 text-amber-200 border border-amber-900/30 rounded-lg transition cursor-pointer"
+              title="Éditer"
             >
-              Éditer
+              ✏️
             </button>
+            
             <button
               onClick={(e) => onDelete(idea.id, e)}
-              className="text-xs bg-red-950/50 hover:bg-red-900/80 text-red-300 border border-red-900/30 px-2.5 py-1.5 rounded-lg transition cursor-pointer"
-              title="Supprimer l'idée"
+              className="w-8 h-8 flex items-center justify-center bg-red-950/40 hover:bg-red-900/80 text-red-400 border border-red-900/30 rounded-lg transition cursor-pointer"
+              title="Supprimer"
             >
-              ✕
+              🗑️
             </button>
           </div>
         </div>
 
-        <h3 className="font-serif font-bold text-amber-100 text-xl md:text-2xl tracking-tight mb-3">
+        {/* Contenu principal */}
+        <h3 className="font-serif font-bold text-amber-100 text-lg md:text-xl tracking-tight mb-2 pr-2">
           {idea.name}
         </h3>
 
-        {/* Espace de lecture long format */}
-        <div className="text-amber-200/80 font-serif text-base leading-relaxed whitespace-pre-wrap pt-3 border-t border-amber-900/20 mb-6 wrap-break-word">
+        <div className="text-amber-200/70 font-serif text-sm md:text-base leading-relaxed whitespace-pre-wrap pt-3 border-t border-amber-900/20 mb-4 wrap-break-word">
           {idea.description || "Aucune description détaillée."}
         </div>
       </div>
 
-      <div className="pt-4 border-t border-amber-900/25 flex items-center justify-between text-xs text-amber-200/40 font-serif">
+      {/* Pied de carte */}
+      <div className="pt-3 border-t border-amber-900/20 flex items-center justify-between text-[11px] text-amber-200/40 font-serif mt-auto">
         <span>Créée le {formatDate(idea.createdAt)}</span>
       </div>
     </div>
