@@ -14,7 +14,7 @@ export const CATEGORY_PRESETS: CategoryPreset[] = [
   { name: 'Créature', color: '#a16207', template: ['Apparence', 'Habitat', 'Comportement', 'Pouvoirs et capacités', 'Relations avec les autres créatures'] },
   { name: 'Événement', color: '#b45309', template: ['Résumé', 'Lieu et date', 'Personnages impliqués', 'Conséquences', 'Répercussions à long terme'] },
   { name: 'Autre', color: '#6b7280', template: ['Description', 'Détails supplémentaires'] },
-  { name: 'Immportant', color: '#f59e0b', template: ['Résumé', 'Détails clés', 'Conséquences', 'Répercussions à long terme'] },
+  { name: 'Important', color: '#f59e0b', template: ['Résumé', 'Détails clés', 'Conséquences', 'Répercussions à long terme'] },
   { name: 'Ressource', color: '#059669', template: ['Description', 'Utilisation', 'Disponibilité', 'Valeur'] },
   
 ];
