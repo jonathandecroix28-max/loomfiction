@@ -15,6 +15,7 @@ export default defineConfig({
         description: 'Écris tes livres, chapitres et idées, même sans connexion.',
         lang: 'fr',
         display: 'standalone',
+        orientation: 'portrait-primary',
         start_url: '/',
         scope: '/',
         theme_color: '#b45309',
@@ -24,6 +25,19 @@ export default defineConfig({
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        shortcuts: [
+          {
+            name: 'Nouveau livre',
+            short_name: 'Nouveau livre',
+            description: 'Créer un nouveau livre',
+            url: '/books/new',
+            icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+          }
+        ],
+        screenshots: [
+          { src: '/screenshot-mobile.png', sizes: '1080x1920', type: 'image/png' },
+          { src: '/screenshot-desktop.png', sizes: '1920x1080', type: 'image/png', form_factor: 'wide' }
+        ]
       },
       workbox: {
         // tout le "shell" de l'app est mis en cache pour fonctionner sans internet
