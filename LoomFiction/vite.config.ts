@@ -30,7 +30,7 @@ export default defineConfig({
             name: 'Nouveau livre',
             short_name: 'Nouveau livre',
             description: 'Créer un nouveau livre',
-            url: '/books/new',
+            url: '/books',
             icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
           }
         ],
