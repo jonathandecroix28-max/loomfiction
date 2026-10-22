@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Image from '@tiptap/extension-image';
-import DOMPurify from 'dompurify'; 
+import { ChapterContent, ChapterHeading, READING_COLUMN } from '../components/ChapterReading';
+import { useKeyboardViewport } from '../../../hooks/useKeyboardViewport';
 import { offlineChapterService } from '../../../services/offlineChapterService';
 import { offlineChapterVersionService } from '../../../services/offlineChapterVersionService';
 import { useUpdateChapter } from '../../chapters/hooks/UseUpdateChapter';
@@ -13,6 +14,11 @@ import { EditorToolbar } from '../../../components/tools/EditorToolbar';
 import { imageFilesFrom, insertImageFiles } from '../../../utils/images/editorImages';
 import type { ChapterResponse } from '../../../types/chapter';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
+
+const keepEditorFocus = (event: MouseEvent) => {
+  if ((event.target as HTMLElement).closest('input, textarea, select')) return;
+  event.preventDefault();
+};
 
 export function ChapterEditorPage() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
@@ -25,6 +31,7 @@ export function ChapterEditorPage() {
   const [saveMessage, setSaveMessage] = useState('');
   const [isPreview, setIsPreview] = useState(false); 
   const [imageError, setImageError] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const { updateChapter, isUpdating, error: updateError } = useUpdateChapter();
   const { versions: chapterVersions, refetch: refetchChapterVersions } = useChapterVersions(chapterIdNumber);
@@ -40,7 +47,7 @@ export function ChapterEditorPage() {
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] text-lg leading-relaxed text-amber-100/90 font-serif',
+        class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] text-lg leading-relaxed text-amber-100/90 font-serif pb-12',
       },
       handlePaste: (view, event) => {
         const files = imageFilesFrom(event.clipboardData?.files);
@@ -60,6 +67,16 @@ export function ChapterEditorPage() {
       },
     },
   });
+
+  const keyboardOpen = useKeyboardViewport(rootRef, !isPageLoading && !!chapter);
+
+  useEffect(() => {
+    if (!keyboardOpen || !editor) return;
+    const timer = setTimeout(() => editor.commands.scrollIntoView(), 150);
+    return () => clearTimeout(timer);
+  }, [keyboardOpen, editor]);
+
+  const previewHtml = useMemo(() => (isPreview && editor ? editor.getHTML() : ''), [isPreview, editor]);
 
   useEffect(() => {
     if (!imageError) return;
@@ -142,7 +159,7 @@ export function ChapterEditorPage() {
 
   if (isPageLoading) {
     return (
-      <div className="min-h-screen bg-[#1c1411] flex items-center justify-center font-serif text-amber-200/60">
+      <div className="h-[100dvh] bg-[#1c1411] flex items-center justify-center font-serif text-amber-200/60">
         Ouverture de l'écritoire...
       </div>
     );
@@ -153,10 +170,9 @@ export function ChapterEditorPage() {
   const chapterNum = chapter?.chapter_number ?? 1;
 
   return (
-    <div className="min-h-screen bg-[#1c1411] text-[#fcf9f2] flex flex-col font-serif overflow-x-hidden">
+    <div ref={rootRef} className="h-[100dvh] bg-[#1c1411] text-[#fcf9f2] flex flex-col font-serif overflow-hidden">
       
-      {/* HEADER FIXE (Navigation seule) */}
-      <header className="sticky top-0 z-20 bg-[#1c1411]/95 backdrop-blur-md border-b border-amber-900/40 px-3 sm:px-6 py-2.5 flex items-center justify-between shadow-md">
+      <header className="shrink-0 z-20 bg-[#1c1411]/95 backdrop-blur-md border-b border-amber-900/40 px-3 sm:px-6 py-2.5 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => navigate(-1)}
@@ -189,41 +205,38 @@ export function ChapterEditorPage() {
         )}
       </header>
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 pt-6 pb-28 sm:pb-36 flex flex-col">
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          disabled={isPreview}
-          placeholder="Titre du chapitre..."
-          className="text-2xl sm:text-3xl md:text-4xl font-bold font-serif text-amber-100 bg-transparent border-b border-amber-900/30 pb-3 mb-4 focus:outline-none focus:border-amber-600 placeholder:text-amber-200/30 disabled:border-transparent"
-        />
-
+      <main className={`flex-1 overflow-y-auto w-full flex flex-col ${isPreview ? '' : 'px-4 sm:px-6 pt-6'}`}>
         {isPreview ? (
-          <div 
-            className="prose prose-invert max-w-none text-lg leading-relaxed text-amber-100/90 font-serif py-4"
-            dangerouslySetInnerHTML={{ 
-              __html: DOMPurify.sanitize(editor ? editor.getHTML() : '') 
-            }} 
-          />
+          <div className={READING_COLUMN}>
+            <ChapterHeading>{title}</ChapterHeading>
+            <ChapterContent html={previewHtml} />
+          </div>
         ) : (
-          <>
+          <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Titre du chapitre..."
+              className="text-2xl sm:text-3xl md:text-4xl font-bold font-serif text-amber-100 bg-transparent border-b border-amber-900/30 pb-3 mb-4 focus:outline-none focus:border-amber-600 placeholder:text-amber-200/30 shrink-0"
+            />
+
             {imageError && (
-              <p role="alert" className="text-sm font-sans text-red-400 mb-3">
+              <p role="alert" className="text-sm font-sans text-red-400 mb-3 shrink-0">
                 {imageError}
               </p>
             )}
             <div className="flex-1 w-full bg-transparent cursor-text mt-2">
               <EditorContent editor={editor} />
             </div>
-          </>
+          </div>
         )}
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-[#1c1411]/95 backdrop-blur-md border-t border-amber-900/40 p-2 sm:p-3 shadow-2xl space-y-2">
+      <div className="shrink-0 z-30 bg-[#1c1411]/95 backdrop-blur-md border-t border-amber-900/40 p-2 sm:p-3 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.5)] space-y-2">
         
         {!isPreview && (
-          <div className="max-w-4xl mx-auto overflow-x-auto no-scrollbar">
+          <div className="max-w-4xl mx-auto overflow-x-auto no-scrollbar" onMouseDown={keepEditorFocus}>
             <EditorToolbar editor={editor} onImageError={setImageError} />
           </div>
         )}

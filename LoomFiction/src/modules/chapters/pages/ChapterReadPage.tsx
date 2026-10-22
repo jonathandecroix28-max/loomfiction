@@ -1,19 +1,9 @@
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import DOMPurify from 'dompurify';
 import { useChapterReader } from '../hooks/useChapterReader';
 import { useEdgeSwipeNavigation } from '../hooks/useEdgeSwipeNavigation';
 import { EdgeSwipeHint } from '../components/EdgeSwipeHint';
-
-const ChapterContent = memo(function ChapterContent({ html }: { html: string }) {
-  const clean = useMemo(() => DOMPurify.sanitize(html), [html]);
-  return (
-    <div
-      className="prose prose-invert max-w-none text-lg leading-relaxed text-amber-100/90 font-serif mb-16"
-      dangerouslySetInnerHTML={{ __html: clean }}
-    />
-  );
-});
+import { ChapterContent, ChapterHeading, READING_COLUMN } from '../components/ChapterReading';
 
 export function ChapterReadPage() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
@@ -66,10 +56,8 @@ export function ChapterReadPage() {
         <div className="hidden sm:block w-16"></div>
       </header>
 
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16 flex flex-col">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold font-serif text-amber-100 mb-10 text-center tracking-tight">
-          {chapter.title}
-        </h1>
+      <main className={`flex-1 flex flex-col ${READING_COLUMN}`}>
+        <ChapterHeading>{chapter.title}</ChapterHeading>
 
         <ChapterContent html={chapter.content || ''} />
 
