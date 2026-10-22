@@ -3,19 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/loomfiction-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/loomfiction-icon.png" />
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#451a03" />
 
     <title>LoomFiction – écris tes livres, même hors-ligne</title>
     <meta name="description" content="LoomFiction : organise tes romans, chapitres et idées, et écris sans connexion." />
-    <link rel="canonical" href="https://plotweaver-hwf7.onrender.com/" />
+    <link rel="canonical" href="https://loomfiction.onrender.com/" />
+    
     <meta property="og:title" content="LoomFiction" />
     <meta property="og:description" content="Écris tes livres, même hors-ligne." />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://loomfiction.onrender.com/og-image.jpg" />
+    
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LoomFiction" />
+    <meta name="twitter:description" content="Écris tes livres, même hors-ligne." />
+    <meta name="twitter:image" content="https://loomfiction.onrender.com/og-image.jpg" />
   </head>
   <body>
+    <noscript>
+      <div style="padding: 20px; text-align: center; color: white; background-color: #1c1411; font-family: sans-serif; height: 100vh;">
+        LoomFiction nécessite l'activation de JavaScript pour fonctionner correctement.
+      </div>
+    </noscript>
+    
     <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
   </body>
