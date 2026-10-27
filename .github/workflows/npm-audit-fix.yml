@@ -24,6 +24,11 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: 'LoomFiction/package-lock.json'
+          
+      - name: Inspecter les fichiers présents
+        run: |
+          pwd
+          ls -la
 
       - name: Application des correctifs
         run: |
