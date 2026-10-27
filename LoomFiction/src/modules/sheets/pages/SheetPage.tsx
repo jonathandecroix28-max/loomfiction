@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSheetPage } from '../hooks/useSheetPage';
-import { useCategories } from '../../categories/hooks/useCategories';
 import { SheetCardItem } from '../components/SheetCardItem';
 import { SheetDocument } from '../components/SheetDocument';
 import { IdeaModal } from '../../ideas/components/IdeaModal';
-import { ImportSheetModal } from '../components/ImportSheetModal';
 import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
 import { exportSheetToJson, exportSheetToMarkdownFile } from '../services/sheetExchange';
@@ -40,11 +38,8 @@ export function SheetPage() {
     reload,
   } = useSheetPage(numSheetId);
 
-  const { categories } = useCategories();
-
   const [mode, setMode] = useState<Mode>('cards');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isImportOpen, setIsImportOpen] = useState(false);
   const [cardToEdit, setCardToEdit] = useState<IdeaResponse | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -384,13 +379,6 @@ export function SheetPage() {
               )}
             </div>
 
-            {/* Bouton d'Importation */}
-            <button
-              onClick={() => setIsImportOpen(true)}
-              className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
-            >
-              📥 Importer une fiche
-            </button>
           </div>
 
           <button
@@ -448,16 +436,6 @@ export function SheetPage() {
         lockedCategoryId={sheet.categoryId}
         sortOrder={cards.length}
         onSuccess={() => void reload()}
-      />
-
-      <ImportSheetModal
-        isOpen={isImportOpen}
-        categories={categories}
-        defaultCategoryId={sheet.categoryId}
-        onClose={() => setIsImportOpen(false)}
-        onImported={(importedSheet) => {
-          navigate(`/ideas/fiches/${importedSheet.id}`);
-        }}
       />
     </div>
   );

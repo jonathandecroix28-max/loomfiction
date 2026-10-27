@@ -24,6 +24,8 @@ import { NewSheetModal } from '../../sheets/components/NewSheetModal';
 
 import { AttachToSheetModal } from '../../sheets/components/AttachToSheetModal';
 import { AttachNotesModal } from '../../sheets/components/AttachNotesModal';
+import { ImportSheetModal } from '../../sheets/components/ImportSheetModal';
+import { ExportSheetsModal } from '../../sheets/components/ExportSheetsModal';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n > 1 ? many : one}`;
 
@@ -44,6 +46,9 @@ export function IdeasPage() {
   const [selectedIdea, setSelectedIdea] = useState<IdeaResponse | null>(null);
   const [newSheetCategory, setNewSheetCategory] = useState<CategoryResponse | null>(null);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [notice, setNotice] = useState('');
 
   const [ideaToAttach, setIdeaToAttach] = useState<IdeaResponse | null>(null);
   const [sheetToAttach, setSheetToAttach] = useState<SheetResponse | null>(null);
@@ -153,6 +158,23 @@ export function IdeasPage() {
     else alert('Impossible de supprimer.');
   };
 
+  const flash = (text: string) => {
+    setNotice(text);
+    setTimeout(() => setNotice(''), 4000);
+  };
+
+  const handleImported = async (imported: SheetResponse[], { failed }: { failed: number }) => {
+    await Promise.all([refreshIdeas(), refreshSheets()]);
+
+    if (imported.length === 1 && failed === 0) {
+      navigate(`/ideas/fiches/${imported[0].id}`);
+      return;
+    }
+
+    setPendingTab(String(imported[0].categoryId));
+    flash(`${plural(imported.length, 'fiche importée', 'fiches importées')}${failed > 0 ? ` · ${failed} en échec` : ''}.`);
+  };
+
   if (areIdeasLoading) {
     return (
       <div className="flex justify-center items-center h-screen bg-[#1c1411]">
@@ -167,10 +189,20 @@ export function IdeasPage() {
     <div className="min-h-screen bg-[#1c1411] text-[#fcf9f2] flex flex-col font-sans overflow-x-hidden">
       
       <div className="w-full max-w-[1700px] mx-auto px-4 sm:px-6 pt-6 sm:pt-8 md:px-12 shrink-0">
-        <IdeasHeader 
+        <IdeasHeader
           onManageCategories={() => setIsManageCategoriesOpen(true)}
           onNewIdea={() => { setSelectedIdea(null); setIsModalOpen(true); }}
+          onImportSheets={() => setIsImportOpen(true)}
+          onExportSheets={() => setIsExportOpen(true)}
+          showImportExport={categories.length > 0}
+          canExport={sheets.length > 0}
         />
+
+        {notice && (
+          <div role="status" className="mb-4 rounded-xl border border-emerald-900/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-300">
+            {notice}
+          </div>
+        )}
 
         <div className="flex items-center gap-4 sm:gap-8 border-b border-amber-900/40 mb-6 overflow-x-auto text-sm font-serif scrollbar-none pb-1">
           {tabs.map((tab) => (
@@ -263,6 +295,8 @@ export function IdeasPage() {
                           + Nouvelle fiche
                         </button>
                       )}
+
+                      
                     </div>
 
                     {tabSheets.length === 0 ? (
@@ -375,6 +409,30 @@ export function IdeasPage() {
           await refreshSheets();
         }}
       />
+
+      {isImportOpen && (
+        <ImportSheetModal
+          categories={categories}
+          defaultCategoryId={activeTab !== 'all' ? Number(activeTab) : null}
+          onClose={() => setIsImportOpen(false)}
+          onImported={handleImported}
+        />
+      )}
+
+      {isExportOpen && (
+        <ExportSheetsModal
+          sheets={sheets}
+          categories={categories}
+          cardsBySheet={cardsBySheet}
+          defaultSelectedIds={
+            activeTab === 'all'
+              ? sheets.map((sheet) => sheet.id)
+              : sheets.filter((sheet) => String(sheet.categoryId) === activeTab).map((sheet) => sheet.id)
+          }
+          onClose={() => setIsExportOpen(false)}
+          onExported={(count) => flash(`${plural(count, 'fiche exportée', 'fiches exportées')}.`)}
+        />
+      )}
 
       {sheetToAttach && (
         <AttachNotesModal
