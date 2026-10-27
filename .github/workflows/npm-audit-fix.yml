@@ -1,6 +1,8 @@
 name: Audit & Fix NPM
 
 on:
+  push:
+    branches: [ build/workflow ]
   schedule:
     - cron: '0 8 * * 1'
   workflow_dispatch:
