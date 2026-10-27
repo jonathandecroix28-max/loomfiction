@@ -2,7 +2,7 @@ name: Audit and Fix npm Vulnerabilities
 
 on:
   push:
-    branches: [ build/workflows ]
+    branches: [ build/workflow ]
   schedule:
     - cron: '0 8 * * 1'
   workflow_dispatch:
