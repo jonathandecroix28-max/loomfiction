@@ -25,7 +25,6 @@ export function CategoryQuickAdd({ existing, onCreate, onDone, autoFocus = false
       return;
     }
 
-    // Un nom connu (Personnage, Lieu…) reprend sa couleur et ses cartes types
     const preset = presetFor(clean);
 
     setBusy(true);
@@ -78,8 +77,8 @@ export function CategoryQuickAdd({ existing, onCreate, onDone, autoFocus = false
       {error && <p className="text-xs text-red-300">{error}</p>}
 
       {suggestions.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-serif text-xs text-amber-200/40">Suggestions :</span>
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 scrollbar-none sm:flex-wrap sm:overflow-visible sm:whitespace-normal sm:pb-0">
+          <span className="shrink-0 font-serif text-xs text-amber-200/40 sm:shrink">Suggestions :</span>
           {suggestions.map((preset) => (
             <button
               key={preset.name}
@@ -87,7 +86,7 @@ export function CategoryQuickAdd({ existing, onCreate, onDone, autoFocus = false
               disabled={busy}
               onClick={() => void create(preset.name)}
               title={preset.template ? `Avec un modèle de fiche : ${preset.template.join(', ')}` : 'Notes libres'}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-900/40 bg-neutral-900 px-3 py-1.5 text-xs text-amber-200 transition hover:border-amber-600/60 disabled:opacity-50"
+              className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-amber-900/40 bg-neutral-900 px-3 py-1.5 text-xs text-amber-200 transition hover:border-amber-600/60 disabled:opacity-50 sm:shrink"
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: preset.color }} />
               {preset.name}
