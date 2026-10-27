@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'Loomfiction/package-lock.json'
+          cache-dependency-path: 'LoomFiction/package-lock.json'
 
       - name: Application des correctifs
         run: |
