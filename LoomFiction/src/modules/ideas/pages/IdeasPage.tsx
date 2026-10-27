@@ -274,7 +274,7 @@ export function IdeasPage() {
 
           return (
             <div key={tab.id} className="w-full min-w-full shrink-0 snap-start px-4 sm:px-6 md:px-12 py-4 flex flex-col">
-              <div className="w-full max-w-[1700px] mx-auto flex-1 space-y-8 pb-20">
+              <div className="w-full max-w-[1700px] mx-auto flex-1 space-y-8 pb-32 sm:pb-20">
                 <div className="text-xs uppercase tracking-wider text-amber-200/40 font-serif font-semibold">
                   {tab.label} &bull; {summary}
                 </div>

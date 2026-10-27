@@ -16,12 +16,14 @@ export function IdeasHeader({
   canExport,
 }: IdeasHeaderProps) {
   return (
-    <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-      <h1 className="text-3xl font-serif font-bold leading-tight tracking-tight text-amber-100 md:text-4xl">
-        Carnet d'Inspiration Global
-      </h1>
+    <>
+      <div className="mb-6">
+        <h1 className="text-3xl font-serif font-bold leading-tight tracking-tight text-amber-100 md:text-4xl">
+          Carnet d'Inspiration Global
+        </h1>
+      </div>
 
-      <div className="flex w-full flex-wrap items-center justify-start gap-2 self-start md:w-auto md:self-auto">
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] right-3 z-[45] flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-amber-900/50 bg-[#1c1411]/95 p-2 shadow-xl backdrop-blur sm:bottom-auto sm:top-16 sm:right-6 sm:rounded-xl sm:bg-[#1c1411]/95">
         <button
           type="button"
           onClick={onManageCategories}
@@ -70,6 +72,6 @@ export function IdeasHeader({
           </>
         )}
       </div>
-    </div>
+    </>
   );
 }
