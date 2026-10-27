@@ -1,8 +1,6 @@
-name: Audit and Fix npm Vulnerabilities
+name: Audit & Fix NPM
 
 on:
-  push:
-    branches: [ build/workflow ]
   schedule:
     - cron: '0 8 * * 1'
   workflow_dispatch:
@@ -14,6 +12,7 @@ permissions:
 jobs:
   audit-and-fix:
     runs-on: ubuntu-latest
+
     steps:
       - name: Récupération du code
         uses: actions/checkout@v4
@@ -24,15 +23,10 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: 'LoomFiction/package-lock.json'
-          
-      - name: Inspecter les fichiers présents
-        run: |
-          pwd
-          ls -la
 
       - name: Application des correctifs
-        run: |
-          npm audit fix
+        working-directory: ./LoomFiction
+        run: npm audit fix
 
       - name: Création d'une Pull Request
         uses: peter-evans/create-pull-request@v6
