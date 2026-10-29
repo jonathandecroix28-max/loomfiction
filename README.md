@@ -1,21 +1,30 @@
-# loomfiction
+# LoomFiction
 
-Une application web pour créer des histoires interactives. En PWA, vous pouvez créer des histoires avec des choix multiples et des chemins narratifs différents. L'application est conçue pour être facile à utiliser et accessible à tous. En cours de developpement. 
+LoomFiction est une application web PWA pour écrire, structurer et organiser des histoires interactives.
 
+Elle permet de :
+- créer des livres et des chapitres
+- organiser des idées, catégories et feuilles de travail
+- exporter des contenus
+- travailler en mode local / hors ligne
 
-## Comment démarrer le projet en local
+## État de la version
 
-```cd LoomFiction```
+Cette release sur `main` correspond à la version frontend/offline-first.
 
-```npm install```
+La synchronisation avec un backend n’est pas activée dans cette version. Le backend est prévu comme fonctionnalité future pour la synchronisation des données entre appareils et comptes.
 
-```npm run dev```
+## Démarrer en local
 
+```bash
+cd LoomFiction
+npm install
+npm run dev
+```
 
-## Backend
-
-En cours de production, servira de syncronisation entre le back et front
-
+## Déploiement
+La version actuelle est destinée au frontend uniquement.
+Le projet est pensé pour être utilisable sans serveur backend dans un premier temps.
 
 ## Lien du site hébergé
-[https://loomfiction.onrender.com](https://loomfiction.onrender.com)
+https://loomfiction.onrender.com
