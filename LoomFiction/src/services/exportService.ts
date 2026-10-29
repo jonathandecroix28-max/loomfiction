@@ -163,13 +163,25 @@ function remember<T>(cache: Map<string, T>, key: string, compute: () => T): T {
 }
 
 
-const BLANK_PARAGRAPH = /<p(?:\s[^>]*)?>(?:\s|&nbsp;|<br(?:\s[^>]*)?\/?>)*<\/p>/gi;
+function replaceBlankParagraphs(html: string): string {
+  const container = document.createElement('div');
+  container.innerHTML = html;
+
+  container.querySelectorAll('p').forEach((paragraph) => {
+    const text = (paragraph.textContent ?? '').replace(/\u00A0/g, ' ').replace(/\s+/g, '').trim();
+    if (!text) {
+      paragraph.innerHTML = '<br />';
+    }
+  });
+
+  return container.innerHTML;
+}
 
 function normalizeContent(raw: string): string {
   return remember(htmlCache, raw || '', () => {
     const text = raw || '';
     if (looksLikeHtml(text)) {
-      return DOMPurify.sanitize(text).replace(BLANK_PARAGRAPH, '<p class="blank"><br /></p>');
+      return replaceBlankParagraphs(DOMPurify.sanitize(text));
     }
 
     return text

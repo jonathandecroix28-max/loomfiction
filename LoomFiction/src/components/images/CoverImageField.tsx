@@ -7,6 +7,26 @@ interface CoverImageFieldProps {
   error?: string | null;
 }
 
+function sanitizeImageSource(value: string): string | undefined {
+  const candidate = value.trim();
+  if (!candidate) return undefined;
+
+  if (/^data:image\//i.test(candidate)) {
+    return candidate;
+  }
+
+  try {
+    const url = new URL(candidate);
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      return url.href;
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
+}
+
 export function CoverImageField({ value, onChange, error }: CoverImageFieldProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -16,6 +36,7 @@ export function CoverImageField({ value, onChange, error }: CoverImageFieldProps
 
   const hasImage = value.trim() !== '';
   const isLocal = isDataImageUrl(value);
+  const safeImageSrc = sanitizeImageSource(value);
   const urlVisible = !isLocal && (showUrl || hasImage);
   const message = error || fileError;
 
@@ -53,9 +74,9 @@ export function CoverImageField({ value, onChange, error }: CoverImageFieldProps
 
       <div className="flex gap-4 items-start">
         <div className="w-24 h-32 shrink-0 rounded-xl overflow-hidden border border-amber-900/30 bg-neutral-900 flex items-center justify-center">
-          {hasImage && brokenSrc !== value ? (
+          {hasImage && brokenSrc !== value && safeImageSrc ? (
             <img
-              src={value}
+              src={safeImageSrc}
               alt="Aperçu de la couverture"
               className="w-full h-full object-cover"
               onError={() => setBrokenSrc(value)}

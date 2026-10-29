@@ -1,5 +1,6 @@
 const HTML_TAG = /<\/?[a-z][^>]*>/i;
 const HTML_ENTITY = /&(?:[a-z]+|#\d+|#x[0-9a-f]+);/i;
+const UNSAFE_HTML_TAGS = /<(script|style|iframe|object|embed|svg|math)\b[^>]*>([\s\S]*?)<\/\1>|<(script|style|iframe|object|embed|svg|math)\b[^>]*\/?>/gi;
 
 const BLOCK_TAGS = new Set([
   'p', 'div', 'section', 'article', 'header', 'footer', 'figure', 'figcaption',
@@ -15,8 +16,13 @@ export function looksLikeHtml(text: string): boolean {
 }
 
 function stripTagsFallback(html: string): string {
-  return html
-    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
+   let sanitized = html.replace(UNSAFE_HTML_TAGS, ' ');
+   let previous: string;
+   do {
+     previous = sanitized;
+     sanitized = sanitized.replace(UNSAFE_HTML_TAGS, ' ');
+   } while (sanitized !== previous);
+   return sanitized
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<hr\s*\/?>/gi, '\n* * *\n')
     .replace(/<\/(p|div|h[1-6]|li|blockquote|pre|tr)>/gi, '\n')

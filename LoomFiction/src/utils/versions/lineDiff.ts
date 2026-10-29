@@ -28,7 +28,6 @@ export function splitLines(text: string): string[] {
 
 const same = (a: string, b: string) => a.trimEnd() === b.trimEnd();
 
-// Au-delà, la table de programmation dynamique devient trop lourde : on ne cherche plus d'alignement
 const MAX_LCS_CELLS = 4_000_000;
 
 const equalRow = (a: string[], b: string[], i: number, j: number): LineDiffRow => ({
@@ -46,8 +45,8 @@ function diffMiddle(a: string[], b: string[], start: number, endA: number, endB:
   const n = endA - start;
   const m = endB - start;
 
-  let removed: number[] = []; // indices présents seulement côté actuel
-  let added: number[] = []; // indices présents seulement côté version
+  let removed: number[] = []; 
+  let added: number[] = []; 
 
   const flush = () => {
     const pairs = Math.min(removed.length, added.length);
@@ -93,7 +92,6 @@ function diffMiddle(a: string[], b: string[], start: number, endA: number, endB:
 
   if (n === 0 && m === 0) return rows;
 
-  // Trop gros : tout le bloc est considéré comme modifié (apparié ligne à ligne)
   if ((n + 1) * (m + 1) > MAX_LCS_CELLS) {
     for (let i = 0; i < n; i += 1) removed.push(start + i);
     for (let j = 0; j < m; j += 1) added.push(start + j);
@@ -101,7 +99,6 @@ function diffMiddle(a: string[], b: string[], start: number, endA: number, endB:
     return rows;
   }
 
-  // Table à plat (Uint32Array) : beaucoup plus légère qu'un tableau de tableaux
   const w = m + 1;
   const dp = new Uint32Array((n + 1) * w);
 
@@ -174,7 +171,6 @@ export function buildLineDiff(currentText: string, versionText: string): LineDif
 /*  Choix ligne par ligne et fusion                                            */
 /* -------------------------------------------------------------------------- */
 
-// Par défaut : on garde l'actuel, et on prend les lignes qui n'existent que dans la version
 export function defaultChoice(row: LineDiffRow): LineChoice {
   return row.kind === 'version' ? 'version' : 'current';
 }
@@ -197,7 +193,6 @@ export function composeLineMerge(rows: LineDiffRow[], choices: LineChoices): str
     .join('\n');
 }
 
-/** Fusion avec les choix par défaut (version non ouverte dans le comparatif). */
 export function mergeWithDefaults(currentText: string, versionText: string): string {
   const rows = buildLineDiff(currentText, versionText);
   return composeLineMerge(rows, defaultLineChoices(rows));
