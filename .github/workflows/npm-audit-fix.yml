@@ -28,7 +28,7 @@ jobs:
 
       - name: Application des correctifs
         working-directory: ./LoomFiction
-        run: npm audit fix
+        run: npm audit fix || true
 
       - name: Création d'une Pull Request
         uses: peter-evans/create-pull-request@v6
