@@ -1,12 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { countWords, type ExportBook } from '../../services/exportService';
 
-export function useChapterSelection(book: ExportBook | null) {
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+const allIndexes = (book: ExportBook | null): Set<number> =>
+  new Set((book?.chapters ?? []).map((_, i) => i));
 
-  useEffect(() => {
-    setSelected(new Set((book?.chapters ?? []).map((_, i) => i)));
-  }, [book]);
+export function useChapterSelection(book: ExportBook | null) {
+  const [prevBook, setPrevBook] = useState(book);
+  const [selected, setSelected] = useState<Set<number>>(() => allIndexes(book));
+
+  if (book !== prevBook) {
+    setPrevBook(book);
+    setSelected(allIndexes(book));
+  }
 
   const chapters = useMemo(
     () => (book ? book.chapters.filter((_, i) => selected.has(i)) : []),
@@ -29,7 +34,7 @@ export function useChapterSelection(book: ExportBook | null) {
     chapters,
     totalWords,
     toggle,
-    selectAll: () => setSelected(new Set((book?.chapters ?? []).map((_, i) => i))),
+    selectAll: () => setSelected(allIndexes(book)),
     selectNone: () => setSelected(new Set()),
   };
 }

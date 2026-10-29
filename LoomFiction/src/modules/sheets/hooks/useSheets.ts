@@ -17,8 +17,22 @@ export function useSheets() {
   }, []);
 
   useEffect(() => {
-    void refreshSheets();
-  }, [refreshSheets]);
+    let cancelled = false;
+
+    offlineSheetService
+      .getAll()
+      .then((data) => {
+        if (!cancelled) setSheets(data);
+      })
+      .catch((err) => console.error('Erreur de chargement des fiches :', err))
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return { sheets, isLoading, refreshSheets };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import type { CategoryResponse } from '../../../types/category';
 import type { SheetResponse } from '../../../types/sheet';
 import { createSheetFromTemplate, templateFor } from '../../../services/createSheetFromTemplate';
@@ -16,12 +16,15 @@ export function NewSheetModal({ isOpen, category, onClose, onCreated }: NewSheet
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setName('');
-    setUseTemplate(true);
-    setError('');
-  }, [isOpen]);
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setName('');
+      setUseTemplate(true);
+      setError('');
+    }
+  }
 
   if (!isOpen || !category) return null;
 

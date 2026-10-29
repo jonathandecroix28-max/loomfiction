@@ -41,7 +41,11 @@ export function dedupeBy<T extends { id: number }>(keyOf: (item: T) => string) {
 }
 
 /** Pas de réponse HTTP = réseau coupé, serveur injoignable ou délai dépassé. */
-const isNetworkError = (err: unknown): boolean => !(err as any)?.response;
+const isNetworkError = (err: unknown): boolean => httpStatus(err) === undefined;
+
+/** Corps de la réponse d'erreur HTTP, pour les logs. */
+const errorData = (err: unknown): unknown =>
+  (err as { response?: { data?: unknown } } | null)?.response?.data ?? '';
 
 /* -------------------------------------------------------------------------- */
 /*  Configuration                                                              */
@@ -104,12 +108,26 @@ export interface RepositoryConfig<T extends { id: number }, P> {
 /*  Fabrique                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/** Vue minimale d'IndexedDB : les noms de stores sont dynamiques, donc typés par T ici. */
+interface LooseDb<T> {
+  get(store: StoreName, key: number): Promise<T | undefined>;
+  getAll(store: StoreName): Promise<T[]>;
+  getAllFromIndex(store: StoreName, index: string, key: number): Promise<T[]>;
+  put(store: StoreName, value: T): Promise<unknown>;
+}
+
+interface LooseStore<T> {
+  put(value: T): Promise<unknown>;
+  delete(key: number): Promise<unknown>;
+}
+
 export function createOfflineRepository<T extends { id: number }, P>(cfg: RepositoryConfig<T, P>) {
   const normalize = cfg.normalize ?? ((x: T) => x);
   const arrange = cfg.arrange ?? ((x: T[]) => x);
   const blocked = (record: T): boolean => cfg.dependsOnPending?.(record) ?? false;
-  const storeOf = (tx: RwTx) => (tx as any).objectStore(cfg.store);
-  const db = (): Promise<any> => getDb();
+  const storeOf = (tx: RwTx) =>
+    (tx as unknown as { objectStore(name: StoreName): LooseStore<T> }).objectStore(cfg.store);
+  const db = (): Promise<LooseDb<T>> => getDb() as unknown as Promise<LooseDb<T>>;
 
   let syncPromise: Promise<void> | null = null;
 
@@ -148,7 +166,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
             finalize: cfg.finalize,
           });
         }
-      } catch (error) {
+      } catch {
         console.warn(`Mode hors-ligne actif : ${cfg.entity} lus depuis le stockage local.`);
       }
     }
@@ -171,7 +189,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
             scope: { index: parent.index, key: Number(parentId) },
           });
         }
-      } catch (error) {
+      } catch {
         console.warn(`Mode hors-ligne actif : ${cfg.entity} lus depuis le stockage local.`);
       }
     }
@@ -202,7 +220,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
         const created = await net(() => cfg.remote.create(cfg.toPayload(temp)));
         await replace(temp.id, created);
         return normalize(created);
-      } catch (err) {
+      } catch {
         console.log(`${cfg.entity} enregistré localement en attente de synchronisation.`);
       }
     }
@@ -228,8 +246,8 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
         await d.put(cfg.store, serverUpdated);
         await clearOpsFor(cfg.entity, 'update', id);
         return serverUpdated;
-      } catch (err: any) {
-        console.log('Mise à jour enregistrée en local.', err?.response?.data ?? '');
+      } catch (err) {
+        console.log('Mise à jour enregistrée en local.', errorData(err));
       }
     }
     return updated;
@@ -257,7 +275,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
       if (status === 409 && cfg.deleteConflictMessage) {
         await clearOpsFor(cfg.entity, 'delete', id);
         if (existing) await d.put(cfg.store, existing);
-        throw new Error(cfg.deleteConflictMessage);
+        throw new Error(cfg.deleteConflictMessage, { cause: err });
       }
       if (status === 404) {
         await clearOpsFor(cfg.entity, 'delete', id);
@@ -284,7 +302,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
     for (const syncParent of cfg.syncFirst ?? []) {
       try {
         await syncParent();
-      } catch (e) {
+      } catch {
         console.warn('Synchro d\'un parent ignorée temporairement.');
       }
     }
@@ -332,7 +350,7 @@ export function createOfflineRepository<T extends { id: number }, P>(cfg: Reposi
         const res = await net(() => cfg.remote.getAll());
         if (!Array.isArray(res)) return;
         serverItems = res;
-      } catch (err) {
+      } catch {
         return;
       }
     }

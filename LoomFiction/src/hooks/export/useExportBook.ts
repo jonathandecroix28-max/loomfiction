@@ -1,27 +1,30 @@
 import { useEffect, useState } from 'react';
 import { loadBookForExport, type ExportBook } from '../../services/exportService';
 
+type Result = { id: number; book: ExportBook | null; error: string | null };
+
 export function useExportBook(bookId: number | null) {
-  const [book, setBook] = useState<ExportBook | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
 
   useEffect(() => {
-    if (!bookId) { setBook(null); return; }
+    if (!bookId) return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     loadBookForExport(bookId)
-      .then((b) => !cancelled && setBook(b))
+      .then((book) => {
+        if (!cancelled) setResult({ id: bookId, book, error: null });
+      })
       .catch((e) => {
         console.error('Erreur de chargement du roman :', e);
-        if (cancelled) return;
-        setBook(null);
-        setError('Impossible de charger ce roman.');
-      })
-      .finally(() => !cancelled && setLoading(false));
+        if (!cancelled) setResult({ id: bookId, book: null, error: 'Impossible de charger ce roman.' });
+      });
     return () => { cancelled = true; };
   }, [bookId]);
 
-  return { book, loading, error };
+  const current = bookId && result?.id === bookId ? result : null;
+
+  return {
+    book: current?.book ?? null,
+    loading: !!bookId && !current,
+    error: current?.error ?? null,
+  };
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useUpdateBook } from '../hooks/useUpdateBook';
 import type { BookResponse } from '../../../types/book';
 import { CoverImageField } from '../../../components/images/CoverImageField';
@@ -11,25 +11,26 @@ interface BookEditModalProps {
 }
 
 export function BookEditModal({ isOpen, onClose, book, onBookUpdated }: BookEditModalProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [coverImage, setCoverImage] = useState(''); 
+  const [title, setTitle] = useState(book?.title || '');
+  const [description, setDescription] = useState(book?.description || '');
+  const [coverImage, setCoverImage] = useState(book?.coverImage || '');
   const [urlError, setUrlError] = useState<string | null>(null);
   
   const { updateBook, isUpdating, error } = useUpdateBook();
 
-  useEffect(() => {
+  const [prevInputs, setPrevInputs] = useState({ book, isOpen });
+  if (prevInputs.book !== book || prevInputs.isOpen !== isOpen) {
+    setPrevInputs({ book, isOpen });
     if (book) {
       setTitle(book.title || '');
       setDescription(book.description || '');
       setCoverImage(book.coverImage || '');
       setUrlError(null);
     }
-  }, [book, isOpen]);
+  }
 
   if (!isOpen || !book) return null;
 
-  // Petite validation simple d'URL si elle est remplie
   const validateUrl = (url: string) => {
     if (!url.trim()) return true;
     try {

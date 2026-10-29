@@ -52,8 +52,9 @@ export function BookDetailPage() {
 
   const sortedChapters = [...chapters].sort((a, b) => a.chapter_number - b.chapter_number);
   const firstChapter = sortedChapters.length > 0 ? sortedChapters[0] : null;
-  const bookCreatedAt = (book as any).created_at || book.createdAt;
-  const bookCoverImage = (book as any).cover_image || book.coverImage;
+  const legacyBook = book as unknown as { created_at?: string; cover_image?: string };
+  const bookCreatedAt = legacyBook.created_at || book.createdAt;
+  const bookCoverImage = legacyBook.cover_image || book.coverImage;
 
   return (
     <div className="min-h-screen bg-[#1c1411] text-[#fcf9f2] px-4 sm:px-6 py-8 md:px-16 font-sans overflow-x-hidden">

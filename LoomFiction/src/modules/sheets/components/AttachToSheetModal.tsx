@@ -6,7 +6,6 @@ import type { SheetResponse } from '../../../types/sheet';
 import { attachIdeasToSheet, bookOfSheet, foldText } from '../sheetLinks';
 
 interface AttachToSheetModalProps {
-  /** La note libre à rattacher ; null = modale fermée. */
   idea: IdeaResponse | null;
   sheets: SheetResponse[];
   categories: CategoryResponse[];
@@ -16,18 +15,19 @@ interface AttachToSheetModalProps {
   onAttached: () => void | Promise<void>;
 }
 
-/** Depuis une note libre : choisir la fiche dans laquelle elle devient une caractéristique. */
 export function AttachToSheetModal({ idea, sheets, categories, books, cardsBySheet, onClose, onAttached }: AttachToSheetModalProps) {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const [prevIdeaId, setPrevIdeaId] = useState(idea?.id);
+  if (idea?.id !== prevIdeaId) {
+    setPrevIdeaId(idea?.id);
     setQuery('');
     setSelectedId(null);
     setError('');
-  }, [idea?.id]);
+  }
 
   useEffect(() => {
     if (!idea) return;

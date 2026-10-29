@@ -88,10 +88,13 @@ export function IdeasPage() {
   );
 
   useEffect(() => {
-    if (pendingTab && tabs.some((t) => t.id === pendingTab)) {
+    if (!pendingTab || !tabs.some((t) => t.id === pendingTab)) return;
+
+    const frame = requestAnimationFrame(() => {
       goToTab(pendingTab);
       setPendingTab(null);
-    }
+    });
+    return () => cancelAnimationFrame(frame);
   }, [pendingTab, tabs, goToTab]);
 
   const sheetNameById = useMemo(() => new Map(sheets.map((s) => [s.id, s.name] as const)), [sheets]);

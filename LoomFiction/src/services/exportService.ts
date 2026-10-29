@@ -11,7 +11,6 @@ export type ExportBook = { title: string; author?: string; chapters: ExportChapt
 export type ExportOptions = {
   titlePage: boolean;
   chapterNumbers: boolean;
-  /** true (défaut) : paragraphes espacés ; false : retrait de première ligne, façon livre imprimé. */
   spacedParagraphs?: boolean;
 };
 
@@ -87,7 +86,6 @@ export async function loadBookForExport(bookId: number, author?: string): Promis
   };
 }
 
-/** Liste des romans disponibles pour l'export (id + titre). */
 export async function loadBooksForExport(): Promise<{ id: number; title: string }[]> {
   const books = await offlineBookService.getAll();
   return books.map((book) => ({
@@ -107,7 +105,8 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
-// XML : on retire aussi les caractères de contrôle interdits (sinon Word refuse d'ouvrir le fichier)
+
+// eslint-disable-next-line no-control-regex
 const XML_INVALID_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
 
 function escapeXml(text: string): string {
@@ -149,8 +148,7 @@ function downloadBlob(blob: Blob, filename: string): void {
 
 /* ───────────────────────── Performances ───────────────────────── */
 
-// Nettoyer le HTML (DOMPurify) est la partie coûteuse : on le fait une seule fois par contenu,
-// puis aperçu, comptage, copie et export réutilisent le résultat.
+
 const CACHE_LIMIT = 300;
 const htmlCache = new Map<string, string>();
 const wordCache = new Map<string, number>();
@@ -164,8 +162,7 @@ function remember<T>(cache: Map<string, T>, key: string, compute: () => T): T {
   return value;
 }
 
-// HTML nettoyé (le contenu vient de l'éditeur, on ne lui fait jamais confiance aveuglément)
-// L'éditeur écrit une ligne blanche <p></p> : sans hauteur, elle disparaît à l'export. On lui donne une ligne.
+
 const BLANK_PARAGRAPH = /<p(?:\s[^>]*)?>(?:\s|&nbsp;|<br(?:\s[^>]*)?\/?>)*<\/p>/gi;
 
 function normalizeContent(raw: string): string {
@@ -184,7 +181,6 @@ function normalizeContent(raw: string): string {
   });
 }
 
-/** Nombre de mots d'un chapitre : sans DOM, donc quasi instantané même sur un long roman. */
 export function countWords(content: string): number {
   return remember(wordCache, content || '', () => {
     const text = (content || '')
@@ -197,8 +193,7 @@ export function countWords(content: string): number {
 
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-// Traite les chapitres par petits lots et rend la main au navigateur entre deux lots :
-// l'interface reste fluide et la progression peut s'afficher.
+
 async function mapChunked<T, R>(
   items: T[],
   fn: (item: T, index: number) => R,
@@ -216,7 +211,6 @@ async function mapChunked<T, R>(
   return out;
 }
 
-// JSZip n'est chargé qu'au moment d'un export EPUB/DOCX : le bundle de départ reste léger
 async function newZip() {
   const { default: JSZip } = await import('jszip');
   return new JSZip();
@@ -380,7 +374,6 @@ h2 { font-size: 20pt; margin: 0; }
 blockquote { margin: 1em 2em; font-style: italic; }
 `;
 
-// Mise en forme des paragraphes : espacés (défaut) ou avec retrait de première ligne
 function paragraphCss(options: ExportOptions): string {
   const common = `
 .chapter p:not(.kicker) { orphans: 3; widows: 3; text-align: justify; }
@@ -426,8 +419,6 @@ function printHtml(html: string, title: string): Promise<void> {
   return new Promise((resolve) => {
     const iframe = document.createElement('iframe');
     iframe.setAttribute('aria-hidden', 'true');
-    // Cadre de la taille d'une page A4, simplement hors écran : un cadre 0×0 masqué est mal mis en page
-    // (voire tronqué) par certains navigateurs à l'impression.
     iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;height:297mm;border:0;pointer-events:none';
     document.body.appendChild(iframe);
 
@@ -445,14 +436,12 @@ function printHtml(html: string, title: string): Promise<void> {
         return;
       }
 
-      // On attend les polices : sinon la pagination est calculée avec une police de secours
       try {
         await win.document.fonts?.ready;
       } catch {
         /* polices indisponibles : on imprime quand même */
       }
 
-      // Le titre de la page sert souvent de nom de fichier suggéré pour le PDF
       document.title = title;
       win.addEventListener('afterprint', cleanup, { once: true });
       win.focus();
@@ -580,7 +569,6 @@ function uuid(): string {
   });
 }
 
-// Convertit du HTML en XHTML valide (obligatoire pour l'EPUB)
 function toXhtml(html: string): string {
   const serializer = new XMLSerializer();
   return Array.from(parseBody(html).childNodes)
@@ -602,7 +590,6 @@ async function buildEpub(book: ExportBook, options: ExportOptions, onProgress?: 
   const bookId = `urn:uuid:${uuid()}`;
   const modified = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
-  // Le fichier "mimetype" doit être le premier et non compressé
   zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
   zip.file(
     'META-INF/container.xml',
@@ -693,7 +680,7 @@ async function buildEpub(book: ExportBook, options: ExportOptions, onProgress?: 
 
 type RunFmt = { b?: boolean; i?: boolean; u?: boolean; s?: boolean };
 type Seg = { text: string; fmt: RunFmt } | { br: true };
-type DocxCtx = { first: boolean }; // true = prochain paragraphe sans retrait (début de chapitre, après un titre)
+type DocxCtx = { first: boolean };
 
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -721,7 +708,6 @@ const DOCX_DOC_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationship Id="rId2" Type="${REL}/footer" Target="footer1.xml"/>
 </Relationships>`;
 
-// Styles réels (Titre 1, Titre 2...) : Word, Google Docs et Pages construisent automatiquement le plan du document
 const DOCX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="${W_NS}">
 <w:docDefaults>
@@ -739,7 +725,6 @@ const DOCX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:style w:type="paragraph" w:customStyle="1" w:styleId="ListPara"><w:name w:val="List Item"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:ind w:left="720" w:hanging="360"/><w:jc w:val="left"/></w:pPr></w:style>
 </w:styles>`;
 
-// Paragraphes espacés : espace après chaque paragraphe et pas de retrait de première ligne
 const docxStyles = (options: ExportOptions): string =>
   isSpaced(options)
     ? DOCX_STYLES.replace(
@@ -751,7 +736,6 @@ const docxStyles = (options: ExportOptions): string =>
 const DOCX_FOOTER = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:ftr xmlns:w="${W_NS}" xmlns:r="${R_NS}"><w:p><w:pPr><w:ind w:firstLine="0"/><w:jc w:val="center"/></w:pPr><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>`;
 
-// A4, marges de 2,5 cm, numéro de page centré en pied
 const DOCX_SECTION = `<w:sectPr><w:footerReference w:type="default" r:id="rId2"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1417" w:right="1417" w:bottom="1417" w:left="1417" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>`;
 
 function runXml(text: string, fmt: RunFmt): string {
@@ -799,7 +783,6 @@ function hasContent(segs: Seg[]): boolean {
 function segmentsToRuns(segs: Seg[]): string {
   const items = segs.map((seg) => ({ ...seg })) as Seg[];
 
-  // Pas d'espace parasite en début / fin de paragraphe
   const firstText = items.find((seg) => 'text' in seg) as { text: string } | undefined;
   if (firstText) firstText.text = firstText.text.replace(/^\s+/, '');
   const lastText = [...items].reverse().find((seg) => 'text' in seg) as { text: string } | undefined;
@@ -910,7 +893,6 @@ function walkBlocks(parent: Node, ctx: DocxCtx, out: string[], quote = false): v
     } else if (tag === 'div' || tag === 'section' || tag === 'article' || tag === 'header' || tag === 'footer' || tag === 'figure') {
       walkBlocks(element, ctx, out, quote);
     } else {
-      // pre, table... : on garde au moins le texte
       const segs: Seg[] = [];
       collectSegments(element, {}, segs);
       const paragraph = bodyParagraph(segs, ctx, quote);
@@ -932,7 +914,6 @@ function docxChapter(chapter: ExportChapter, options: ExportOptions): string {
   const out: string[] = [];
   const kicker = options.chapterNumbers;
 
-  // Saut de page avant chaque chapitre
   if (kicker) out.push(paragraphXml('Kicker', runXml(`Chapitre ${chapter.number}`, {}), '<w:pageBreakBefore/>'));
   out.push(paragraphXml('Heading1', runXml(chapter.title, {}), kicker ? '' : '<w:pageBreakBefore/>'));
 

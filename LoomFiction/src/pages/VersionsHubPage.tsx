@@ -65,9 +65,11 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
   const pageSize = 10;
   const totalPages = Math.ceil(rows.length / pageSize);
 
-  useEffect(() => {
+  const [prevRows, setPrevRows] = useState(rows);
+  if (rows !== prevRows) {
+    setPrevRows(rows);
     setPage(1);
-  }, [rows]);
+  }
 
   const paginatedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 

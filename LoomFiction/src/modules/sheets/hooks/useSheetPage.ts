@@ -39,8 +39,44 @@ export function useSheetPage(sheetId: number | null) {
   }, [sheetId]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!sheetId) return;
+    let cancelled = false;
 
-  return { sheet, category, cards, setCards, isLoading, error, reload: load };
+    offlineSheetService
+      .getById(sheetId)
+      .then(async (sheetData) => {
+        const [categoryData, cardsData] = await Promise.all([
+          offlineCategoryService.getById(sheetData.categoryId).catch(() => null),
+          offlineIdeaService.getBySheetId(sheetId),
+        ]);
+        if (cancelled) return;
+        setSheet(sheetData);
+        setCategory(categoryData);
+        setCards(cardsData);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error('Erreur lors du chargement de la fiche :', err);
+        if (!cancelled) setError('Impossible de charger cette fiche.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sheetId]);
+
+  const missing = !sheetId;
+
+  return {
+    sheet,
+    category,
+    cards,
+    setCards,
+    isLoading: missing ? false : isLoading,
+    error: missing ? 'Fiche introuvable.' : error,
+    reload: load,
+  };
 }

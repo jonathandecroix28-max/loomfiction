@@ -9,8 +9,9 @@ interface BookCardProps {
 }
 
 export function BookCard({ book, onSelect, onDelete, chapterCount }: BookCardProps) {
-  const imageUrl = (book as any).cover_image || book.coverImage;
-  const createdDate = (book as any).created_at || book.createdAt;
+  const legacyBook = book as BookResponse & { cover_image?: string; created_at?: string };
+  const imageUrl = legacyBook.cover_image || book.coverImage;
+  const createdDate = legacyBook.created_at || book.createdAt;
   const chapters = chapterCount ?? book.chapterCount ?? 0;
 
   return (

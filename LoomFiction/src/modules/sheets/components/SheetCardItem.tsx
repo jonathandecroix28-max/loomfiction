@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { IdeaResponse } from '../../../types/idea';
 
 interface SheetCardItemProps {
@@ -33,9 +32,12 @@ export function SheetCardItem({
   const [draftDescription, setDraftDescription] = useState(card.description || '');
   const [isSavingDescription, setIsSavingDescription] = useState(false);
 
-  useEffect(() => {
+
+  const [prevDescription, setPrevDescription] = useState(card.description);
+  if (card.description !== prevDescription) {
+    setPrevDescription(card.description);
     setDraftDescription(card.description || '');
-  }, [card.description]);
+  }
 
   const startEditing = () => {
     setDraftDescription(card.description || '');

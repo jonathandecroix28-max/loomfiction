@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useCreateBook } from '../hooks/useCreateBook';
 import { useCoverImage } from '../../../hooks/images/useCoverImage'; 
 import type { BookResponse } from '../../../types/book';
@@ -17,13 +17,15 @@ export function BookModal({ isOpen, onClose, onBookCreated }: BookModalProps) {
   const { url: coverImage, setUrl: setCoverImage, error: urlError, validate } = useCoverImage('');
   const { createBook, isCreating, error } = useCreateBook();
 
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (prevIsOpen !== isOpen) {
+    setPrevIsOpen(isOpen);
     if (!isOpen) {
       setTitle('');
       setDescription('');
       setCoverImage('');
     }
-  }, [isOpen, setCoverImage]);
+  }
 
   if (!isOpen) return null;
 

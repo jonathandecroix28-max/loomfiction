@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   copyBookToClipboard,
   exportBook,
@@ -26,7 +26,12 @@ export function useExportActions({ book, chapters, author, remember, format, opt
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [status, setStatus] = useState<Status>(null);
 
-  useEffect(() => setStatus(null), [book]);
+  // Nouveau livre : on efface le message précédent (réinitialisation pendant le rendu, sans effet)
+  const [prevBook, setPrevBook] = useState(book);
+  if (book !== prevBook) {
+    setPrevBook(book);
+    setStatus(null);
+  }
 
   const payload = (): ExportBook => ({ ...(book as ExportBook), author: author.trim() || undefined, chapters });
 

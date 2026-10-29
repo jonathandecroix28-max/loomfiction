@@ -186,8 +186,11 @@ export async function rwTx(): Promise<RwTx> {
 /*  Utilitaires                                                                */
 /* -------------------------------------------------------------------------- */
 
+type HttpErrorLike = { response?: { status?: number } };
+type Raw = Record<string, unknown>;
+
 export const httpStatus = (err: unknown): number | undefined =>
-  (err as any)?.response?.status;
+  (err as HttpErrorLike | null)?.response?.status;
 
 /**
  * Interrupteur de la synchro avec le back-end.
@@ -228,40 +231,38 @@ export const sortNewestFirst = <T extends { createdAt?: string }>(items: T[]): T
 
 /** Les données historiques mélangent bookId / book_id et nombres / chaînes. */
 export const normalizeIdea = (i: IdeaResponse): IdeaResponse => {
-  const raw = i as any;
-  const { book_id: _ignored, ...rest } = raw;
-  const b = raw.bookId ?? raw.book_id;
-  return { ...rest, bookId: b == null ? null : Number(b) } as IdeaResponse;
+  const { book_id, ...rest } = i as unknown as Raw;
+  const b = rest.bookId ?? book_id;
+  return { ...rest, bookId: b == null ? null : Number(b) } as unknown as IdeaResponse;
 };
 
 export const normalizeChapter = (c: ChapterResponse): ChapterResponse => {
-  const raw = c as any;
-  const { bookId: _ignored, ...rest } = raw;
+  const { bookId, ...rest } = c as unknown as Raw;
   return {
     ...rest,
-    book_id: Number(raw.book_id ?? raw.bookId),
-    chapter_number: Number(raw.chapter_number),
-  } as ChapterResponse;
+    book_id: Number(rest.book_id ?? bookId),
+    chapter_number: Number(rest.chapter_number),
+  } as unknown as ChapterResponse;
 };
 
 export const normalizeChapterVersion = (version: ChapterVersionResponse): ChapterVersionResponse => {
-  const raw = version as any;
+  const raw = version as unknown as Raw;
   return {
     ...raw,
     chapterId: Number(raw.chapterId),
     versionNumber: Number(raw.versionNumber),
     id: Number(raw.id),
-  } as ChapterVersionResponse;
+  } as unknown as ChapterVersionResponse;
 };
 
 export const normalizeIdeaVersion = (version: IdeaVersionResponse): IdeaVersionResponse => {
-  const raw = version as any;
+  const raw = version as unknown as Raw;
   return {
     ...raw,
     ideaId: Number(raw.ideaId),
     versionNumber: Number(raw.versionNumber),
     id: Number(raw.id),
-  } as IdeaVersionResponse;
+  } as unknown as IdeaVersionResponse;
 };
 
 /* -------------------------------------------------------------------------- */

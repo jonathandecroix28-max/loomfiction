@@ -7,6 +7,15 @@ export function useChapters(bookId: number | null) {
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [prevBookId, setPrevBookId] = useState(bookId);
+  if (bookId !== prevBookId) {
+    setPrevBookId(bookId);
+    if (bookId) {
+      setIsLoadingChapters(true);
+      setError(null);
+    }
+  }
+
   const fetchChapters = useCallback(async () => {
     if (!bookId) return;
     try {
@@ -23,8 +32,26 @@ export function useChapters(bookId: number | null) {
   }, [bookId]);
 
   useEffect(() => {
-    fetchChapters();
-  }, [fetchChapters]);
+    if (!bookId) return;
+    let cancelled = false;
+
+    offlineChapterService
+      .getByBookId(bookId)
+      .then((data) => {
+        if (!cancelled) setChapters(data);
+      })
+      .catch((err) => {
+        console.error("Erreur de chargement des chapitres :", err);
+        if (!cancelled) setError("Impossible de charger les chapitres.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingChapters(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookId]);
 
   return { chapters, isLoadingChapters, error, setChapters, refetch: fetchChapters };
 }

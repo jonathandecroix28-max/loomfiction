@@ -53,12 +53,16 @@ export function ManageCategoriesModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setEditingId(null);
-    setDeletingId(null);
-    setError('');
-  }, [isOpen]);
+
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setEditingId(null);
+      setDeletingId(null);
+      setError('');
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) return;

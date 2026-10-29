@@ -17,10 +17,12 @@ export function BooksPage() {
   const { deleteBook } = useDeleteBook();
   const chapterCountOf = useChapterCounts(books);
 
+  if (searchParams.get('action') === 'new' && !isModalOpen) {
+    setIsModalOpen(true);
+  }
+
   useEffect(() => {
     if (searchParams.get('action') === 'new') {
-      setIsModalOpen(true);
-      
       searchParams.delete('action');
       setSearchParams(searchParams, { replace: true });
     }

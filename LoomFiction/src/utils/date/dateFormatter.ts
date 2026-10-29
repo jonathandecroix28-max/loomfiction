@@ -13,7 +13,7 @@ export function formatDate(dateString?: string): string {
       month: 'long',
       year: 'numeric',
     }).format(date);
-  } catch (error) {
+  } catch {
     return 'Date invalide';
   }
 }
@@ -35,7 +35,7 @@ export function formatDateTime(dateString?: string): string {
       hour: '2-digit',
       minute: '2-digit',
     }).format(date);
-  } catch (error) {
+  } catch {
     return 'Date invalide';
   }
 }

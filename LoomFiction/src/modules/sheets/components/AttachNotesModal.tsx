@@ -18,26 +18,32 @@ interface AttachNotesModalProps {
 
 const excerpt = (text?: string | null) => (text ?? '').replace(/\s+/g, ' ').trim().slice(0, 100);
 
-/** Depuis une fiche : piocher dans les notes libres pour en faire des caractéristiques. */
 export function AttachNotesModal({ isOpen, sheet, cards, onClose, onAttached }: AttachNotesModalProps) {
   const [notes, setNotes] = useState<IdeaResponse[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [books, setBooks] = useState<BookResponse[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isOpen);
   const [query, setQuery] = useState('');
   const [sameCategory, setSameCategory] = useState(true);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setLoading(true);
+      setQuery('');
+      setSameCategory(true);
+      setSelected(new Set());
+      setError('');
+    }
+  }
+
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
-    setLoading(true);
-    setQuery('');
-    setSameCategory(true);
-    setSelected(new Set());
-    setError('');
 
     Promise.all([
       offlineIdeaService.getAll(),

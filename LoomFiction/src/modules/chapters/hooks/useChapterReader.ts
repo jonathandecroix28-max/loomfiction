@@ -9,6 +9,16 @@ export function useChapterReader(bookId: number | null, chapterId: number | null
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  const requestKey = `${chapterId ?? ''}:${reloadKey}`;
+  const [prevRequestKey, setPrevRequestKey] = useState(requestKey);
+  if (requestKey !== prevRequestKey) {
+    setPrevRequestKey(requestKey);
+    if (chapterId) {
+      setIsLoading(true);
+      setError(null);
+    }
+  }
+
   useEffect(() => {
     if (!bookId) return;
     let cancelled = false;
@@ -26,15 +36,8 @@ export function useChapterReader(bookId: number | null, chapterId: number | null
   }, [bookId, reloadKey]);
 
   useEffect(() => {
-    if (!chapterId) {
-      setError('Chapitre introuvable.');
-      setIsLoading(false);
-      return;
-    }
+    if (!chapterId) return;
     let cancelled = false;
-
-    setIsLoading(true);
-    setError(null);
 
     offlineChapterService
       .getById(chapterId)
@@ -72,5 +75,15 @@ export function useChapterReader(bookId: number | null, chapterId: number | null
 
   const refetch = useCallback(() => setReloadKey((key) => key + 1), []);
 
-  return { chapter, chapters, isLoading, error, prevChapter, nextChapter, refetch };
+  const missing = !chapterId;
+
+  return {
+    chapter,
+    chapters,
+    isLoading: missing ? false : isLoading,
+    error: missing ? 'Chapitre introuvable.' : error,
+    prevChapter,
+    nextChapter,
+    refetch,
+  };
 }

@@ -12,15 +12,22 @@ interface IdeaModalProps {
   onClose: () => void;
   bookId?: number | null;
   ideaToEdit?: IdeaResponse | null;
-  /** Création d'une carte dans une fiche */
   sheetId?: number | null;
   sortOrder?: number;
-  /** Catégorie imposée (celle de la fiche) */
   lockedCategoryId?: number | null;
-  /** Catégorie présélectionnée pour une nouvelle note libre */
   defaultCategoryId?: number | null;
   onSuccess: (updatedIdeas: IdeaResponse[]) => void;
 }
+
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  start(): void;
+}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
 const templates = {
   personnage: {
@@ -48,11 +55,15 @@ export function IdeaModal({
   defaultCategoryId,
   onSuccess,
 }: IdeaModalProps) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState<number>(0);
-  const [status, setStatus] = useState<IdeaStatus>('draft');
-  const [selectedBookId, setSelectedBookId] = useState<number>(bookId || 0);
+  const [name, setName] = useState(ideaToEdit?.name ?? '');
+  const [description, setDescription] = useState(ideaToEdit?.description || '');
+  const [categoryId, setCategoryId] = useState<number>(
+    ideaToEdit?.categoryId ?? lockedCategoryId ?? defaultCategoryId ?? 0,
+  );
+  const [status, setStatus] = useState<IdeaStatus>(ideaToEdit?.status || 'draft');
+  const [selectedBookId, setSelectedBookId] = useState<number>(
+    ideaToEdit ? ideaToEdit.bookId || 0 : bookId || 0,
+  );
 
   const [books, setBooks] = useState<BookResponse[]>([]);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
@@ -61,7 +72,6 @@ export function IdeaModal({
   const { createIdea, isCreating } = useCreateIdea();
   const { updateIdea, isUpdating } = useUpdateIdea();
 
-  // Une carte de fiche garde la catégorie de sa fiche
   const categoryLocked =
     lockedCategoryId != null || ideaToEdit?.sheetId != null;
   const isCard = !!sheetId || ideaToEdit?.sheetId != null;
@@ -82,9 +92,29 @@ export function IdeaModal({
         }
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  useEffect(() => {
+  
+  const [prevInputs, setPrevInputs] = useState({
+    ideaToEdit,
+    isOpen,
+    bookId,
+    categories,
+    lockedCategoryId,
+    defaultCategoryId,
+  });
+
+  if (
+    prevInputs.ideaToEdit !== ideaToEdit ||
+    prevInputs.isOpen !== isOpen ||
+    prevInputs.bookId !== bookId ||
+    prevInputs.categories !== categories ||
+    prevInputs.lockedCategoryId !== lockedCategoryId ||
+    prevInputs.defaultCategoryId !== defaultCategoryId
+  ) {
+    setPrevInputs({ ideaToEdit, isOpen, bookId, categories, lockedCategoryId, defaultCategoryId });
+
     if (ideaToEdit) {
       setName(ideaToEdit.name);
       setDescription(ideaToEdit.description || '');
@@ -104,21 +134,18 @@ export function IdeaModal({
         setCategoryId(fallback);
       }
     }
-  }, [
-    ideaToEdit,
-    isOpen,
-    bookId,
-    categories,
-    lockedCategoryId,
-    defaultCategoryId,
-  ]);
+  }
 
   if (!isOpen) return null;
 
   const handleVoiceDictation = () => {
+    const speechWindow = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
     const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      speechWindow.SpeechRecognition ||
+      speechWindow.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       alert("La dictée vocale n'est pas supportée par votre navigateur.");
@@ -132,7 +159,7 @@ export function IdeaModal({
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       setDescription((prev) =>
         prev ? `${prev} ${transcript}` : transcript,
@@ -168,7 +195,7 @@ export function IdeaModal({
       ...(ideaToEdit ? {} : { sheetId: sheetId ?? undefined, sortOrder }),
     };
 
-    let result: IdeaResponse[] | null = null;
+    let result: IdeaResponse[] | null;
 
     if (ideaToEdit) {
       result = await updateIdea(ideaToEdit.id, data);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { buildPreviewDocument, type ExportBook, type ExportOptions } from '../../services/exportService';
 import { stepScale } from '../../utils/export/text';
 import { useDebouncedValue } from './useDebouncedValue';
@@ -22,7 +22,11 @@ export function useExportPreview({ book, chapters, author, options }: Args) {
   const [limit, setLimit] = useState(PREVIEW_STEP);
   const debouncedAuthor = useDebouncedValue(author);
 
-  useEffect(() => setLimit(PREVIEW_STEP), [book]);
+  const [prevBook, setPrevBook] = useState(book);
+  if (prevBook !== book) {
+    setPrevBook(book);
+    setLimit(PREVIEW_STEP);
+  }
 
   const visible = useMemo(() => chapters.slice(0, limit), [chapters, limit]);
   const hidden = chapters.length - visible.length;

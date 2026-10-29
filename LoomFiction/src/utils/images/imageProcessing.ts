@@ -1,9 +1,6 @@
 export interface ImagePreset {
-  /** Plus grand côté, en pixels. */
   maxDimension: number;
-  /** Qualité JPEG de départ (0-1). */
   quality: number;
-  /** Poids visé après compression, en octets. */
   maxBytes: number;
 }
 
@@ -30,6 +27,7 @@ async function decode(file: File): Promise<Decoded> {
       const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
       return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close() };
     } catch {
+      // createImageBitmap a échoué : on retombe sur <img> ci-dessous
     }
   }
 

@@ -4,8 +4,21 @@ import type { IdeaVersionResponse } from '../../../types/ideaVersion';
 
 export function useIdeaVersions(ideaId: number | null, versionId?: number | null) {
   const [versions, setVersions] = useState<IdeaVersionResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!!ideaId);
   const [error, setError] = useState<string | null>(null);
+
+ 
+  const [prevIdeaId, setPrevIdeaId] = useState(ideaId);
+  if (ideaId !== prevIdeaId) {
+    setPrevIdeaId(ideaId);
+    if (ideaId) {
+      setIsLoading(true);
+      setError(null);
+    } else {
+      setVersions([]);
+      setIsLoading(false);
+    }
+  }
 
   const fetchVersions = useCallback(async () => {
     if (!ideaId) {
@@ -28,8 +41,26 @@ export function useIdeaVersions(ideaId: number | null, versionId?: number | null
   }, [ideaId]);
 
   useEffect(() => {
-    fetchVersions();
-  }, [fetchVersions]);
+    if (!ideaId) return;
+    let cancelled = false;
+
+    offlineIdeaVersionService
+      .getByIdeaId(ideaId)
+      .then((data) => {
+        if (!cancelled) setVersions(data);
+      })
+      .catch((err) => {
+        console.error('Erreur de chargement des versions d’idée :', err);
+        if (!cancelled) setError('Impossible de charger les versions de l’idée.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ideaId]);
 
   const selectedVersion = useMemo(() => {
     if (versions.length === 0) return null;
