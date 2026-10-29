@@ -13,7 +13,7 @@ module.exports = {
     [
       "jest-html-reporter",
       {
-        pageTitle: "Rapport de Tests - CapyCarrer",
+        pageTitle: "Rapport de Tests - LoomFiction",
         outputPath: "./rapport-tests.html",
         includeFailureMsg: true,
         includeConsoleLog: false
