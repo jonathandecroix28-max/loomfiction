@@ -22,17 +22,24 @@ function stripTagsFallback(html: string): string {
      previous = sanitized;
      sanitized = sanitized.replace(UNSAFE_HTML_TAGS, ' ');
    } while (sanitized !== previous);
+
+   sanitized = sanitized
+     .replace(/<br\s*\/?>/gi, '\n')
+     .replace(/<hr\s*\/?>/gi, '\n* * *\n')
+     .replace(/<\/(p|div|h[1-6]|li|blockquote|pre|tr)>/gi, '\n');
+
+   do {
+     previous = sanitized;
+     sanitized = sanitized.replace(/<[^>]+>/g, '');
+   } while (sanitized !== previous);
+
    return sanitized
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<hr\s*\/?>/gi, '\n* * *\n')
-    .replace(/<\/(p|div|h[1-6]|li|blockquote|pre|tr)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&amp;/gi, '&');
+     .replace(/&nbsp;/gi, ' ')
+     .replace(/&lt;/gi, '<')
+     .replace(/&gt;/gi, '>')
+     .replace(/&quot;/gi, '"')
+     .replace(/&#39;|&apos;/gi, "'")
+     .replace(/&amp;/gi, '&');
 }
 
 
