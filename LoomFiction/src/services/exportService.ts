@@ -342,7 +342,6 @@ function markdownBlocks(parent: Node, depth = 0): string[] {
       const text = Array.from(element.childNodes).map(markdownInline).join('').trim();
       if (text) blocks.push(text);
     } else if (/^h[1-6]$/.test(tag)) {
-      // Le titre du chapitre est en "##" : les titres internes descendent d'un cran
       const level = Math.min(6, Number(tag[1]) + 2);
       const text = Array.from(element.childNodes).map(markdownInline).join('').trim();
       if (text) blocks.push(`${'#'.repeat(level)} ${text}`);
@@ -460,7 +459,6 @@ function printHtml(html: string, title: string): Promise<void> {
       win.print();
       resolve();
 
-      // Filet de sécurité : certains navigateurs mobiles n'émettent pas "afterprint"
       setTimeout(cleanup, 120_000);
     };
 
@@ -1026,5 +1024,3 @@ export async function exportBook(
       return;
   }
 }
-
-//P.S: à optimiser
