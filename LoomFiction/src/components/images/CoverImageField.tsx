@@ -11,7 +11,8 @@ function sanitizeImageSource(value: string): string | undefined {
   const candidate = value.trim();
   if (!candidate) return undefined;
 
-  if (/^data:image\//i.test(candidate)) {
+  const safeDataImagePattern = /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i;
+  if (safeDataImagePattern.test(candidate)) {
     return candidate;
   }
 
@@ -113,7 +114,8 @@ export function CoverImageField({ value, onChange, error }: CoverImageFieldProps
               value={value}
               onChange={(e) => {
                 setFileError(null);
-                onChange(e.target.value);
+                const sanitizedValue = sanitizeImageSource(e.target.value);
+                onChange(sanitizedValue ?? '');
               }}
               placeholder="https://..."
               className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 text-amber-100 placeholder:text-amber-200/30 focus:outline-none font-sans text-sm ${
