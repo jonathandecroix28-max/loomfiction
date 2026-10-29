@@ -1,13 +1,7 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
   preset: "ts-jest",
-  
   testEnvironment: "node",
-  
-  setupFilesAfterEnv: [
-    "<rootDir>/tests/setup.ts"
-  ],
-  
   reporters: [
     "default",
     [
@@ -16,8 +10,8 @@ module.exports = {
         pageTitle: "Rapport de Tests - LoomFiction",
         outputPath: "./rapport-tests.html",
         includeFailureMsg: true,
-        includeConsoleLog: false
-      }
-    ]
-  ]
+        includeConsoleLog: false,
+      },
+    ],
+  ],
 };
