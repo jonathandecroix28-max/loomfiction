@@ -1,8 +1,6 @@
 name: Audit & Fix NPM
 
 on:
-  push:
-    branches: [ build/workflow ]
   schedule:
     - cron: '0 8 * * 1'
   workflow_dispatch:
@@ -10,17 +8,15 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write      
 
 jobs:
   audit-and-fix:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Récupération du code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configuration de Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
@@ -31,11 +27,19 @@ jobs:
         run: npm audit fix || true
 
       - name: Création d'une Pull Request
+        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "security: correctifs automatiques npm audit"
           title: "🔒 Mise à jour de sécurité automatique (npm audit fix)"
-          body: "Ce workflow a exécuté `npm audit fix` pour corriger les vulnérabilités détectées."
+          body: "Ce workflow a exécuté `npm audit fix`. La CI est lancée automatiquement sur cette branche."
           branch: "auto-npm-audit-fix"
+          base: build/workflow
           delete-branch: true
+
+      - name: Lancer la CI sur la branche de la PR
+        if: steps.cpr.outputs.pull-request-operation == 'created' || steps.cpr.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run ci.yml --ref auto-npm-audit-fix
