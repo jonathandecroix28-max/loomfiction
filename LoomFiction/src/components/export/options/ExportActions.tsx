@@ -1,5 +1,6 @@
 import type { Status } from '../../../hooks/export/useExportActions';
 import { StatusBanner } from '../StatusBanner';
+import { IconCopy } from '../../icons';
 
 type Props = {
   status: Status;
@@ -51,7 +52,12 @@ export function ExportActions({
         disabled={disabled}
         className="w-full px-4 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-amber-900/30 text-amber-200 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {copying ? 'Copie…' : '📋 Copier le texte (pour le coller ailleurs)'}
+        {copying ? 'Copie…' : (
+          <span className="inline-flex items-center gap-1.5">
+            <IconCopy className="size-4" aria-hidden="true" />
+            Copier le texte (pour le coller ailleurs)
+          </span>
+        )}
       </button>
 
       {showSelectHint && (

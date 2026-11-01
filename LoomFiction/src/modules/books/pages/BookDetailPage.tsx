@@ -6,6 +6,13 @@ import { useDeleteChapter } from '../../chapters/hooks/useDeleteChapter';
 import { ChapterModal } from '../../chapters/components/ChapterModal'; 
 import { formatDate } from '../../../utils/date/dateFormatter';
 import { BookEditModal } from '../components/BookEditModal';
+import {
+  IconAdd,
+  IconBack,
+  IconBook,
+  IconBooks,
+  IconDelete,
+} from '../../../components/icons';
 
 export function BookDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -64,7 +71,8 @@ export function BookDetailPage() {
           onClick={() => navigate('/books')}
           className="text-amber-200/60 hover:text-amber-100 font-serif text-sm mb-8 flex items-center gap-1.5 transition-colors cursor-pointer group"
         >
-          <span className="transition-transform group-hover:-translate-x-1">&larr;</span> Retour à la bibliothèque
+          <IconBack className="size-4 transition-transform group-hover:-translate-x-1" aria-hidden="true" />
+          Retour à la bibliothèque
         </button>
 
         {/* En-tête principal du livre */}
@@ -108,7 +116,8 @@ export function BookDetailPage() {
                 onClick={() => navigate(`/books/${bookId}/chapters/${firstChapter.id}/read`)}
                 className="bg-amber-700 hover:bg-amber-600 text-amber-50 font-sans font-medium px-5 py-2.5 rounded-xl shadow-md transition text-sm cursor-pointer flex items-center justify-center gap-2 w-full sm:w-auto touch-target"
               >
-                <span>📖</span> Commencer la lecture
+                <IconBook className="size-4 shrink-0" aria-hidden="true" />
+                Commencer la lecture
               </button>
             )}
 
@@ -116,7 +125,8 @@ export function BookDetailPage() {
               onClick={() => setIsChapterModalOpen(true)}
               className="bg-neutral-900 hover:bg-neutral-800 text-amber-200 font-sans font-medium px-5 py-2.5 rounded-xl border border-amber-900/30 transition text-sm cursor-pointer flex items-center justify-center gap-2 w-full sm:w-auto touch-target"
             >
-              <span>+</span> Ajouter un chapitre
+              <IconAdd className="size-4 shrink-0" aria-hidden="true" />
+              Ajouter un chapitre
             </button>
 
             <button 
@@ -130,7 +140,8 @@ export function BookDetailPage() {
 
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h2 className="text-2xl font-serif font-bold text-amber-100 flex items-center gap-2">
-            <span>📚</span> Table des matières
+            <IconBooks className="size-5 shrink-0" aria-hidden="true" />
+            Table des matières
           </h2>
         </div>
 
@@ -142,7 +153,8 @@ export function BookDetailPage() {
               onClick={() => setIsChapterModalOpen(true)}
               className="bg-amber-700 hover:bg-amber-600 text-amber-50 font-sans font-medium px-5 py-2.5 rounded-xl shadow-md transition text-sm cursor-pointer inline-flex items-center gap-2"
             >
-              + Rédiger le chapitre 1
+              <IconAdd className="size-4 shrink-0" aria-hidden="true" />
+              Rédiger le chapitre 1
             </button>
           </div>
         ) : (
@@ -192,8 +204,9 @@ export function BookDetailPage() {
                     onClick={(e) => handleDeleteChapter(chapter.id, e)}
                     className="text-xs bg-red-950/50 hover:bg-red-900/80 text-red-300 border border-red-900/30 px-3 py-2 rounded-lg transition font-sans font-medium cursor-pointer"
                     title="Supprimer le chapitre"
+                    aria-label="Supprimer le chapitre"
                   >
-                    ✕
+                    <IconDelete className="size-4" aria-hidden="true" />
                   </button>
                 </div>
               </div>

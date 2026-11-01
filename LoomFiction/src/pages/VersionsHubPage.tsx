@@ -12,6 +12,7 @@ import type { ChapterResponse } from '../types/chapter';
 import type { ChapterVersionResponse } from '../types/chapterVersion';
 import type { IdeaResponse } from '../types/idea';
 import type { IdeaVersionResponse } from '../types/ideaVersion';
+import { IconBooks, IconDelete, IconGlobe, IconSheet } from '../components/icons';
 
 interface VersionRow {
   key: string;
@@ -86,8 +87,9 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
         onClick={() => onDelete(row)}
         className="px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg bg-red-950/40 hover:bg-red-900/80 text-red-400 border border-red-900/30 text-[10px] sm:text-xs transition-colors cursor-pointer"
         title="Supprimer cette version"
+        aria-label="Supprimer cette version"
       >
-        🗑️
+        <IconDelete className="size-4" aria-hidden="true" />
       </button>
     </div>
   );
@@ -359,12 +361,12 @@ export function VersionsHubPage() {
       <>
         {book ? (
           <span className={`${pill} border-amber-800/40 bg-amber-950 text-amber-300`}>
-            <span aria-hidden>📚</span>
+            <IconBooks className="size-3.5" aria-hidden="true" />
             <span className="truncate">{book}</span>
           </span>
         ) : (
           <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200/70`}>
-            <span aria-hidden>🌐</span>
+            <IconGlobe className="size-3.5" aria-hidden="true" />
             {row.kind === 'chapter' ? 'Roman inconnu' : 'Carnet global'}
           </span>
         )}
@@ -382,7 +384,7 @@ export function VersionsHubPage() {
 
         {row.kind === 'idea' && row.sheetId != null && (
           <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>
-            <span aria-hidden>🗂️</span>
+            <IconSheet className="size-3.5" aria-hidden="true" />
             <span className="truncate">{sheet ?? 'Fiche introuvable'}</span>
           </span>
         )}

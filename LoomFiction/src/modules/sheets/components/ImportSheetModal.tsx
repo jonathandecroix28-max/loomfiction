@@ -2,6 +2,7 @@ import { useState, type ChangeEvent } from 'react';
 import type { CategoryResponse } from '../../../types/category';
 import type { SheetResponse } from '../../../types/sheet';
 import { parseSheetContent, createSheetFromImport } from '../services/sheetExchange';
+import { IconClose, IconDone, IconImport } from '../../../components/icons';
 
 export const MAX_IMPORT_FILES = 5;
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
@@ -41,7 +42,7 @@ async function readEntry(file: File): Promise<Entry> {
 const STATUS_LABEL: Record<Entry['status'], { text: string; className: string } | null> = {
   ready: null,
   importing: { text: 'Importation…', className: 'text-amber-300 animate-pulse' },
-  done: { text: '✓ Importée', className: 'text-emerald-300' },
+  done: { text: 'Importée', className: 'text-emerald-300' },
   failed: { text: 'Échec de l’import', className: 'text-red-300' },
 };
 
@@ -134,7 +135,10 @@ export function ImportSheetModal({ categories, defaultCategoryId, onClose, onImp
         aria-label="Importer des fiches"
         className="max-h-[90dvh] w-full max-w-md space-y-5 overflow-y-auto rounded-3xl border border-amber-900/40 bg-[#1c1411] p-6 font-sans text-amber-50 shadow-2xl md:p-8"
       >
-        <h2 className="font-serif text-xl font-bold text-amber-100">📥 Importer des fiches</h2>
+        <h2 className="inline-flex items-center gap-2 font-serif text-xl font-bold text-amber-100">
+          <IconImport className="size-5 shrink-0" aria-hidden="true" />
+          Importer des fiches
+        </h2>
 
         <div>
           <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-amber-200/60">
@@ -173,7 +177,12 @@ export function ImportSheetModal({ categories, defaultCategoryId, onClose, onImp
                         {entry.parsed!.cards.length > 1 ? 'caractéristiques' : 'caractéristique'}
                       </p>
                     )}
-                    {status && <p className={`text-xs font-medium ${status.className}`}>{status.text}</p>}
+                    {status && (
+                      <p className={`inline-flex items-center gap-1 text-xs font-medium ${status.className}`}>
+                        {entry.status === 'done' && <IconDone className="size-3.5" aria-hidden="true" />}
+                        {status.text}
+                      </p>
+                    )}
                   </div>
 
                   {!busy && entry.status !== 'done' && (
@@ -183,7 +192,7 @@ export function ImportSheetModal({ categories, defaultCategoryId, onClose, onImp
                       aria-label={`Retirer ${entry.fileName}`}
                       className="shrink-0 cursor-pointer rounded-lg px-2 py-1 text-amber-200/50 transition hover:bg-neutral-800 hover:text-amber-100"
                     >
-                      ✕
+                      <IconClose className="size-4" aria-hidden="true" />
                     </button>
                   )}
                 </li>

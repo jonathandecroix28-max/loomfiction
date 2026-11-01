@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { SheetResponse } from '../../../types/sheet';
+import { IconBooks, IconImport } from '../../../components/icons';
 
 interface SheetCardProps {
   sheet: SheetResponse;
@@ -22,7 +23,10 @@ export function SheetCard({ sheet, color = '#b45309', total, filled, bookTitle =
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-serif text-lg font-bold text-amber-100">{sheet.name}</h3>
-          <p className="mt-1 truncate font-sans text-xs text-amber-300/70">📚 {bookTitle}</p>
+          <p className="mt-1 inline-flex items-center gap-1 truncate font-sans text-xs text-amber-300/70">
+            <IconBooks className="size-3.5 shrink-0" aria-hidden="true" />
+            {bookTitle}
+          </p>
         </div>
 
         {onAttach && (
@@ -34,8 +38,9 @@ export function SheetCard({ sheet, color = '#b45309', total, filled, bookTitle =
             }}
             className="shrink-0 opacity-0 focus:opacity-100 group-hover:opacity-100 transition-opacity text-xs bg-amber-950/80 hover:bg-amber-900 text-amber-200 border border-amber-900/30 px-2 py-1 rounded-lg font-medium cursor-pointer"
             title="Aspirer des notes libres vers cette fiche"
+            aria-label="Aspirer des notes libres vers cette fiche"
           >
-            📥
+            <IconImport className="size-4" aria-hidden="true" />
           </button>
         )}
       </div>

@@ -1,5 +1,12 @@
 import { useState } from 'react';
 import type { IdeaResponse } from '../../../types/idea';
+import {
+  IconDelete,
+  IconDown,
+  IconEdit,
+  IconHistory,
+  IconUp,
+} from '../../../components/icons';
 
 interface SheetCardItemProps {
   card: IdeaResponse;
@@ -76,7 +83,7 @@ export function SheetCardItem({
             title="Monter"
             className={`${btn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
-            <span aria-hidden="true" className="text-base">↑</span>
+            <IconUp className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">Monter</span>
           </button>
 
@@ -87,7 +94,7 @@ export function SheetCardItem({
             title="Descendre"
             className={`${btn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
-            <span aria-hidden="true" className="text-base">↓</span>
+            <IconDown className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">Descendre</span>
           </button>
 
@@ -97,7 +104,7 @@ export function SheetCardItem({
             title="Versions"
             className={`${btn} border-amber-900/30 bg-amber-950/80 text-amber-200 hover:bg-amber-900`}
           >
-            <span aria-hidden="true" className="text-base">↶</span>
+            <IconHistory className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">Versions</span>
           </button>
 
@@ -107,7 +114,7 @@ export function SheetCardItem({
             title="Éditer"
             className={`${btn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
-            <span aria-hidden="true" className="text-base">✎</span>
+            <IconEdit className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">Éditer</span>
           </button>
 
@@ -117,7 +124,7 @@ export function SheetCardItem({
             title="Supprimer"
             className={`${btn} border-red-900/30 bg-red-950/50 text-red-300 hover:bg-red-900/80`}
           >
-            <span aria-hidden="true" className="text-base">🗑</span>
+            <IconDelete className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">Supprimer</span>
           </button>
         </div>

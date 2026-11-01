@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CategoryResponse, CategoryUpsertRequest } from '../../../types/category';
 import { CATEGORY_PRESETS, nameKey, nextColor, presetFor } from '../categoryPresets';
+import { IconSheet } from '../../../components/icons';
 
 interface CategoryQuickAddProps {
   existing: CategoryResponse[];
@@ -90,7 +91,7 @@ export function CategoryQuickAdd({ existing, onCreate, onDone, autoFocus = false
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: preset.color }} />
               {preset.name}
-              {preset.template && <span aria-hidden="true">🗂️</span>}
+              {preset.template && <IconSheet className="size-3.5" aria-hidden="true" />}
             </button>
           ))}
         </div>

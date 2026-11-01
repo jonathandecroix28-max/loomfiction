@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useUpdateBook } from '../hooks/useUpdateBook';
 import type { BookResponse } from '../../../types/book';
 import { CoverImageField } from '../../../components/images/CoverImageField';
+import { IconClose } from '../../../components/icons';
 
 interface BookEditModalProps {
   isOpen: boolean;
@@ -68,9 +69,10 @@ export function BookEditModal({ isOpen, onClose, book, onBookUpdated }: BookEdit
           <h2 className="text-2xl font-serif font-bold text-amber-100">Modifier le Grimoire</h2>
           <button 
             onClick={onClose}
+            aria-label="Fermer"
             className="text-amber-200/50 hover:text-amber-100 font-serif text-xl cursor-pointer"
           >
-            &times;
+            <IconClose className="size-5" aria-hidden="true" />
           </button>
         </div>
 

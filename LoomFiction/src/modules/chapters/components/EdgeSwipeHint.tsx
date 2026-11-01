@@ -1,4 +1,5 @@
 import type { EdgePull } from '../hooks/useEdgeSwipeNavigation';
+import { IconDown, IconUp } from '../../../components/icons';
 
 type Props = { pull: EdgePull; prevLabel?: string; nextLabel?: string };
 
@@ -23,7 +24,7 @@ export function EdgeSwipeHint({ pull, prevLabel, nextLabel }: Props) {
     >
       <div className="w-64 max-w-full rounded-2xl border border-amber-900/40 bg-neutral-950/90 px-4 py-3 font-sans text-xs text-amber-100 shadow-lg backdrop-blur-xs">
         <div className="flex items-center gap-2">
-          <span className="text-base leading-none">{isNext ? '↑' : '↓'}</span>
+          {isNext ? <IconUp className="size-4" aria-hidden="true" /> : <IconDown className="size-4" aria-hidden="true" />}
           <span className="truncate">
             {ready ? 'Relâche pour ouvrir' : isNext ? 'Continue : chapitre suivant' : 'Continue : chapitre précédent'}
           </span>

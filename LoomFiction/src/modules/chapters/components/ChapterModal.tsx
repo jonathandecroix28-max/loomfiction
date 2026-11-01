@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCreateChapter } from '../hooks/useCreateChapter';
 import type { ChapterResponse } from '../../../types/chapter';
+import { IconClose } from '../../../components/icons';
 
 interface ChapterModalProps {
   isOpen: boolean;
@@ -38,9 +39,10 @@ export function ChapterModal({ isOpen, onClose, bookId, nextChapterNumber, onCha
           <h2 className="text-xl font-serif font-bold text-amber-100">Nouveau Chapitre</h2>
           <button 
             onClick={onClose}
+            aria-label="Fermer"
             className="text-amber-200/50 hover:text-amber-100 transition-colors text-2xl leading-none cursor-pointer"
           >
-            &times;
+            <IconClose className="size-5" aria-hidden="true" />
           </button>
         </div>
 

@@ -1,39 +1,50 @@
 import { Link, useNavigate } from 'react-router-dom';
+import type { LucideIcon } from '../components/icons';
+import {
+  IconBooks,
+  IconExport,
+  IconGlobe,
+  IconHistory,
+  IconIdea,
+  IconMobile,
+  IconSheet,
+  IconSunrise,
+} from '../components/icons';
 //import { AppDemo } from '../components/landing/AppDemo';
 //import { SITE } from '../config/site';
 
 const FEATURES = [
   {
-    icon: '📚',
+    Icon: IconBooks,
     title: 'Romans & chapitres',
     text: 'Structurez chaque livre en chapitres et écrivez dans un éditeur sobre, pensé pour rester concentré.',
   },
   {
-    icon: '💡',
+    Icon: IconIdea,
     title: 'Carnet d’idées',
     text: 'Notez vos idées au fil de l’eau, classez-les par statut et rattachez-les à un roman.',
   },
   {
-    icon: '🗂️',
+    Icon: IconHistory,
     title: 'Versions & fusion',
     text: 'Gardez l’historique de vos textes, comparez-les ligne par ligne et fusionnez ce que vous voulez garder.',
   },
   {
-    icon: '📴',
+    Icon: IconSheet,
     title: 'Hors ligne d’abord',
     text: 'Écrivez partout, même sans connexion. Vos textes sont stockés localement et vous appartiennent.',
   },
   {
-    icon: '📤',
+    Icon: IconExport,
     title: 'Export en un clic',
     text: 'PDF, EPUB, Word ou texte brut : récupérez votre manuscrit dans le format qu’il vous faut.',
   },
   {
-    icon: '🎨',
+    Icon: IconSunrise,
     title: 'Thèmes clair & sombre',
     text: 'Une interface chaleureuse, confortable pour les longues sessions d’écriture, jour comme nuit.',
   },
-];
+] as const satisfies ReadonlyArray<{ Icon: LucideIcon; title: string; text: string }>;
 
 const STEPS = [
   { n: '1', title: 'Créez votre roman', text: 'Donnez-lui un titre, ajoutez vos premiers chapitres.' },
@@ -70,7 +81,7 @@ export function LandingPage() {
               to="/donate"
               className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm text-yellow-200 bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-500/30 transition"
             >
-              <span aria-hidden>☕</span> Soutenir
+              <span aria-hidden>Soutenir</span>
             </Link> */}
             <button
               onClick={() => navigate('/books')}
@@ -86,7 +97,7 @@ export function LandingPage() {
       <section className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 lg:pt-20 pb-16 sm:pb-24 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,36rem)] gap-12 lg:gap-16 items-center">
         <div className="space-y-6 sm:space-y-7">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-800/30 text-amber-300 text-xs font-serif tracking-wide">
-            ✨ Votre grimoire numérique d’écriture
+            Votre grimoire numérique d’écriture
           </div>
 
           <h1 className="text-4xl sm:text-5xl xl:text-6xl font-serif font-bold tracking-tight text-amber-50 leading-[1.08]">
@@ -102,7 +113,7 @@ export function LandingPage() {
               onClick={() => navigate('/books')}
               className="flex items-center justify-center sm:justify-start gap-3 bg-amber-600 hover:bg-amber-500 text-amber-950 px-6 py-3 rounded-2xl font-bold transition shadow-lg cursor-pointer hover:-translate-y-0.5"
             >
-              <span className="text-xl">🌐</span>
+              <IconGlobe className="size-5" aria-hidden="true" />
               <span className="text-left">
                 <span className="block text-[10px] uppercase tracking-wider opacity-80">Lancer sur</span>
                 <span className="block text-sm">Version Web</span>
@@ -110,7 +121,7 @@ export function LandingPage() {
             </button>
 
             <div className="flex items-center justify-center sm:justify-start gap-3 bg-neutral-900 border border-neutral-700 text-neutral-200 px-6 py-3 rounded-2xl">
-              <span className="text-xl">📱</span>
+              <IconMobile className="size-5" aria-hidden="true" />
               <span className="text-left">
                 <span className="block text-[10px] uppercase tracking-wider opacity-60">Bientôt sur</span>
                 <span className="block text-sm font-medium">iOS & Android</span>
@@ -119,9 +130,9 @@ export function LandingPage() {
           </div>
 
           <ul className="flex flex-wrap gap-x-6 gap-y-2 pt-2 text-sm text-amber-200/60 font-serif">
-            <li>✓ Gratuit</li>
-            <li>✓ Fonctionne hors ligne</li>
-            <li>✓ Vos textes vous appartiennent</li>
+            <li>Gratuit</li>
+            <li>Fonctionne hors ligne</li>
+            <li>Vos textes vous appartiennent</li>
           </ul>
         </div>
 
@@ -144,8 +155,8 @@ export function LandingPage() {
                 key={feature.title}
                 className="rounded-3xl border border-amber-900/25 bg-neutral-950/60 p-6 shadow-xl hover:border-amber-700/50 transition"
               >
-                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-800/40 bg-amber-950 text-2xl" aria-hidden>
-                  {feature.icon}
+                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-800/40 bg-amber-950" aria-hidden>
+                  <feature.Icon className="size-6 text-amber-300" />
                 </div>
                 <h3 className="font-serif text-xl font-bold text-amber-100">{feature.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-amber-200/60">{feature.text}</p>
@@ -195,7 +206,7 @@ export function LandingPage() {
               to="/donate"
               className="px-7 py-3.5 rounded-2xl text-yellow-200 bg-yellow-400/10 hover:bg-yellow-400/20 border border-yellow-500/30 font-medium transition"
             >
-              ☕ Soutenir le projet
+              Soutenir le projet
             </Link> */}
           </div>
         </div>
@@ -215,7 +226,7 @@ export function LandingPage() {
             <Link to="/terms" className="hover:text-neutral-300 transition">Conditions</Link>
             <Link to="/support" className="hover:text-neutral-300 transition">Support</Link>
             <a href="https://github.com/jonathandecroix28-max/loomfiction" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-300 transition">GitHub</a>
-            {/* <Link to="/donate" className="hover:text-neutral-300 transition">☕ Soutenir</Link> */}
+            {/* <Link to="/donate" className="hover:text-neutral-300 transition">Soutenir</Link> */}
           </nav>
         </div>
       </footer>

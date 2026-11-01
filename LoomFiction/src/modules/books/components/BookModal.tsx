@@ -3,6 +3,7 @@ import { useCreateBook } from '../hooks/useCreateBook';
 import { useCoverImage } from '../../../hooks/images/useCoverImage'; 
 import type { BookResponse } from '../../../types/book';
 import { CoverImageField } from '../../../components/images/CoverImageField';
+import { IconClose } from '../../../components/icons';
 
 interface BookModalProps {
   isOpen: boolean;
@@ -51,9 +52,10 @@ export function BookModal({ isOpen, onClose, onBookCreated }: BookModalProps) {
           <h2 className="text-2xl font-serif font-bold text-amber-100">Nouveau Grimoire</h2>
           <button 
             onClick={onClose}
+            aria-label="Fermer"
             className="text-amber-200/50 hover:text-amber-100 font-serif text-xl cursor-pointer"
           >
-            &times;
+            <IconClose className="size-5" aria-hidden="true" />
           </button>
         </div>
 

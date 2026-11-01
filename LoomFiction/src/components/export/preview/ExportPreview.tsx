@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { labelClass, sectionClass, smallBtn } from '../../../utils/export/ui';
+import { IconFullscreen } from '../../icons';
 
 type Props = {
   show: boolean;
@@ -36,7 +37,10 @@ export function ExportPreview(p: Props) {
         <div className="flex shrink-0 gap-2">
           <button type="button" onClick={p.onFullscreen} disabled={!p.canAct}
                   className="px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-50 text-xs font-medium cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed">
-            ⛶ Plein écran
+            <span className="inline-flex items-center gap-1.5">
+              <IconFullscreen className="size-3.5" aria-hidden="true" />
+              Plein écran
+            </span>
           </button>
           <button type="button" onClick={p.onToggle} className={smallBtn}>{p.show ? 'Masquer' : 'Afficher'}</button>
         </div>

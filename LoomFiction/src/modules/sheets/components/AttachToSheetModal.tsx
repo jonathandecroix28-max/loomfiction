@@ -4,6 +4,7 @@ import type { CategoryResponse } from '../../../types/category';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetResponse } from '../../../types/sheet';
 import { attachIdeasToSheet, bookOfSheet, foldText } from '../sheetLinks';
+import { IconBooks, IconSearch } from '../../../components/icons';
 
 interface AttachToSheetModalProps {
   idea: IdeaResponse | null;
@@ -103,14 +104,17 @@ export function AttachToSheetModal({ idea, sheets, categories, books, cardsByShe
         </div>
 
         {sheets.length > 4 && (
-          <input
-            type="text"
-            value={query}
-            autoFocus
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="🔍 Rechercher une fiche..."
-            className="w-full rounded-xl border border-amber-900/40 bg-neutral-900 px-4 py-2.5 font-serif text-sm text-amber-100 placeholder:text-amber-200/30 focus:outline-none focus:ring-1 focus:ring-amber-500"
-          />
+          <div className="relative">
+            <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-amber-200/40" aria-hidden="true" />
+            <input
+              type="text"
+              value={query}
+              autoFocus
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Rechercher une fiche..."
+              className="w-full rounded-xl border border-amber-900/40 bg-neutral-900 py-2.5 pl-10 pr-4 font-serif text-sm text-amber-100 placeholder:text-amber-200/30 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+          </div>
         )}
 
         <div className="max-h-[40vh] space-y-2 overflow-y-auto pr-1">
@@ -145,7 +149,11 @@ export function AttachToSheetModal({ idea, sheets, categories, books, cardsByShe
                     )}
                   </div>
                   <p className="mt-1 truncate text-xs text-amber-200/50">
-                    {category?.name ?? '—'} · 📚 {book ?? 'Sans roman'} · {cards.length} {cards.length > 1 ? 'cartes' : 'carte'}
+                    <span className="inline-flex items-center gap-1">
+                      {category?.name ?? '—'} ·
+                      <IconBooks className="size-3.5" aria-hidden="true" />
+                      {book ?? 'Sans roman'} · {cards.length} {cards.length > 1 ? 'cartes' : 'carte'}
+                    </span>
                   </p>
                 </button>
               );

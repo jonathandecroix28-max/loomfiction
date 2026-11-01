@@ -1,5 +1,6 @@
 import type { BookResponse } from '../../../types/book';
 import { formatDate } from '../../../utils/date/dateFormatter';
+import { IconNext } from '../../../components/icons';
 
 interface BookCardProps {
   book: BookResponse;
@@ -67,7 +68,7 @@ export function BookCard({ book, onSelect, onDelete, chapterCount }: BookCardPro
         <div className="pt-4 border-t border-amber-900/20 flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center text-xs text-amber-200/40">
           <span className="font-serif italic">Créé le {formatDate(createdDate)}</span>
           <span className="text-amber-400 font-sans font-medium group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-            Explorer &rarr;
+            Explorer <IconNext className="size-3.5" aria-hidden="true" />
           </span>
         </div>
       </div>

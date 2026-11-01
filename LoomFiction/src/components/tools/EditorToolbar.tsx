@@ -1,6 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import { imageFilesFrom, insertImageFiles } from '../../utils/images/editorImages';
+import {
+  IconAlignCenter,
+  IconAlignJustify,
+  IconAlignLeft,
+  IconAlignRight,
+  IconBold,
+  IconCode,
+  IconHeading1,
+  IconHeading2,
+  IconHeading3,
+  IconImage,
+  IconItalic,
+  IconList,
+  IconListOrdered,
+  IconMinus,
+  IconParagraph,
+  IconQuote,
+  IconRedo,
+  IconStrike,
+  IconUndo,
+} from '../icons';
 
 interface EditorToolbarProps {
   editor: Editor | null;
@@ -66,7 +87,7 @@ export function EditorToolbar({ editor, onImageError }: EditorToolbarProps) {
         className={plainBtn}
         title="Annuler (Ctrl+Z)"
       >
-        ↺
+        <IconUndo className="size-4" aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -75,71 +96,71 @@ export function EditorToolbar({ editor, onImageError }: EditorToolbarProps) {
         className={plainBtn}
         title="Rétablir (Ctrl+Y)"
       >
-        ↻
+        <IconRedo className="size-4" aria-hidden="true" />
       </button>
 
       {separator}
 
       {/* Style de texte */}
       <button type="button" onClick={() => chain().toggleBold().run()} className={btnClass(editor.isActive('bold'))} title="Gras">
-        <span className="font-bold">G</span>
+        <IconBold className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().toggleItalic().run()} className={btnClass(editor.isActive('italic'))} title="Italique">
-        <span className="italic font-serif">I</span>
+        <IconItalic className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().toggleStrike().run()} className={btnClass(editor.isActive('strike'))} title="Barré">
-        <span className="line-through">S</span>
+        <IconStrike className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().toggleCode().run()} className={btnClass(editor.isActive('code'))} title="Code">
-        <span className="font-mono text-[11px]">&lt;/&gt;</span>
+        <IconCode className="size-4" aria-hidden="true" />
       </button>
 
       {separator}
 
       {/* Alignements */}
       <button type="button" onClick={() => chain().setTextAlign('left').run()} className={btnClass(editor.isActive({ textAlign: 'left' }))} title="Aligner à gauche">
-        ≡
+        <IconAlignLeft className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().setTextAlign('center').run()} className={btnClass(editor.isActive({ textAlign: 'center' }))} title="Centrer">
-        ≣
+        <IconAlignCenter className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().setTextAlign('right').run()} className={btnClass(editor.isActive({ textAlign: 'right' }))} title="Aligner à droite">
-        ⁝
+        <IconAlignRight className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().setTextAlign('justify').run()} className={btnClass(editor.isActive({ textAlign: 'justify' }))} title="Justifier">
-        ☰
+        <IconAlignJustify className="size-4" aria-hidden="true" />
       </button>
 
       {separator}
 
       {/* Titres */}
       <button type="button" onClick={() => chain().toggleHeading({ level: 1 }).run()} className={btnClass(editor.isActive('heading', { level: 1 }))} title="Titre 1">
-        H1
+        <IconHeading1 className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().toggleHeading({ level: 2 }).run()} className={btnClass(editor.isActive('heading', { level: 2 }))} title="Titre 2">
-        H2
+        <IconHeading2 className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().toggleHeading({ level: 3 }).run()} className={btnClass(editor.isActive('heading', { level: 3 }))} title="Titre 3">
-        H3
+        <IconHeading3 className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().setParagraph().run()} className={btnClass(editor.isActive('paragraph'))} title="Paragraphe">
-        ¶
+        <IconParagraph className="size-4" aria-hidden="true" />
       </button>
 
       {separator}
 
       {/* Listes & Citations */}
       <button type="button" onClick={() => chain().toggleBulletList().run()} className={btnClass(editor.isActive('bulletList'))} title="Liste à puces">
-        •≡
+        <IconList className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().toggleOrderedList().run()} className={btnClass(editor.isActive('orderedList'))} title="Liste numérotée">
-        1.
+        <IconListOrdered className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().toggleBlockquote().run()} className={btnClass(editor.isActive('blockquote'))} title="Citation">
-        “ ”
+        <IconQuote className="size-4" aria-hidden="true" />
       </button>
       <button type="button" onClick={() => chain().setHorizontalRule().run()} className={baseBtn} title="Séparateur">
-        ―
+        <IconMinus className="size-4" aria-hidden="true" />
       </button>
 
       {separator}
@@ -152,7 +173,7 @@ export function EditorToolbar({ editor, onImageError }: EditorToolbarProps) {
         className={plainBtn}
         title="Insérer une image"
       >
-        {imageBusy ? '…' : '🖼'}
+        {imageBusy ? '…' : <IconImage className="size-4" aria-hidden="true" />}
       </button>
       <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageFiles} />
 

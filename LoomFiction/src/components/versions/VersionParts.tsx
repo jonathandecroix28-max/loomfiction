@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { SortBy } from '../../hooks/versions/useVersionCompare';
 import { btnBase, ghostBtn } from '../../utils/versions/versionStyles';
+import { IconBack } from '../icons';
 
 /* ───────────────────────── États de la page ───────────────────────── */
 
@@ -60,7 +61,7 @@ export function VersionsHeader({
             onClick={onBack}
             className="text-amber-200/60 hover:text-amber-100 transition-colors text-sm cursor-pointer flex items-center gap-1 font-sans mb-1 sm:mb-2"
           >
-            &larr; {backLabel}
+            <IconBack className="size-4" aria-hidden="true" /> {backLabel}
           </button>
           <h1 className="text-xl sm:text-3xl font-bold text-amber-100">{title}</h1>
           <p className="text-sm text-amber-200/50 mt-1 truncate">{subtitle}</p>

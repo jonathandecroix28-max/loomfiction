@@ -1,8 +1,11 @@
 import { memo, useMemo, type ReactNode } from 'react';
 import DOMPurify from 'dompurify';
 
+export const READING_COLUMN =
+  'w-full max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16';
 
-export const READING_COLUMN = 'w-full max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16';
+export const READING_TEXT =
+  'prose prose-invert max-w-[65ch] w-full mx-auto text-[1.125rem] leading-[1.75] text-amber-100/90 font-serif mb-16';
 
 export function ChapterHeading({ children }: { children: ReactNode }) {
   return (
@@ -12,11 +15,16 @@ export function ChapterHeading({ children }: { children: ReactNode }) {
   );
 }
 
-export const ChapterContent = memo(function ChapterContent({ html }: { html: string }) {
+export const ChapterContent = memo(function ChapterContent({
+  html,
+}: {
+  html: string;
+}) {
   const clean = useMemo(() => DOMPurify.sanitize(html), [html]);
+
   return (
     <div
-      className="prose prose-invert max-w-none text-lg leading-relaxed text-amber-100/90 font-serif mb-16"
+      className={READING_TEXT}
       dangerouslySetInnerHTML={{ __html: clean }}
     />
   );

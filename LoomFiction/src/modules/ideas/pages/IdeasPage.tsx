@@ -239,10 +239,14 @@ export function IdeasPage() {
           </div>
         )}
 
-        <IdeasFilters 
-          search={ideaSearch} onSearchChange={setIdeaSearch}
-          bookFilter={bookTitleFilter} onBookFilterChange={setBookTitleFilter}
-          statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
+        <IdeasFilters
+          search={ideaSearch}
+          onSearchChange={setIdeaSearch}
+          bookFilter={bookTitleFilter}
+          onBookFilterChange={setBookTitleFilter}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          books={books}
         />
       </div>
 

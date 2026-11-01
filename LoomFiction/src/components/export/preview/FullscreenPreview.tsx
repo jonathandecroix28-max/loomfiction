@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useOverlayLock } from '../../../hooks/export/useOverlayLock';
+import { IconClose } from '../../icons';
 
 type Props = { title?: string; html: string; controls: ReactNode; footer: ReactNode; onClose: () => void };
 
@@ -14,7 +15,10 @@ export function FullscreenPreview({ title, html, controls, footer, onClose }: Pr
       <div className="flex items-center justify-between gap-2 border-b border-amber-900/40 bg-neutral-950 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <button type="button" onClick={onClose}
                 className="px-3 py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-50 text-sm font-medium cursor-pointer">
-          ✕ Fermer
+          <span className="inline-flex items-center gap-1.5">
+            <IconClose className="size-4" aria-hidden="true" />
+            Fermer
+          </span>
         </button>
         <span className="hidden sm:block min-w-0 truncate text-sm text-amber-200/60">{title}</span>
         {controls}

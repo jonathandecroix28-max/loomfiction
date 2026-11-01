@@ -4,7 +4,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import Image from '@tiptap/extension-image';
-import { ChapterContent, ChapterHeading, READING_COLUMN } from '../components/ChapterReading';
+import { ChapterContent, ChapterHeading, READING_COLUMN, READING_TEXT } from '../components/ChapterReading';
 import { useKeyboardViewport } from '../../../hooks/useKeyboardViewport';
 import { offlineChapterService } from '../../../services/offlineChapterService';
 import { offlineChapterVersionService } from '../../../services/offlineChapterVersionService';
@@ -14,6 +14,14 @@ import { EditorToolbar } from '../../../components/tools/EditorToolbar';
 import { imageFilesFrom, insertImageFiles } from '../../../utils/images/editorImages';
 import type { ChapterResponse } from '../../../types/chapter';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
+import {
+  IconAdd,
+  IconBack,
+  IconEdit,
+  IconHistory,
+  IconSave,
+  IconView,
+} from '../../../components/icons';
 
 const keepEditorFocus = (event: MouseEvent) => {
   if ((event.target as HTMLElement).closest('input, textarea, select')) return;
@@ -47,7 +55,7 @@ export function ChapterEditorPage() {
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-[60vh] text-lg leading-relaxed text-amber-100/90 font-serif pb-12',
+        class: `${READING_TEXT} focus:outline-none min-h-[60vh] pb-12`,
       },
       handlePaste: (view, event) => {
         const files = imageFilesFrom(event.clipboardData?.files);
@@ -127,7 +135,7 @@ export function ChapterEditorPage() {
 
     if (updated) {
       setChapter(updated);
-      setSaveMessage('Enregistré ! ✨');
+      setSaveMessage('Enregistré');
       setTimeout(() => setSaveMessage(''), 3000);
     } else if (updateError) {
       setSaveMessage('Erreur sauvegarde.');
@@ -179,7 +187,7 @@ export function ChapterEditorPage() {
             title="Retour"
             className="h-9 px-2 sm:px-2.5 rounded-lg text-amber-200/70 hover:text-amber-100 hover:bg-neutral-900 text-xs sm:text-sm font-sans flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
           >
-            &larr; <span className="hidden sm:inline">Retour</span>
+            <IconBack className="size-4" aria-hidden="true" /> <span className="hidden sm:inline">Retour</span>
           </button>
           
           <span className="text-amber-900/50 text-xs">|</span>
@@ -193,7 +201,7 @@ export function ChapterEditorPage() {
             title="Historique des versions"
             className="h-9 px-2 sm:px-3 rounded-lg border border-amber-900/30 bg-neutral-900 hover:bg-neutral-800 text-amber-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
           >
-            <span>📜</span>
+            <IconHistory className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">Versions</span>
           </button>
         </div>
@@ -249,7 +257,7 @@ export function ChapterEditorPage() {
               title="Créer une nouvelle version"
               className="h-9 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-200 font-sans text-xs sm:text-sm font-medium transition-colors cursor-pointer border border-amber-900/30 disabled:opacity-40 flex items-center justify-center gap-1.5 shrink-0"
             >
-              <span>➕</span>
+              <IconAdd className="size-4" aria-hidden="true" />
               <span className="hidden sm:inline">Nouvelle version</span>
             </button>
 
@@ -258,7 +266,7 @@ export function ChapterEditorPage() {
               title={isPreview ? "Passer en mode édition" : "Passer en mode aperçu"}
               className="h-9 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-200 font-sans text-xs sm:text-sm font-medium transition-colors cursor-pointer border border-amber-900/30 flex items-center justify-center gap-1.5 shrink-0"
             >
-              <span>{isPreview ? "✏️" : "👁️"}</span>
+              {isPreview ? <IconEdit className="size-4" aria-hidden="true" /> : <IconView className="size-4" aria-hidden="true" />}
               <span className="hidden sm:inline">{isPreview ? "Modifier" : "Aperçu"}</span>
             </button>
           </div>
@@ -269,7 +277,7 @@ export function ChapterEditorPage() {
             title="Enregistrer les modifications"
             className="h-9 px-4 sm:px-6 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 font-sans text-xs sm:text-sm font-medium transition-colors shadow-md cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5 shrink-0"
           >
-            <span>💾</span>
+            <IconSave className="size-4" aria-hidden="true" />
             <span>{isUpdating ? "Enregistrement..." : "Enregistrer"}</span>
           </button>
         </div>

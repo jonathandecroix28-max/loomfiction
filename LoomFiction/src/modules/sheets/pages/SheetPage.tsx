@@ -8,6 +8,15 @@ import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
 import { exportSheetToJson, exportSheetToMarkdownFile } from '../services/sheetExchange';
 import type { IdeaResponse, IdeaUpsertRequest } from '../../../types/idea';
+import {
+  IconAdd,
+  IconBack,
+  IconChevronDown,
+  IconCopy,
+  IconExport,
+  IconFile,
+  IconPrint,
+} from '../../../components/icons';
 
 type Mode = 'cards' | 'document';
 
@@ -219,7 +228,8 @@ export function SheetPage() {
             onClick={() => navigate('/ideas')}
             className="touch-target flex cursor-pointer items-center gap-1 self-start font-sans text-sm text-amber-200/60 transition-colors hover:text-amber-100"
           >
-            &larr; Retour au carnet
+            <IconBack className="size-4" aria-hidden="true" />
+            Retour au carnet
           </button>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -325,14 +335,20 @@ export function SheetPage() {
                 onClick={openCreate}
                 className={`${toolbarBtn} border-amber-600 bg-amber-700 text-amber-50 shadow-md hover:bg-amber-600`}
               >
-                + Ajouter une characteristique
+                <span className="inline-flex items-center gap-1.5">
+                  <IconAdd className="size-4" aria-hidden="true" />
+                  Ajouter une characteristique
+                </span>
               </button>
             ) : (
               <button
                 onClick={() => window.print()}
                 className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
               >
-                🖨️ Imprimer / PDF
+                <span className="inline-flex items-center gap-1.5">
+                  <IconPrint className="size-4" aria-hidden="true" />
+                  Imprimer / PDF
+                </span>
               </button>
             )}
 
@@ -342,8 +358,11 @@ export function SheetPage() {
                 onClick={() => setIsExportMenuOpen((open) => !open)}
                 className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800 flex items-center gap-1.5`}
               >
-                <span>💾 Exporter</span>
-                <span className="text-xs">▾</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <IconExport className="size-4" aria-hidden="true" />
+                  Exporter
+                </span>
+                <IconChevronDown className="size-3.5" aria-hidden="true" />
               </button>
 
               {isExportMenuOpen && (
@@ -355,7 +374,10 @@ export function SheetPage() {
                     }}
                     className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-neutral-900 text-amber-100"
                   >
-                    📄 Fichier JSON (.json)
+                    <span className="inline-flex items-center gap-1.5">
+                      <IconFile className="size-3.5" aria-hidden="true" />
+                      Fichier JSON (.json)
+                    </span>
                   </button>
                   <button
                     onClick={() => {
@@ -364,7 +386,10 @@ export function SheetPage() {
                     }}
                     className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-neutral-900 text-amber-100"
                   >
-                    📝 Fichier Markdown (.md)
+                    <span className="inline-flex items-center gap-1.5">
+                      <IconFile className="size-3.5" aria-hidden="true" />
+                      Fichier Markdown (.md)
+                    </span>
                   </button>
                   <button
                     onClick={() => {
@@ -373,7 +398,10 @@ export function SheetPage() {
                     }}
                     className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-neutral-900 text-amber-100"
                   >
-                    📋 Copier le Markdown
+                    <span className="inline-flex items-center gap-1.5">
+                      <IconCopy className="size-3.5" aria-hidden="true" />
+                      Copier le Markdown
+                    </span>
                   </button>
                 </div>
               )}

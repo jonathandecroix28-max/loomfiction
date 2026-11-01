@@ -4,6 +4,7 @@ import { useChapterReader } from '../hooks/useChapterReader';
 import { useEdgeSwipeNavigation } from '../hooks/useEdgeSwipeNavigation';
 import { EdgeSwipeHint } from '../components/EdgeSwipeHint';
 import { ChapterContent, ChapterHeading, READING_COLUMN } from '../components/ChapterReading';
+import { IconBack, IconNext } from '../../../components/icons';
 
 export function ChapterReadPage() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
@@ -50,7 +51,8 @@ export function ChapterReadPage() {
           onClick={() => navigate(`/books/${bookId}`)}
           className="text-amber-200/60 hover:text-amber-100 transition-colors text-sm cursor-pointer flex items-center gap-1 font-sans touch-target"
         >
-          &larr; Retour au livre
+          <IconBack className="size-4" aria-hidden="true" />
+          Retour au livre
         </button>
         <span className="text-sm font-sans text-amber-200/70 font-medium">Chapitre {chapter.chapter_number}</span>
         <div className="hidden sm:block w-16"></div>
@@ -67,7 +69,8 @@ export function ChapterReadPage() {
       onClick={() => goToChapter(prevChapter.id)}
       className="px-5 py-2.5 rounded-xl border border-amber-900/30 hover:bg-neutral-900 text-amber-200 text-sm font-medium transition-colors cursor-pointer flex items-center justify-center gap-2 touch-target"
       >
-      &larr; Chapitre précédent
+      <IconBack className="size-4" aria-hidden="true" />
+      Chapitre précédent
     </button>
   ) : (
     <div />
@@ -78,7 +81,7 @@ export function ChapterReadPage() {
       onClick={() => goToChapter(nextChapter.id)}
       className="px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 text-sm font-medium transition-colors shadow-md cursor-pointer flex items-center justify-center gap-2 ml-auto touch-target"
     >
-      Chapitre suivant &rarr;
+      Chapitre suivant <IconNext className="size-4" aria-hidden="true" />
     </button>
   )}
       </div>

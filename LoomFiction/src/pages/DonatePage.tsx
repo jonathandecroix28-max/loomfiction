@@ -1,26 +1,35 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { LucideIcon } from '../components/icons';
+import {
+  IconBack,
+  IconCoffee,
+  IconDone,
+  IconGlobe,
+  IconWrench,
+  IconZap,
+} from '../components/icons';
 
 const BMC_USERNAME = 'ton-pseudo';
 const BMC_URL = `https://www.buymeacoffee.com/${BMC_USERNAME}`;
 
 const USES = [
   {
-    icon: '🛠️',
+    Icon: IconWrench,
     title: 'Le temps de développement',
     text: 'Corriger les bugs, améliorer l’éditeur et faire évoluer Plotweaver au quotidien.',
   },
   {
-    icon: '☁️',
+    Icon: IconGlobe,
     title: 'Le serveur et la synchro',
     text: 'Héberger les données et garder la synchronisation entre tes appareils fiable.',
   },
   {
-    icon: '✨',
+    Icon: IconZap,
     title: 'Les nouvelles fonctionnalités',
     text: 'Financer les prochaines idées : meilleurs outils d’écriture, plus de confort de relecture.',
   },
-];
+] as const satisfies ReadonlyArray<{ Icon: LucideIcon; title: string; text: string }>;
 
 export function DonatePage() {
   const navigate = useNavigate();
@@ -43,7 +52,7 @@ export function DonatePage() {
           onClick={() => navigate(-1)}
           className="text-amber-200/60 hover:text-amber-100 transition-colors text-sm cursor-pointer flex items-center gap-1 font-sans"
         >
-          &larr; Retour
+          <IconBack className="size-4" aria-hidden="true" /> Retour
         </button>
 
         {/* Hero */}
@@ -55,7 +64,7 @@ export function DonatePage() {
 
           <div className="relative">
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-amber-800/40 bg-amber-950 text-4xl shadow-lg">
-              ☕
+              <IconCoffee className="size-9 text-amber-300" aria-hidden="true" />
             </div>
 
             <p className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-amber-200/40 mb-2">Soutenir Plotweaver</p>
@@ -72,7 +81,7 @@ export function DonatePage() {
                 rel="noopener noreferrer"
                 className="inline-flex w-full sm:w-auto items-center justify-center gap-3 rounded-xl bg-[#FFDD00] px-6 py-3.5 text-base font-bold text-neutral-900 shadow-lg transition hover:bg-[#ffe84d] active:scale-[0.98] font-sans"
               >
-                <span aria-hidden className="text-xl">☕</span>
+                <IconCoffee className="size-5" aria-hidden="true" />
                 Buy me a coffee
               </a>
 
@@ -80,7 +89,12 @@ export function DonatePage() {
                 onClick={handleCopy}
                 className="text-xs text-amber-200/50 hover:text-amber-100 transition-colors cursor-pointer font-sans"
               >
-                {copied ? '✓ Lien copié' : 'Copier le lien'}
+                {copied ? (
+                  <span className="inline-flex items-center gap-1">
+                    <IconDone className="size-3.5" aria-hidden="true" />
+                    Lien copié
+                  </span>
+                ) : 'Copier le lien'}
               </button>
             </div>
 
@@ -100,8 +114,8 @@ export function DonatePage() {
                 key={item.title}
                 className="rounded-2xl border border-amber-900/25 bg-neutral-950/55 p-4 sm:p-5 shadow-xl"
               >
-                <div className="mb-2 text-2xl" aria-hidden>
-                  {item.icon}
+                <div className="mb-2" aria-hidden>
+                  <item.Icon className="size-6 text-amber-300" />
                 </div>
                 <h3 className="text-sm sm:text-base font-semibold text-amber-100">{item.title}</h3>
                 <p className="mt-1 text-xs sm:text-sm text-amber-200/55 leading-relaxed">{item.text}</p>
@@ -111,7 +125,7 @@ export function DonatePage() {
         </section>
 
         <p className="text-center text-sm text-amber-200/50 pb-2">
-          Un don est totalement facultatif. Merci d’utiliser Plotweaver, et bonne écriture ! ✍️
+          Un don est totalement facultatif. Merci d’utiliser Plotweaver, et bonne écriture.
         </p>
       </main>
     </div>

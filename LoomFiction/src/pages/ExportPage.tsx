@@ -17,6 +17,7 @@ import { ExportPreview } from '../components/export/preview/ExportPreview';
 import { FullscreenPreview } from '../components/export/preview/FullscreenPreview';
 import { PreviewControls } from '../components/export/preview/PreviewControls';
 import { MoreChaptersButton } from '../components/export/MoreChaptersButton';
+import { IconBooks } from '../components/icons';
 
 export function ExportPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -59,7 +60,9 @@ export function ExportPage() {
           <div className="rounded-2xl border border-red-900/30 bg-red-950/20 p-6 text-red-200">{booksError}</div>
         ) : books.length === 0 ? (
           <div className={`${sectionClass} text-center py-12 space-y-4`}>
-            <p className="text-4xl" aria-hidden>📚</p>
+            <div className="flex justify-center">
+              <IconBooks className="size-10" aria-hidden="true" />
+            </div>
             <h2 className="text-xl sm:text-2xl font-bold text-amber-100">Aucun roman à exporter</h2>
             <p className="text-sm text-amber-200/60 max-w-md mx-auto">
               Crée un roman et écris au moins un chapitre : il apparaîtra ici, prêt à être exporté en Word, PDF, EPUB…

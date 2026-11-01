@@ -3,6 +3,7 @@ import type { CategoryResponse } from '../../../types/category';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetResponse } from '../../../types/sheet';
 import { exportSheetToJson, exportSheetToMarkdownFile } from '../services/sheetExchange';
+import { IconExport } from '../../../components/icons';
 
 type Format = 'json' | 'md';
 type CategoryArg = Parameters<typeof exportSheetToJson>[1];
@@ -17,8 +18,8 @@ interface ExportSheetsModalProps {
 }
 
 const FORMATS: { key: Format; label: string; hint: string }[] = [
-  { key: 'json', label: '📄 JSON (.json)', hint: 'Ré-importable dans Plotweaver' },
-  { key: 'md', label: '📝 Markdown (.md)', hint: 'Lisible partout, ré-importable' },
+  { key: 'json', label: 'JSON (.json)', hint: 'Ré-importable dans Plotweaver' },
+  { key: 'md', label: 'Markdown (.md)', hint: 'Lisible partout, ré-importable' },
 ];
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -101,7 +102,10 @@ export function ExportSheetsModal({
         aria-label="Exporter des fiches"
         className="flex max-h-[90dvh] w-full max-w-md flex-col gap-5 rounded-3xl border border-amber-900/40 bg-[#1c1411] p-6 font-sans text-amber-50 shadow-2xl md:p-8"
       >
-        <h2 className="font-serif text-xl font-bold text-amber-100">💾 Exporter des fiches</h2>
+        <h2 className="inline-flex items-center gap-2 font-serif text-xl font-bold text-amber-100">
+          <IconExport className="size-5 shrink-0" aria-hidden="true" />
+          Exporter des fiches
+        </h2>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div className="flex items-center justify-between gap-3">

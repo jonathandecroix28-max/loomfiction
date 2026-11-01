@@ -6,6 +6,8 @@ import { offlineCategoryService } from '../../../services/offlineCategoryService
 import type { IdeaResponse, IdeaUpsertRequest, IdeaStatus } from '../../../types/idea';
 import type { BookResponse } from '../../../types/book';
 import type { CategoryResponse } from '../../../types/category';
+import type { LucideIcon } from '../../../components/icons';
+import { IconGlobe, IconMic, IconUser, IconZap } from '../../../components/icons';
 
 interface IdeaModalProps {
   isOpen: boolean;
@@ -31,18 +33,21 @@ type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
 const templates = {
   personnage: {
-    label: '👤 Personnage',
+    label: 'Personnage',
+    Icon: IconUser,
     text: 'Nom:\nÂge:\nObjectif:\nSecret:\nApparence:\nTraits de caractère:\n',
   },
   intrigue: {
-    label: '⚡ Rebondissement',
+    label: 'Rebondissement',
+    Icon: IconZap,
     text: "Situation initiale:\nL'élément perturbateur:\nAction(s) entreprise(s):\nConséquence:\n",
   },
   univers: {
-    label: '🌍 Lieu / Lore',
+    label: 'Lieu / Lore',
+    Icon: IconGlobe,
     text: 'Nom du lieu:\nAtmosphère/Ambiance:\nParticularité/Règle magique:\nDanger potentiel:\n',
   },
-};
+} as const satisfies Record<string, { label: string; Icon: LucideIcon; text: string }>;
 
 export function IdeaModal({
   isOpen,
@@ -348,7 +353,7 @@ export function IdeaModal({
                     isListening ? 'Arrêter la dictée' : 'Dicter votre idée'
                   }
                 >
-                  <span aria-hidden="true">🎙️</span>
+                  <IconMic className="size-4" aria-hidden="true" />
                   <span>{isListening ? 'Écoute...' : 'Dicter'}</span>
                 </button>
               </div>
@@ -377,9 +382,9 @@ export function IdeaModal({
               onChange={(e) => setStatus(e.target.value as IdeaStatus)}
               className="w-full rounded-xl border border-amber-900/40 bg-neutral-900 px-3 py-3 font-serif text-sm text-amber-100 focus:outline-none"
             >
-              <option value="draft">💡 Brute</option>
-              <option value="in-progress">🛠️ En cours</option>
-              <option value="integrated">✅ Intégrée</option>
+              <option value="draft">Brute</option>
+              <option value="in-progress">En cours</option>
+              <option value="integrated">Intégrée</option>
             </select>
           </div>
 

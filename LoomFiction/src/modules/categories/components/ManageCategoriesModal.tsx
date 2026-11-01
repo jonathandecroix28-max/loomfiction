@@ -8,6 +8,7 @@ import {
 } from '../../../services/categoryContent';
 import { CategoryQuickAdd } from './CategoryQuickAdd';
 import { nameKey, presetFor } from '../categoryPresets';
+import { IconClose } from '../../../components/icons';
 
 interface ManageCategoriesModalProps {
   isOpen: boolean;
@@ -146,7 +147,7 @@ export function ManageCategoriesModal({
         <div className="mb-5 flex items-center justify-between border-b border-amber-900/30 pb-3">
           <h2 className="font-serif text-xl font-bold text-amber-100">Gérer les catégories</h2>
           <button onClick={onClose} aria-label="Fermer" className="cursor-pointer font-serif text-xl text-amber-200/50 hover:text-amber-100">
-            &times;
+            <IconClose className="size-5" aria-hidden="true" />
           </button>
         </div>
 
