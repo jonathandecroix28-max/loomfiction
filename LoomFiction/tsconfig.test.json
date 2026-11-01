@@ -1,0 +1,18 @@
+
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "types": ["jest", "node"],
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "strict": true
+  },
+  "include": ["src", "tests", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+  "exclude": ["node_modules", "dist"]
+}
