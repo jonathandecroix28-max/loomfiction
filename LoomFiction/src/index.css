@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+@theme {
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --font-serif: 'Literata Variable', Georgia, 'Times New Roman', serif;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    THÈMES LoomFiction
 
@@ -101,6 +106,12 @@ body,
   background: var(--c-a900);
   color: var(--c-heading);
 }
+
+
+:where(h1, h2, h3):not(.prose *) {
+  font-family: var(--font-display);
+}
+
 @page {
   size: A4;
   margin: 18mm 17mm;
@@ -119,6 +130,11 @@ body,
   .print-hidden,
   button {
     display: none !important;
+  }
+
+  #root,
+  .bg-\[\#1c1411\] {
+    background: #fff !important;
   }
 
   .sheet-document,
