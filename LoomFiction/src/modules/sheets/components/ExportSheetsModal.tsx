@@ -62,7 +62,7 @@ export function ExportSheetsModal({
   onClose,
   onExported,
 }: ExportSheetsModalProps) {
-  const canPickFolder = useMemo(supportsDirectoryPicker, []);
+  const canPickFolder = useMemo(() => supportsDirectoryPicker(), []);
   const initial = useMemo(() => loadOptions(canPickFolder), [canPickFolder]);
 
   const [selected, setSelected] = useState<Set<number>>(
