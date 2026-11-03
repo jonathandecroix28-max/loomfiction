@@ -3,9 +3,20 @@ import type { CategoryResponse } from '../../../types/category';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetResponse } from '../../../types/sheet';
 import { exportSheetToJson, exportSheetToMarkdownFile } from '../services/sheetExchange';
+import {
+  captureDownload,
+  downloadZip,
+  isAbortError,
+  pickDirectory,
+  sanitizeName,
+  supportsDirectoryPicker,
+  writeToDirectory,
+  type ExportFile,
+} from '../services/exportDestinations';
 import { IconExport } from '../../../components/icons';
 
 type Format = 'json' | 'md';
+type Destination = 'zip' | 'folder' | 'files';
 type CategoryArg = Parameters<typeof exportSheetToJson>[1];
 
 interface ExportSheetsModalProps {
@@ -18,12 +29,30 @@ interface ExportSheetsModalProps {
 }
 
 const FORMATS: { key: Format; label: string; hint: string }[] = [
-  { key: 'json', label: 'JSON (.json)', hint: 'Ré-importable dans Plotweaver' },
+  { key: 'json', label: 'JSON (.json)', hint: 'Ré-importable dans LoomFiction' },
   { key: 'md', label: 'Markdown (.md)', hint: 'Lisible partout, ré-importable' },
 ];
 
+const OPTIONS_KEY = 'loomfiction:export-sheets-options';
+const DEFAULT_FOLDER = 'Fiches LoomFiction';
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const byOrder = (a: IdeaResponse, b: IdeaResponse) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+
+function loadOptions(canPickFolder: boolean): { destination: Destination; byCategory: boolean } {
+  const fallback = { destination: 'zip' as Destination, byCategory: true };
+  try {
+    const raw = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? 'null');
+    if (!raw) return fallback;
+    const destination: Destination = ['zip', 'folder', 'files'].includes(raw.destination) ? raw.destination : 'zip';
+    return {
+      destination: destination === 'folder' && !canPickFolder ? 'zip' : destination,
+      byCategory: typeof raw.byCategory === 'boolean' ? raw.byCategory : true,
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 export function ExportSheetsModal({
   sheets,
@@ -33,11 +62,18 @@ export function ExportSheetsModal({
   onClose,
   onExported,
 }: ExportSheetsModalProps) {
+  const canPickFolder = useMemo(supportsDirectoryPicker, []);
+  const initial = useMemo(() => loadOptions(canPickFolder), [canPickFolder]);
+
   const [selected, setSelected] = useState<Set<number>>(
     () => new Set(defaultSelectedIds.filter((id) => sheets.some((sheet) => sheet.id === id)))
   );
   const [format, setFormat] = useState<Format>('json');
+  const [destination, setDestination] = useState<Destination>(initial.destination);
+  const [folderName, setFolderName] = useState(DEFAULT_FOLDER);
+  const [byCategory, setByCategory] = useState(initial.byCategory);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const groups = useMemo(() => {
     const known = new Set(categories.map((category) => category.id));
@@ -67,27 +103,93 @@ export function ExportSheetsModal({
       return next;
     });
 
+  const pick = (value: Destination) => {
+    setDestination(value);
+    setError('');
+  };
+
+  const buildFiles = async (chosen: SheetResponse[]): Promise<ExportFile[]> => {
+    const files: ExportFile[] = [];
+
+    for (const sheet of chosen) {
+      const category = (categories.find((c) => c.id === sheet.categoryId) ?? null) as CategoryArg;
+      const cards = [...(cardsBySheet.get(sheet.id) ?? [])].sort(byOrder);
+
+      const captured = await captureDownload(() =>
+        format === 'json' ? exportSheetToJson(sheet, category, cards) : exportSheetToMarkdownFile(sheet, category, cards)
+      );
+      if (!captured) throw new Error('capture');
+
+      files.push({
+        name: sanitizeName(captured.name, `fiche.${format}`),
+        blob: captured.blob,
+        folder: byCategory ? sanitizeName(categories.find((c) => c.id === sheet.categoryId)?.name ?? '', 'Sans catégorie') : undefined,
+      });
+    }
+
+    return files;
+  };
+
   const handleExport = async () => {
     const chosen = sheets.filter((sheet) => selected.has(sheet.id));
     if (chosen.length === 0 || busy) return;
 
     setBusy(true);
-    for (const [index, sheet] of chosen.entries()) {
-      const category = (categories.find((c) => c.id === sheet.categoryId) ?? null) as CategoryArg;
-      const cards = [...(cardsBySheet.get(sheet.id) ?? [])].sort(byOrder);
+    setError('');
 
-      if (format === 'json') exportSheetToJson(sheet, category, cards);
-      else exportSheetToMarkdownFile(sheet, category, cards);
+    try {
+      try {
+        localStorage.setItem(OPTIONS_KEY, JSON.stringify({ destination, byCategory }));
+      } catch {
+        /* stockage indisponible : on ignore */
+      }
 
-      // Laisse le navigateur enchaîner les téléchargements au lieu de les bloquer
-      if (index < chosen.length - 1) await sleep(400);
+      if (destination === 'files') {
+        for (const [index, sheet] of chosen.entries()) {
+          const category = (categories.find((c) => c.id === sheet.categoryId) ?? null) as CategoryArg;
+          const cards = [...(cardsBySheet.get(sheet.id) ?? [])].sort(byOrder);
+
+          if (format === 'json') exportSheetToJson(sheet, category, cards);
+          else exportSheetToMarkdownFile(sheet, category, cards);
+
+          if (index < chosen.length - 1) await sleep(400);
+        }
+      } else if (destination === 'zip') {
+        const files = await buildFiles(chosen);
+        await downloadZip(files, sanitizeName(folderName, DEFAULT_FOLDER));
+      } else {
+        const root = await pickDirectory();
+        const files = await buildFiles(chosen);
+        await writeToDirectory(files, root, folderName.trim() ? sanitizeName(folderName, DEFAULT_FOLDER) : undefined);
+      }
+
+      onExported(chosen.length);
+      onClose();
+    } catch (err) {
+      if (isAbortError(err)) return;
+      console.error('Erreur lors de l’export des fiches :', err);
+      setError(
+        err instanceof Error && err.message === 'capture'
+          ? 'Impossible de préparer les fichiers dans ce mode. Choisis « Fichiers séparés ».'
+          : 'L’export a échoué. Réessaie, ou choisis un autre emplacement.'
+      );
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
-    onExported(chosen.length);
-    onClose();
   };
 
   const count = selected.size;
+
+  const DESTINATIONS: { key: Destination; label: string; hint: string; disabled?: boolean }[] = [
+    { key: 'zip', label: 'Dossier compressé (.zip)', hint: 'Un seul fichier, avec un dossier rangé à l’intérieur' },
+    {
+      key: 'folder',
+      label: 'Choisir un dossier',
+      hint: canPickFolder ? 'Écrit directement dans le dossier de ton choix' : 'Chrome, Edge ou Opera sur ordinateur uniquement',
+      disabled: !canPickFolder,
+    },
+    { key: 'files', label: 'Fichiers séparés', hint: 'Un téléchargement par fiche, dans ton dossier de téléchargements' },
+  ];
 
   return (
     <div
@@ -185,11 +287,67 @@ export function ExportSheetsModal({
             </div>
           </div>
 
-          {count > 1 && (
-            <p className="text-xs text-amber-200/50">
-              {count} fichiers seront téléchargés l'un après l'autre. Si ton navigateur le demande, autorise les
-              téléchargements multiples.
-            </p>
+          <div>
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-amber-200/60">Où l’enregistrer</span>
+            <div className="space-y-2">
+              {DESTINATIONS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  disabled={item.disabled}
+                  onClick={() => pick(item.key)}
+                  aria-pressed={destination === item.key}
+                  className={`w-full rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                    destination === item.key
+                      ? 'cursor-pointer border-amber-600 bg-amber-900/60 text-amber-50'
+                      : 'cursor-pointer border-amber-900/30 bg-neutral-900 text-amber-200 hover:border-amber-700/60'
+                  }`}
+                >
+                  <span className="block text-sm font-semibold">{item.label}</span>
+                  <span className="mt-0.5 block text-[11px] text-amber-200/50">{item.hint}</span>
+                </button>
+              ))}
+            </div>
+
+            {destination !== 'files' && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label htmlFor="export-folder-name" className="mb-1.5 block text-[11px] uppercase tracking-[0.22em] text-amber-200/40">
+                    {destination === 'zip' ? 'Nom du dossier' : 'Sous-dossier à créer (facultatif)'}
+                  </label>
+                  <input
+                    id="export-folder-name"
+                    value={folderName}
+                    onChange={(event) => setFolderName(event.target.value)}
+                    placeholder={DEFAULT_FOLDER}
+                    className="w-full rounded-xl border border-amber-900/30 bg-neutral-900 px-4 py-2.5 text-sm text-amber-100 placeholder:text-amber-200/30 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  {destination === 'folder' && (
+                    <p className="mt-1 text-[11px] text-amber-200/40">
+                      Laisse vide pour écrire directement dans le dossier choisi. Un fichier du même nom n’est jamais remplacé.
+                    </p>
+                  )}
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-amber-200/80">
+                  <input type="checkbox" checked={byCategory} onChange={(event) => setByCategory(event.target.checked)} />
+                  Ranger dans un sous-dossier par catégorie
+                </label>
+              </div>
+            )}
+
+            {destination === 'files' && count > 1 && (
+              <p className="mt-2 text-xs text-amber-200/50">
+                {count} fichiers seront téléchargés l'un après l'autre. Si ton navigateur le demande, autorise les
+                téléchargements multiples.
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div role="alert" className="rounded-xl border border-red-900/40 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+              {error}
+            </div>
           )}
         </div>
 
