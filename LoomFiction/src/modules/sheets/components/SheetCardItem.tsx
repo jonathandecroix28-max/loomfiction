@@ -1,200 +1,195 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { IdeaResponse } from '../../../types/idea';
-import {
-  IconDelete,
-  IconDown,
-  IconEdit,
-  IconHistory,
-  IconUp,
-} from '../../../components/icons';
+import { IconDelete, IconDown, IconEdit, IconUp } from '../../../components/icons';
+import { ActionMenu } from './ActionMenu';
 
 interface SheetCardItemProps {
   card: IdeaResponse;
   index: number;
   total: number;
+  autoFocus?: boolean;
   onMove: (index: number, delta: -1 | 1) => void;
   onEdit: (card: IdeaResponse) => void;
-  onVersions: (card: IdeaResponse) => void;
   onDelete: (card: IdeaResponse) => void;
-  onSaveDescription: (
-    card: IdeaResponse,
-    description: string,
-  ) => Promise<boolean>;
+  onSaveDescription: (card: IdeaResponse, description: string) => Promise<boolean>;
 }
 
-const btn =
-  'flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-30 sm:min-h-9 sm:py-1.5';
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+const SAVE_DELAY = 900;
+
+const iconBtn =
+  'touch-target inline-flex min-w-9 cursor-pointer items-center justify-center rounded-lg border px-2.5 transition disabled:cursor-not-allowed disabled:opacity-30';
 
 export function SheetCardItem({
   card,
   index,
   total,
+  autoFocus = false,
   onMove,
   onEdit,
-  onVersions,
   onDelete,
   onSaveDescription,
 }: SheetCardItemProps) {
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
-  const [draftDescription, setDraftDescription] = useState(card.description || '');
-  const [isSavingDescription, setIsSavingDescription] = useState(false);
+  const incoming = card.description ?? '';
+  const [value, setValue] = useState(incoming);
+  const [state, setState] = useState<SaveState>('idle');
 
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+  const valueRef = useRef(incoming);
+  const savedRef = useRef(incoming);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cardRef = useRef(card);
+  const saveRef = useRef(onSaveDescription);
+  cardRef.current = card;
+  saveRef.current = onSaveDescription;
 
-  const [prevDescription, setPrevDescription] = useState(card.description);
-  if (card.description !== prevDescription) {
-    setPrevDescription(card.description);
-    setDraftDescription(card.description || '');
-  }
-
-  const startEditing = () => {
-    setDraftDescription(card.description || '');
-    setIsEditingDescription(true);
-  };
-
-  const cancelEditing = () => {
-    setDraftDescription(card.description || '');
-    setIsEditingDescription(false);
-  };
-
-  const saveDescription = async () => {
-    if (isSavingDescription) return;
-
-    setIsSavingDescription(true);
-    try {
-      const saved = await onSaveDescription(card, draftDescription);
-      if (saved) setIsEditingDescription(false);
-    } finally {
-      setIsSavingDescription(false);
+  // Texte modifié ailleurs (fenêtre « Éditer », rechargement) : on le reprend s'il n'y a pas de saisie en cours
+  useEffect(() => {
+    if (valueRef.current === savedRef.current && incoming !== savedRef.current) {
+      savedRef.current = incoming;
+      valueRef.current = incoming;
+      setValue(incoming);
     }
+  }, [incoming]);
+
+  const flush = async () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    const next = valueRef.current;
+    if (next === savedRef.current) return;
+
+    setState('saving');
+    const ok = await saveRef.current(cardRef.current, next);
+    if (!ok) {
+      setState('error');
+      return;
+    }
+    savedRef.current = next;
+    setState(valueRef.current === next ? 'saved' : 'idle');
   };
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+
+  const handleChange = (text: string) => {
+    setValue(text);
+    valueRef.current = text;
+    setState('idle');
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => void flushRef.current(), SAVE_DELAY);
+  };
+
+  // Ce qui est tapé n'est jamais perdu : on enregistre aussi en quittant la page
+  useEffect(
+    () => () => {
+      void flushRef.current();
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    const area = areaRef.current;
+    if (!area) return;
+    area.focus();
+    area.setSelectionRange(area.value.length, area.value.length);
+  }, [autoFocus]);
+
+  // Le champ grandit avec le texte
+  useLayoutEffect(() => {
+    const area = areaRef.current;
+    if (!area) return;
+    area.style.height = 'auto';
+    area.style.height = `${area.scrollHeight}px`;
+  }, [value]);
 
   return (
     <div className="rounded-2xl border border-amber-900/25 bg-neutral-950/70 p-4 shadow-xl sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <h3 className="min-w-0 break-words font-serif text-xl font-bold text-amber-100">
-          {card.name}
-        </h3>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-serif text-lg font-bold text-amber-100 wrap-break-word sm:text-xl">{card.name}</h3>
+          <p role="status" className={`mt-0.5 h-4 font-sans text-[11px] ${state === 'error' ? 'text-red-400' : 'text-amber-200/50'}`}>
+            {state === 'saving' && 'Enregistrement…'}
+            {state === 'saved' && 'Enregistré'}
+            {state === 'error' && (
+              <>
+                Échec de l’enregistrement.{' '}
+                <button type="button" onClick={() => void flush()} className="cursor-pointer underline">
+                  Réessayer
+                </button>
+              </>
+            )}
+          </p>
+        </div>
 
-        <div className="grid w-full grid-cols-5 gap-2 font-sans sm:flex sm:w-auto sm:shrink-0 sm:flex-wrap sm:items-center">
+        {/* Grand écran : les actions restent visibles */}
+        <div className="hidden shrink-0 items-center gap-1.5 font-sans sm:flex">
           <button
+            type="button"
             disabled={index === 0}
             onClick={() => onMove(index, -1)}
             aria-label="Monter la carte"
             title="Monter"
-            className={`${btn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
+            className={`${iconBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
             <IconUp className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Monter</span>
           </button>
-
           <button
+            type="button"
             disabled={index === total - 1}
             onClick={() => onMove(index, 1)}
             aria-label="Descendre la carte"
             title="Descendre"
-            className={`${btn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
+            className={`${iconBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
             <IconDown className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Descendre</span>
           </button>
-
           <button
-            onClick={() => onVersions(card)}
-            aria-label="Voir les versions"
-            title="Versions"
-            className={`${btn} border-amber-900/30 bg-amber-950/80 text-amber-200 hover:bg-amber-900`}
-          >
-            <IconHistory className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Versions</span>
-          </button>
-
-          <button
+            type="button"
             onClick={() => onEdit(card)}
-            aria-label="Éditer la carte"
-            title="Éditer"
-            className={`${btn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
+            aria-label="Modifier le titre"
+            title="Modifier le titre"
+            className={`${iconBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
             <IconEdit className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Éditer</span>
           </button>
-
           <button
+            type="button"
             onClick={() => onDelete(card)}
             aria-label="Supprimer la carte"
-            title="Supprimer"
-            className={`${btn} border-red-900/30 bg-red-950/50 text-red-300 hover:bg-red-900/80`}
+            title="Supprimer la carte"
+            className={`${iconBtn} border-red-900/30 bg-red-950/50 text-red-300 hover:bg-red-900/80`}
           >
             <IconDelete className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Supprimer</span>
           </button>
         </div>
+
+        {/* Mobile : un seul bouton, les actions sont dans le menu */}
+        <ActionMenu
+          className="shrink-0 sm:hidden"
+          label={`Actions de la carte ${card.name}`}
+          items={[
+            { key: 'up', label: 'Monter', icon: IconUp, disabled: index === 0, onSelect: () => onMove(index, -1) },
+            { key: 'down', label: 'Descendre', icon: IconDown, disabled: index === total - 1, onSelect: () => onMove(index, 1) },
+            { key: 'edit', label: 'Modifier le titre', icon: IconEdit, onSelect: () => onEdit(card) },
+            { key: 'delete', label: 'Supprimer la carte', icon: IconDelete, danger: true, separatorBefore: true, onSelect: () => onDelete(card) },
+          ]}
+        />
       </div>
 
       <div className="mt-3 border-t border-amber-900/20 pt-3">
-        {isEditingDescription ? (
-          <div className="space-y-3">
-            <textarea
-              autoFocus
-              value={draftDescription}
-              onChange={(event) => setDraftDescription(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  event.preventDefault();
-                  cancelEditing();
-                }
-                if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-                  event.preventDefault();
-                  void saveDescription();
-                }
-              }}
-              aria-label={`Modifier la description de ${card.name}`}
-              placeholder="Écrire la description..."
-              rows={5}
-              className="min-h-32 w-full resize-y rounded-xl border border-amber-800/50 bg-neutral-900 px-3 py-3 font-sans text-sm leading-relaxed text-amber-100 outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600"
-            />
-
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={cancelEditing}
-                disabled={isSavingDescription}
-                className="min-h-10 cursor-pointer rounded-lg border border-amber-900/30 px-4 py-2 text-sm text-amber-200/80 hover:bg-neutral-900 disabled:opacity-50"
-              >
-                Annuler
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void saveDescription()}
-                disabled={isSavingDescription}
-                className="min-h-10 cursor-pointer rounded-lg border border-amber-700 bg-amber-800 px-4 py-2 text-sm font-medium text-amber-50 hover:bg-amber-700 disabled:cursor-wait disabled:opacity-50"
-              >
-                {isSavingDescription ? 'Enregistrement...' : 'Enregistrer'}
-              </button>
-            </div>
-
-            <p className="text-xs text-amber-200/40">
-              Astuce : Ctrl + Entrée pour enregistrer, Échap pour annuler.
-            </p>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={startEditing}
-            aria-label={`Toucher pour modifier la description de ${card.name}`}
-            className="block min-h-10 w-full cursor-text rounded-lg text-left transition hover:bg-amber-950/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-700"
-          >
-            {card.description?.trim() ? (
-              <span className="block whitespace-pre-wrap break-words py-1 leading-relaxed text-amber-200/80">
-                {card.description}
-              </span>
-            ) : (
-              <span className="block py-1 italic text-amber-200/50">
-                À compléter… (toucher pour écrire)
-              </span>
-            )}
-          </button>
-        )}
+        <textarea
+          ref={areaRef}
+          value={value}
+          rows={2}
+          onChange={(event) => handleChange(event.target.value)}
+          onBlur={() => void flush()}
+          aria-label={`Texte de la caractéristique ${card.name}`}
+          placeholder="À compléter… écrivez directement ici"
+          className="block w-full resize-none rounded-xl border border-transparent bg-transparent px-3 py-2 font-serif leading-relaxed text-amber-200/90 transition placeholder:italic placeholder:text-amber-200/30 hover:border-amber-900/30 focus:border-amber-600/60 focus:bg-neutral-900/60 focus:outline-none"
+        />
       </div>
     </div>
   );
