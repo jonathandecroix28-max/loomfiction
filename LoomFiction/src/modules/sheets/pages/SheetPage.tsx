@@ -3,57 +3,46 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSheetPage } from '../hooks/useSheetPage';
 import { SheetCardItem } from '../components/SheetCardItem';
 import { SheetDocument } from '../components/SheetDocument';
+import { ActionMenu, type ActionMenuItem } from '../components/ActionMenu';
+import { AttachNotesModal } from '../components/AttachNotesModal';
 import { IdeaModal } from '../../ideas/components/IdeaModal';
 import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
+import { offlineSheetVersionService } from '../../../services/offlineSheetVersionService';
 import { exportSheetToJson, exportSheetToMarkdownFile } from '../services/sheetExchange';
-import type { IdeaResponse, IdeaUpsertRequest } from '../../../types/idea';
+import { toUpsert } from '../sheetLinks';
+import type { IdeaResponse } from '../../../types/idea';
 import {
   IconAdd,
+  IconAttach,
   IconBack,
-  IconChevronDown,
   IconCopy,
-  IconExport,
+  IconDelete,
+  IconEdit,
   IconFile,
+  IconHistory,
   IconPrint,
+  IconSave,
 } from '../../../components/icons';
 
 type Mode = 'cards' | 'document';
 
-const toUpsert = (card: IdeaResponse): IdeaUpsertRequest => ({
-  name: card.name,
-  description: card.description,
-  bookId: card.bookId,
-  categoryId: card.categoryId,
-  status: card.status,
-  sortOrder: card.sortOrder,
-});
-
-const toolbarBtn =
-  'cursor-pointer rounded-xl border px-4 py-2.5 text-sm font-medium transition touch-target';
+const toolbarBtn = 'cursor-pointer rounded-xl border px-4 py-2.5 text-sm font-medium transition touch-target';
 
 export function SheetPage() {
   const { sheetId } = useParams<{ sheetId: string }>();
   const navigate = useNavigate();
   const numSheetId = sheetId ? Number(sheetId) : null;
 
-  const {
-    sheet,
-    category,
-    cards,
-    setCards,
-    isLoading,
-    error,
-    reload,
-  } = useSheetPage(numSheetId);
+  const { sheet, category, cards, setCards, isLoading, error, reload } = useSheetPage(numSheetId);
 
   const [mode, setMode] = useState<Mode>('cards');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAttachOpen, setIsAttachOpen] = useState(false);
   const [cardToEdit, setCardToEdit] = useState<IdeaResponse | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [feedback, setFeedback] = useState('');
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (error || !sheet)) {
@@ -72,6 +61,7 @@ export function SheetPage() {
   if (error || !sheet) return null;
 
   const filled = cards.filter((card) => card.description?.trim()).length;
+  const versionsPath = `/ideas/fiches/${sheet.id}/versions`;
 
   const flash = (text: string) => {
     setFeedback(text);
@@ -93,22 +83,14 @@ export function SheetPage() {
     if (target < 0 || target >= cards.length) return;
 
     const reordered = [...cards];
-    [reordered[index], reordered[target]] = [
-      reordered[target],
-      reordered[index],
-    ];
-
-    const withOrder = reordered.map((card, position) => ({
-      ...card,
-      sortOrder: position,
-    }));
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    const withOrder = reordered.map((card, position) => ({ ...card, sortOrder: position }));
 
     setCards(withOrder);
 
     try {
       for (const [position, card] of withOrder.entries()) {
         const before = cards.find((c) => c.id === card.id);
-
         if (before?.sortOrder !== position) {
           await offlineIdeaService.update(card.id, toUpsert(card));
         }
@@ -119,34 +101,13 @@ export function SheetPage() {
     }
   };
 
-  const saveCardDescription = async (
-    card: IdeaResponse,
-    description: string,
-  ): Promise<boolean> => {
+  const saveCardDescription = async (card: IdeaResponse, description: string): Promise<boolean> => {
     try {
-      await offlineIdeaService.update(card.id, {
-        ...toUpsert(card),
-        description,
-      });
-
-      setCards((current) =>
-        current.map((item) =>
-          item.id === card.id
-            ? { ...item, description }
-            : item,
-        ),
-      );
-
-      flash('Description enregistrée.');
+      await offlineIdeaService.update(card.id, { ...toUpsert(card), description });
+      setCards((current) => current.map((item) => (item.id === card.id ? { ...item, description } : item)));
       return true;
     } catch (err) {
-      console.error(
-        "Erreur lors de l'enregistrement de la description :",
-        err,
-      );
-
-      flash("Impossible d'enregistrer la description.");
-      await reload();
+      console.error("Erreur lors de l'enregistrement de la description :", err);
       return false;
     }
   };
@@ -178,18 +139,9 @@ export function SheetPage() {
   };
 
   const deleteSheet = async () => {
-    const detail =
-      cards.length > 0
-        ? ` et ses ${cards.length} ${cards.length > 1 ? 'cartes' : 'carte'}`
-        : '';
+    const detail = cards.length > 0 ? ` et ses ${cards.length} ${cards.length > 1 ? 'cartes' : 'carte'}` : '';
 
-    if (
-      !confirm(
-        `Supprimer la fiche « ${sheet.name} »${detail} ? Cette action est irréversible.`,
-      )
-    ) {
-      return;
-    }
+    if (!confirm(`Supprimer la fiche « ${sheet.name} »${detail} ? Cette action est irréversible.`)) return;
 
     try {
       await offlineSheetService.remove(sheet.id);
@@ -201,10 +153,7 @@ export function SheetPage() {
   };
 
   const copyMarkdown = async () => {
-    const parts = [
-      `# ${sheet.name}`,
-      category ? `*${category.name}*` : '',
-    ];
+    const parts = [`# ${sheet.name}`, category ? `*${category.name}*` : ''];
 
     for (const card of cards) {
       if (card.description?.trim()) {
@@ -220,52 +169,71 @@ export function SheetPage() {
     }
   };
 
+  /** Une version enregistre la fiche entière : son nom et toutes ses cartes. */
+  const saveVersion = async () => {
+    try {
+      const version = await offlineSheetVersionService.createFromSheet(sheet, cards);
+      flash(`Version ${version.versionNumber} enregistrée (${cards.length} ${cards.length > 1 ? 'cartes' : 'carte'}).`);
+    } catch (err) {
+      console.error('Erreur lors de la création de la version de fiche :', err);
+      flash('Impossible d’enregistrer la version.');
+    }
+  };
+
+  const menuItems: ActionMenuItem[] = [
+    { key: 'save-version', label: 'Enregistrer une version', icon: IconSave, onSelect: () => void saveVersion() },
+    { key: 'versions', label: 'Historique des versions', icon: IconHistory, onSelect: () => navigate(versionsPath) },
+    { key: 'attach', label: 'Ajouter des notes existantes', icon: IconAttach, separatorBefore: true, onSelect: () => setIsAttachOpen(true) },
+    { key: 'print', label: 'Imprimer / PDF', icon: IconPrint, onSelect: () => { setMode('document'); setTimeout(() => window.print(), 100); } },
+    { key: 'json', label: 'Exporter en JSON', icon: IconFile, separatorBefore: true, onSelect: () => exportSheetToJson(sheet, category, cards) },
+    { key: 'md', label: 'Exporter en Markdown', icon: IconFile, onSelect: () => exportSheetToMarkdownFile(sheet, category, cards) },
+    { key: 'copy', label: 'Copier le Markdown', icon: IconCopy, onSelect: () => void copyMarkdown() },
+    { key: 'delete', label: 'Supprimer la fiche', icon: IconDelete, danger: true, separatorBefore: true, onSelect: () => void deleteSheet() },
+  ];
+
   return (
     <div className="min-h-screen bg-[#1c1411] font-serif text-[#fcf9f2] print:bg-white">
       <header className="border-b border-amber-900/40 bg-neutral-950/80 px-4 py-4 sm:px-6 print:hidden">
         <div className="mx-auto flex max-w-4xl flex-col gap-3">
-          <button
-            onClick={() => navigate('/ideas')}
-            className="touch-target flex cursor-pointer items-center gap-1 self-start font-sans text-sm text-amber-200/60 transition-colors hover:text-amber-100"
-          >
-            <IconBack className="size-4" aria-hidden="true" />
-            Retour au carnet
-          </button>
+          {/* Ligne du haut : retour à gauche, menu d'actions à droite */}
+          <div className="flex items-center justify-between gap-3">
+            <button
+              onClick={() => navigate('/ideas')}
+              className="touch-target flex cursor-pointer items-center gap-1 font-sans text-sm text-amber-200/60 transition-colors hover:text-amber-100"
+            >
+              <IconBack className="size-4" aria-hidden="true" />
+              Carnet
+            </button>
 
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0">
-              {category && (
-                <p className="mb-1 flex items-center gap-2 font-sans text-xs uppercase tracking-[0.2em] text-amber-200/60">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: category.color }}
-                  />
-                  {category.name}
-                </p>
-              )}
+            <ActionMenu label="Actions de la fiche" items={menuItems} />
+          </div>
 
-              {isRenaming ? (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void saveName();
-                  }}
-                  className="flex flex-wrap gap-2"
-                >
-                  <input
-                    value={draftName}
-                    autoFocus
-                    onChange={(event) => setDraftName(event.target.value)}
-                    className="min-w-0 rounded-xl border border-amber-900/40 bg-neutral-900 px-4 py-2 text-2xl font-bold text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  />
+          <div className="min-w-0">
+            {category && (
+              <p className="mb-1 flex items-center gap-2 font-sans text-xs uppercase tracking-[0.2em] text-amber-200/60">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: category.color }} />
+                {category.name}
+              </p>
+            )}
 
-                  <button
-                    type="submit"
-                    className={`${toolbarBtn} border-amber-600 bg-amber-700 text-amber-50 hover:bg-amber-600`}
-                  >
+            {isRenaming ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void saveName();
+                }}
+                className="flex flex-col gap-2 sm:flex-row"
+              >
+                <input
+                  value={draftName}
+                  autoFocus
+                  onChange={(event) => setDraftName(event.target.value)}
+                  className="min-w-0 flex-1 rounded-xl border border-amber-900/40 bg-neutral-900 px-4 py-2 text-2xl font-bold text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <button type="submit" className={`${toolbarBtn} border-amber-600 bg-amber-700 text-amber-50 hover:bg-amber-600`}>
                     Enregistrer
                   </button>
-
                   <button
                     type="button"
                     onClick={() => setIsRenaming(false)}
@@ -273,52 +241,50 @@ export function SheetPage() {
                   >
                     Annuler
                   </button>
-                </form>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <h1 className="truncate text-3xl font-bold text-amber-100 sm:text-4xl">
-                    {sheet.name}
-                  </h1>
-
-                  <button
-                    onClick={() => {
-                      setDraftName(sheet.name);
-                      setIsRenaming(true);
-                    }}
-                    className="shrink-0 cursor-pointer font-sans text-xs text-amber-200/50 underline hover:text-amber-100"
-                  >
-                    Renommer
-                  </button>
                 </div>
-              )}
-
-              <p className="mt-1 font-sans text-sm text-amber-200/50">
-                {cards.length} {cards.length > 1 ? 'cartes' : 'carte'} · {filled}{' '}
-                {filled > 1 ? 'remplies' : 'remplie'}
-              </p>
-            </div>
-
-            <div className="flex shrink-0 gap-2 font-sans">
-              {(['cards', 'document'] as const).map((value) => (
+              </form>
+            ) : (
+              <div className="flex items-center gap-2">
+                <h1 className="min-w-0 truncate text-3xl font-bold text-amber-100 sm:text-4xl">{sheet.name}</h1>
                 <button
-                  key={value}
-                  onClick={() => setMode(value)}
-                  aria-pressed={mode === value}
-                  className={`${toolbarBtn} ${
-                    mode === value
-                      ? 'border-amber-600 bg-amber-700 text-amber-50'
-                      : 'border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800'
-                  }`}
+                  type="button"
+                  onClick={() => {
+                    setDraftName(sheet.name);
+                    setIsRenaming(true);
+                  }}
+                  aria-label="Renommer la fiche"
+                  title="Renommer la fiche"
+                  className="touch-target inline-flex min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-amber-200/50 transition hover:text-amber-100"
                 >
-                  {value === 'cards' ? 'Cartes' : 'Fiche'}
+                  <IconEdit className="size-4" aria-hidden="true" />
                 </button>
-              ))}
-            </div>
+              </div>
+            )}
+
+            <p className="mt-1 font-sans text-sm text-amber-200/50">
+              {cards.length} {cards.length > 1 ? 'cartes' : 'carte'} · {filled} {filled > 1 ? 'remplies' : 'remplie'}
+            </p>
+          </div>
+
+          {/* Bascule Cartes / Fiche : pleine largeur sur mobile */}
+          <div className="grid grid-cols-2 gap-1 rounded-xl border border-amber-900/30 bg-neutral-950/50 p-1 font-sans sm:w-72">
+            {(['cards', 'document'] as const).map((value) => (
+              <button
+                key={value}
+                onClick={() => setMode(value)}
+                aria-pressed={mode === value}
+                className={`touch-target cursor-pointer rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  mode === value ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-100'
+                }`}
+              >
+                {value === 'cards' ? 'Cartes' : 'Fiche'}
+              </button>
+            ))}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-4 px-4 py-8 sm:px-6 print:max-w-none print:p-0">
+      <main className="mx-auto max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-8 print:max-w-none print:p-0">
         {feedback && (
           <div
             role="status"
@@ -328,105 +294,26 @@ export function SheetPage() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 font-sans print:hidden">
-          <div className="flex flex-wrap items-center gap-2">
-            {mode === 'cards' ? (
-              <button
-                onClick={openCreate}
-                className={`${toolbarBtn} border-amber-600 bg-amber-700 text-amber-50 shadow-md hover:bg-amber-600`}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <IconAdd className="size-4" aria-hidden="true" />
-                  Ajouter une characteristique
-                </span>
-              </button>
-            ) : (
-              <button
-                onClick={() => window.print()}
-                className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <IconPrint className="size-4" aria-hidden="true" />
-                  Imprimer / PDF
-                </span>
-              </button>
-            )}
-
-            {/* Menu d'Exportation */}
-            <div className="relative">
-              <button
-                onClick={() => setIsExportMenuOpen((open) => !open)}
-                className={`${toolbarBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800 flex items-center gap-1.5`}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <IconExport className="size-4" aria-hidden="true" />
-                  Exporter
-                </span>
-                <IconChevronDown className="size-3.5" aria-hidden="true" />
-              </button>
-
-              {isExportMenuOpen && (
-                <div className="absolute left-0 mt-2 w-56 rounded-2xl border border-amber-900/40 bg-[#1c1411] p-2 shadow-2xl z-20 space-y-1">
-                  <button
-                    onClick={() => {
-                      exportSheetToJson(sheet, category, cards);
-                      setIsExportMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-neutral-900 text-amber-100"
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <IconFile className="size-3.5" aria-hidden="true" />
-                      Fichier JSON (.json)
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      exportSheetToMarkdownFile(sheet, category, cards);
-                      setIsExportMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-neutral-900 text-amber-100"
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <IconFile className="size-3.5" aria-hidden="true" />
-                      Fichier Markdown (.md)
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      void copyMarkdown();
-                      setIsExportMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs rounded-xl hover:bg-neutral-900 text-amber-100"
-                  >
-                    <span className="inline-flex items-center gap-1.5">
-                      <IconCopy className="size-3.5" aria-hidden="true" />
-                      Copier le Markdown
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-          </div>
-
+        {/* Une seule action principale : pleine largeur sur mobile */}
+        {mode === 'cards' && cards.length > 0 && (
           <button
-            onClick={() => void deleteSheet()}
-            className={`${toolbarBtn} border-red-900/30 bg-red-950/50 text-red-300 hover:bg-red-900/80`}
+            onClick={openCreate}
+            className={`${toolbarBtn} flex w-full items-center justify-center gap-1.5 border-amber-600 bg-amber-700 font-sans text-amber-50 shadow-md hover:bg-amber-600 sm:w-auto print:hidden`}
           >
-            Supprimer la fiche
+            <IconAdd className="size-4" aria-hidden="true" />
+            Ajouter une caractéristique
           </button>
-        </div>
+        )}
 
         {cards.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-amber-900/30 bg-neutral-950/40 px-6 py-16 text-center print:hidden">
-            <p className="mb-2 text-lg text-amber-200/60">
-              Cette fiche n'a pas encore de carte.
-            </p>
+            <p className="mb-4 text-lg text-amber-200/60">Cette fiche n'a pas encore de carte.</p>
 
             <button
               onClick={openCreate}
-              className="cursor-pointer font-sans text-sm text-amber-400 underline hover:text-amber-300"
+              className={`${toolbarBtn} inline-flex items-center gap-1.5 border-amber-600 bg-amber-700 font-sans text-amber-50 shadow-md hover:bg-amber-600`}
             >
+              <IconAdd className="size-4" aria-hidden="true" />
               Ajouter la première caractéristique
             </button>
           </div>
@@ -438,13 +325,8 @@ export function SheetPage() {
                 card={card}
                 index={index}
                 total={cards.length}
-                onMove={(position, delta) =>
-                  void moveCard(position, delta)
-                }
+                onMove={(position, delta) => void moveCard(position, delta)}
                 onEdit={openEdit}
-                onVersions={(target) =>
-                  navigate(`/ideas/${target.id}/versions`)
-                }
                 onDelete={(target) => void deleteCard(target)}
                 onSaveDescription={saveCardDescription}
               />
@@ -464,6 +346,14 @@ export function SheetPage() {
         lockedCategoryId={sheet.categoryId}
         sortOrder={cards.length}
         onSuccess={() => void reload()}
+      />
+
+      <AttachNotesModal
+        isOpen={isAttachOpen}
+        sheet={sheet}
+        cards={cards}
+        onClose={() => setIsAttachOpen(false)}
+        onAttached={reload}
       />
     </div>
   );

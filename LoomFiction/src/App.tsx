@@ -14,6 +14,7 @@ import VersionsHubPage from './pages/VersionsHubPage';
 import { SheetPage } from './modules/sheets/pages/SheetPage';
 // import DonatePage from './pages/DonatePage';
 import ExportPage from './pages/ExportPage';
+import { SheetVersionsPage } from './modules/sheets/pages/SheetVersionPage';
 //import { TermsPage } from './pages/TermsPage';
 //import { PrivacyPage } from './pages/PrivacyPage';
 //import { SupportPage } from './pages/SupportPage';
@@ -50,6 +51,8 @@ function AppContent() {
           <Route path="/export" element={<ExportPage />} />
           {/* <Route path="/import" element={<ImportPage />} /> */}
           <Route path="/ideas/fiches/:sheetId" element={<SheetPage />} />
+          <Route path="/ideas/fiches/:sheetId/versions" element={<SheetVersionsPage />} />
+          <Route path="/ideas/fiches/:sheetId/versions/:versionId" element={<SheetVersionsPage />} />
           {/* <Route path="/terms" element={<TermsPage />} /> */}
           {/* <Route path="/privacy" element={<PrivacyPage />} /> */}
           {/* <Route path="/support" element={<SupportPage />} /> */}

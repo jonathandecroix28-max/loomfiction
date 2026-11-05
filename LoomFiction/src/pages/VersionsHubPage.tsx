@@ -6,18 +6,22 @@ import { offlineIdeaService } from '../services/offlineIdeaService';
 import { offlineIdeaVersionService } from '../services/offlineIdeaVersionService';
 import { offlineBookService } from '../services/offlineBookService';
 import { useCategories } from '../modules/categories/hooks/useCategories';
-import { useSheets } from '../modules/sheets/hooks/useSheets';
+import { offlineSheetService } from '../services/offlineSheetService';
+import { offlineSheetVersionService } from '../services/offlineSheetVersionService';
+import { bookOfSheet } from '../modules/sheets/sheetLinks';
 import type { BookResponse } from '../types/book';
 import type { ChapterResponse } from '../types/chapter';
 import type { ChapterVersionResponse } from '../types/chapterVersion';
 import type { IdeaResponse } from '../types/idea';
 import type { IdeaVersionResponse } from '../types/ideaVersion';
+import type { SheetResponse } from '../types/sheet';
+import type { SheetVersion } from '../types/sheetVersion';
 import { IconBooks, IconDelete, IconGlobe, IconSheet } from '../components/icons';
 
 interface VersionRow {
   key: string;
   versionId: number;
-  kind: 'chapter' | 'idea';
+  kind: 'chapter' | 'idea' | 'sheet';
   versionNumber: number | string;
   versionName: string;
   updatedAt: string;
@@ -27,6 +31,7 @@ interface VersionRow {
   chapterNumber?: number;
   categoryId?: number | null;
   sheetId?: number | null;
+  cardCount?: number;
   openPath: string | null;
 }
 
@@ -34,6 +39,10 @@ interface Loaded {
   books: BookResponse[];
   chapters: { version: ChapterVersionResponse; chapter: ChapterResponse | null }[];
   ideas: { version: IdeaVersionResponse; idea: IdeaResponse | null }[];
+  sheets: SheetResponse[];
+  sheetVersions: SheetVersion[];
+  /** Roman de chaque fiche, déduit de ses cartes. */
+  sheetBooks: Map<number, number | null>;
 }
 
 const fold = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -194,9 +203,15 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
 export function VersionsHubPage() {
   const navigate = useNavigate();
   const { categories } = useCategories();
-  const { sheets } = useSheets();
 
-  const [loaded, setLoaded] = useState<Loaded>({ books: [], chapters: [], ideas: [] });
+  const [loaded, setLoaded] = useState<Loaded>({
+    books: [],
+    chapters: [],
+    ideas: [],
+    sheets: [],
+    sheetVersions: [],
+    sheetBooks: new Map(),
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -217,6 +232,27 @@ export function VersionsHubPage() {
           offlineBookService.getAll(),
         ]);
 
+        // Fiches : un souci ici ne doit pas empêcher d'afficher les chapitres et les idées
+        const [sheetVersions, sheets, allIdeas] = await Promise.all([
+          offlineSheetVersionService.getAll(),
+          offlineSheetService.getAll(),
+          offlineIdeaService.getAll(),
+        ]).catch((sheetError): [SheetVersion[], SheetResponse[], IdeaResponse[]] => {
+          console.error('Erreur de chargement des versions de fiches :', sheetError);
+          return [[], [], []];
+        });
+
+        // Le roman d'une fiche est celui de ses cartes
+        const cardsBySheet = new Map<number, IdeaResponse[]>();
+        for (const idea of allIdeas ?? []) {
+          if (idea.sheetId == null) continue;
+          const cards = cardsBySheet.get(idea.sheetId);
+          if (cards) cards.push(idea);
+          else cardsBySheet.set(idea.sheetId, [idea]);
+        }
+        const sheetBooks = new Map<number, number | null>();
+        cardsBySheet.forEach((cards, sheetId) => sheetBooks.set(sheetId, bookOfSheet(cards) ?? null));
+
         const chapterCache = new Map<number, Promise<ChapterResponse | null>>();
         const ideaCache = new Map<number, Promise<IdeaResponse | null>>();
 
@@ -236,7 +272,14 @@ export function VersionsHubPage() {
         ]);
 
         if (cancelled) return;
-        setLoaded({ books: books ?? [], chapters, ideas });
+        setLoaded({
+          books: books ?? [],
+          chapters,
+          ideas,
+          sheets: sheets ?? [],
+          sheetVersions: sheetVersions ?? [],
+          sheetBooks,
+        });
       } catch (loadError) {
         console.error('Erreur de chargement du tableau des versions :', loadError);
         if (!cancelled) setError('Impossible de charger les versions.');
@@ -264,11 +307,18 @@ export function VersionsHubPage() {
           ...prev,
           chapters: prev.chapters.filter((c) => c.version.id !== row.versionId),
         }));
-      } else {
+      } else if (row.kind === 'idea') {
         await offlineIdeaVersionService.remove(row.versionId);
         setLoaded((prev) => ({
           ...prev,
           ideas: prev.ideas.filter((i) => i.version.id !== row.versionId),
+        }));
+      } else {
+        const removed = await offlineSheetVersionService.remove(row.versionId);
+        if (!removed) throw new Error('Suppression de la version de fiche refusée');
+        setLoaded((prev) => ({
+          ...prev,
+          sheetVersions: prev.sheetVersions.filter((v) => v.id !== row.versionId),
         }));
       }
     } catch (err) {
@@ -279,7 +329,8 @@ export function VersionsHubPage() {
 
   const bookTitleById = useMemo(() => new Map(loaded.books.map((book) => [book.id, book.title] as const)), [loaded.books]);
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category] as const)), [categories]);
-  const sheetNameById = useMemo(() => new Map(sheets.map((sheet) => [sheet.id, sheet.name] as const)), [sheets]);
+  const sheetById = useMemo(() => new Map(loaded.sheets.map((sheet) => [sheet.id, sheet] as const)), [loaded.sheets]);
+  const sheetNameById = useMemo(() => new Map(loaded.sheets.map((sheet) => [sheet.id, sheet.name] as const)), [loaded.sheets]);
 
   const byNewest = (a: VersionRow, b: VersionRow) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
 
@@ -324,6 +375,32 @@ export function VersionsHubPage() {
     [loaded.ideas]
   );
 
+  const sheetRows = useMemo<VersionRow[]>(
+    () =>
+      loaded.sheetVersions
+        .map((version): VersionRow => {
+          const sheet = sheetById.get(version.sheetId);
+          return {
+            key: `sheet-${version.id}`,
+            versionId: version.id,
+            kind: 'sheet',
+            versionNumber: version.versionNumber,
+            // le nom de la version est celui de la fiche à l'époque : utile seulement s'il a changé
+            versionName: sheet && version.name !== sheet.name ? version.name ?? '' : '',
+            updatedAt: version.updatedAt,
+            parentTitle: sheet ? sheet.name : version.name || 'Fiche supprimée',
+            missing: !sheet,
+            bookId: sheet ? loaded.sheetBooks.get(sheet.id) ?? null : null,
+            categoryId: sheet?.categoryId ?? null,
+            sheetId: sheet?.id ?? null,
+            cardCount: version.cards.length,
+            openPath: sheet ? `/ideas/fiches/${sheet.id}/versions/${version.id}` : null,
+          };
+        })
+        .sort(byNewest),
+    [loaded.sheetVersions, loaded.sheetBooks, sheetById]
+  );
+
   const bookLabel = (row: VersionRow): string | null => (row.bookId == null ? null : bookTitleById.get(row.bookId) ?? 'Roman introuvable');
 
   const query = fold(search.trim());
@@ -342,6 +419,7 @@ export function VersionsHubPage() {
 
   const visibleChapters = chapterRows.filter(matches);
   const visibleIdeas = ideaRows.filter(matches);
+  const visibleSheets = sheetRows.filter(matches);
   const filtering = bookFilter !== 'all' || query !== '';
 
   const renderContext = (row: VersionRow): ReactNode => {
@@ -375,10 +453,17 @@ export function VersionsHubPage() {
           <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>Chap {row.chapterNumber}</span>
         )}
 
-        {row.kind === 'idea' && category && (
+        {(row.kind === 'idea' || row.kind === 'sheet') && category && (
           <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: category.color }} />
             <span className="truncate">{category.name}</span>
+          </span>
+        )}
+
+        {row.kind === 'sheet' && row.cardCount != null && (
+          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>
+            <IconSheet className="size-3.5" aria-hidden="true" />
+            {row.cardCount} {row.cardCount > 1 ? 'cartes' : 'carte'}
           </span>
         )}
 
@@ -399,7 +484,8 @@ export function VersionsHubPage() {
   const stats = [
     { label: 'Chapitres', value: visibleChapters.length },
     { label: 'Idées', value: visibleIdeas.length },
-    { label: 'Total', value: visibleChapters.length + visibleIdeas.length },
+    { label: 'Fiches', value: visibleSheets.length },
+    { label: 'Total', value: visibleChapters.length + visibleIdeas.length + visibleSheets.length },
   ];
 
   const inputClass =
@@ -413,12 +499,12 @@ export function VersionsHubPage() {
             <p className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-amber-200/40 mb-1 sm:mb-2">Administration</p>
             <h1 className="text-2xl sm:text-4xl font-bold text-amber-100">Versions</h1>
             <p className="text-sm sm:text-base text-amber-200/55 mt-1 sm:mt-2 max-w-2xl">
-              Accédez aux tableaux de versions pour les chapitres et les idées depuis un point d’entrée unique.
+              Accédez aux tableaux de versions pour les chapitres, les idées et les fiches depuis un point d’entrée unique.
             </p>
           </div>
         </section>
 
-        <section className="grid grid-cols-3 gap-2 sm:gap-4">
+        <section className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
           {stats.map((stat) => (
             <div key={stat.label} className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/60 p-3 sm:p-6 shadow-xl">
               <div className="text-[10px] sm:text-xs uppercase tracking-[0.18em] sm:tracking-[0.28em] text-amber-200/40 mb-1 sm:mb-2 truncate">
@@ -497,6 +583,18 @@ export function VersionsHubPage() {
               emptyLabel={filtering ? 'Aucune version d’idée ne correspond.' : 'Aucune version d’idée.'}
               contextLabel="Roman / catégorie / fiche"
               rows={visibleIdeas}
+              renderContext={renderContext}
+              onOpen={navigate}
+              onDelete={handleDeleteVersion}
+            />
+
+            <VersionsSection
+              title="Versions des fiches"
+              subtitle="Accès direct à chaque fiche et à son historique"
+              tag="Sheet versions"
+              emptyLabel={filtering ? 'Aucune version de fiche ne correspond.' : 'Aucune version de fiche.'}
+              contextLabel="Roman / catégorie"
+              rows={visibleSheets}
               renderContext={renderContext}
               onOpen={navigate}
               onDelete={handleDeleteVersion}

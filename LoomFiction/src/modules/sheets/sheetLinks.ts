@@ -2,7 +2,6 @@ import { offlineIdeaService } from '../../services/offlineIdeaService';
 import type { IdeaResponse, IdeaUpsertRequest } from '../../types/idea';
 import type { SheetResponse } from '../../types/sheet';
 
-/** Minuscules sans accents : « Élara » est trouvé en tapant « elara ». */
 export const foldText = (text: string): string =>
   text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
@@ -18,8 +17,9 @@ export const toUpsert = (card: IdeaResponse): IdeaUpsertRequest => ({
 /**
  * Le roman d'une fiche = celui de ses cartes (une fiche n'a pas de champ « roman » propre).
  * En cas de désaccord entre cartes, le roman le plus fréquent l'emporte.
+ * Accepte aussi les cartes d'une version enregistrée (même champ `bookId`).
  */
-export function bookOfSheet(cards: IdeaResponse[]): number | null {
+export function bookOfSheet(cards: ReadonlyArray<{ bookId?: number | null }>): number | null {
   const counts = new Map<number, number>();
   for (const card of cards) {
     if (card.bookId != null) counts.set(card.bookId, (counts.get(card.bookId) ?? 0) + 1);
@@ -36,7 +36,6 @@ export function bookOfSheet(cards: IdeaResponse[]): number | null {
   return best;
 }
 
-/** Rattache toutes les cartes d'une fiche à un roman (ou les en détache avec null). */
 export async function setSheetBook(cards: IdeaResponse[], bookId: number | null): Promise<void> {
   for (const card of cards) {
     if ((card.bookId ?? null) !== bookId) {
