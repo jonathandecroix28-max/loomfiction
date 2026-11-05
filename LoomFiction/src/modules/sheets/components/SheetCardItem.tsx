@@ -36,6 +36,7 @@ export function SheetCardItem({
   const [state, setState] = useState<SaveState>('idle');
 
   const areaRef = useRef<HTMLTextAreaElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
   const valueRef = useRef(incoming);
   const savedRef = useRef(incoming);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,7 +45,6 @@ export function SheetCardItem({
   cardRef.current = card;
   saveRef.current = onSaveDescription;
 
-  // Texte modifié ailleurs (fenêtre « Éditer », rechargement) : on le reprend s'il n'y a pas de saisie en cours
   useEffect(() => {
     if (valueRef.current === savedRef.current && incoming !== savedRef.current) {
       savedRef.current = incoming;
@@ -81,7 +81,6 @@ export function SheetCardItem({
     timerRef.current = setTimeout(() => void flushRef.current(), SAVE_DELAY);
   };
 
-  // Ce qui est tapé n'est jamais perdu : on enregistre aussi en quittant la page
   useEffect(
     () => () => {
       void flushRef.current();
@@ -97,12 +96,15 @@ export function SheetCardItem({
     area.setSelectionRange(area.value.length, area.value.length);
   }, [autoFocus]);
 
-  // Le champ grandit avec le texte
   useLayoutEffect(() => {
     const area = areaRef.current;
-    if (!area) return;
+    const box = boxRef.current;
+    if (!area || !box) return;
+
+    box.style.minHeight = `${box.offsetHeight}px`;
     area.style.height = 'auto';
     area.style.height = `${area.scrollHeight}px`;
+    box.style.minHeight = '';
   }, [value]);
 
   return (
@@ -179,7 +181,7 @@ export function SheetCardItem({
         />
       </div>
 
-      <div className="mt-3 border-t border-amber-900/20 pt-3">
+      <div ref={boxRef} className="mt-3 border-t border-amber-900/20 pt-3">
         <textarea
           ref={areaRef}
           value={value}
@@ -188,7 +190,7 @@ export function SheetCardItem({
           onBlur={() => void flush()}
           aria-label={`Texte de la caractéristique ${card.name}`}
           placeholder="À compléter… écrivez directement ici"
-          className="block w-full resize-none rounded-xl border border-transparent bg-transparent px-3 py-2 font-serif leading-relaxed text-amber-200/90 transition placeholder:italic placeholder:text-amber-200/30 hover:border-amber-900/30 focus:border-amber-600/60 focus:bg-neutral-900/60 focus:outline-none"
+          className="block w-full resize-none overflow-hidden rounded-xl border border-transparent bg-transparent px-3 py-2 font-serif leading-relaxed text-amber-200/90 transition placeholder:italic placeholder:text-amber-200/30 hover:border-amber-900/30 focus:border-amber-600/60 focus:bg-neutral-900/60 focus:outline-none"
         />
       </div>
     </div>
