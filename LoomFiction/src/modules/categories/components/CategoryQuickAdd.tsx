@@ -69,7 +69,7 @@ export function CategoryQuickAdd({ existing, onCreate, onDone, autoFocus = false
         <button
           type="submit"
           disabled={busy || !name.trim()}
-          className="shrink-0 cursor-pointer rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-medium text-amber-50 shadow-md transition hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="shrink-0 cursor-pointer rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-medium text-amber-50 shadow-md transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Ajouter
         </button>
@@ -78,8 +78,8 @@ export function CategoryQuickAdd({ existing, onCreate, onDone, autoFocus = false
       {error && <p className="text-xs text-red-300">{error}</p>}
 
       {suggestions.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-serif text-xs text-amber-200/40">Suggestions :</span>
+        <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
+          <span className="shrink-0 font-serif text-xs text-amber-200/40">Suggestions :</span>
           {suggestions.map((preset) => (
             <button
               key={preset.name}
@@ -87,11 +87,11 @@ export function CategoryQuickAdd({ existing, onCreate, onDone, autoFocus = false
               disabled={busy}
               onClick={() => void create(preset.name)}
               title={preset.template ? `Avec un modèle de fiche : ${preset.template.join(', ')}` : 'Notes libres'}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-amber-900/40 bg-neutral-900 px-3 py-1.5 text-xs text-amber-200 transition hover:border-amber-600/60 disabled:opacity-50"
+              className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-900/40 bg-neutral-900 px-3 py-1.5 text-xs text-amber-200 transition hover:border-amber-600/60 disabled:opacity-50"
             >
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: preset.color }} />
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: preset.color }} />
               {preset.name}
-              {preset.template && <IconSheet className="size-3.5" aria-hidden="true" />}
+              {preset.template && <IconSheet className="size-3.5 shrink-0" aria-hidden="true" />}
             </button>
           ))}
         </div>
