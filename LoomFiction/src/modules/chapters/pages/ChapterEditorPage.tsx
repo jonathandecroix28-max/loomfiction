@@ -15,6 +15,7 @@ import { EditorToolbar } from '../../../components/tools/EditorToolbar';
 import { imageFilesFrom, insertImageFiles } from '../../../utils/images/editorImages';
 import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
 import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
+import { MentionDetection } from '../../editor/components/MentionDetection';
 import type { ChapterResponse } from '../../../types/chapter';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
 import type { SheetResponse } from '../../../types/sheet';
@@ -46,6 +47,7 @@ export function ChapterEditorPage() {
   const [isPreview, setIsPreview] = useState(false);
   const [worldbuildingEnabled, setWorldbuildingEnabled] = useState(true);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [showMentionDetection, setShowMentionDetection] = useState(false);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const sheetsRef = useRef<SheetResponse[]>([]);
@@ -87,19 +89,18 @@ export function ChapterEditorPage() {
     },
   });
 
-  useEffect(() => {
-  if (!rootRef.current) return;
-  const tippyDelegate = setupMentionPopovers(
-    rootRef.current,
-    (path) => navigate(path),
-    editor
-  );
-  return () => {
-    tippyDelegate.destroy();
-  };
-}, [editor, isPreview, navigate]);
+  // Le conteneur (rootRef) n'existe qu'une fois le chapitre chargé : l'effet doit se relancer à ce moment-là.
+  // Avant, il ne dépendait pas de l'état de chargement et ne s'installait jamais si l'éditeur était prêt
+  // avant la fin du chargement : les aperçus n'apparaissaient qu'après avoir quitté puis rouvert la page.
+  const rootReady = !isPageLoading && !!chapter;
 
-  const keyboardOpen = useKeyboardViewport(rootRef, !isPageLoading && !!chapter);
+  useEffect(() => {
+    if (!rootReady || !rootRef.current) return;
+    const mentionPopovers = setupMentionPopovers(rootRef.current, (path) => navigate(path), editor);
+    return () => mentionPopovers.destroy();
+  }, [editor, isPreview, rootReady, navigate]);
+
+  const keyboardOpen = useKeyboardViewport(rootRef, rootReady);
 
   useEffect(() => {
     if (!keyboardOpen || !editor) return;
@@ -276,7 +277,8 @@ export function ChapterEditorPage() {
         )}
 
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-2 border-t border-amber-900/20 pt-1">
-          <div className="flex items-center gap-2">
+          {/* Sur petit écran, les boutons défilent horizontalement au lieu de déborder */}
+          <div className="no-scrollbar flex min-w-0 items-center gap-2 overflow-x-auto">
             <button
               onClick={handleCreateVersion}
               disabled={isUpdating || isPreview}
@@ -294,6 +296,17 @@ export function ChapterEditorPage() {
             >
               {isPreview ? <IconEdit className="size-4" aria-hidden="true" /> : <IconView className="size-4" aria-hidden="true" />}
               <span className="hidden sm:inline">{isPreview ? 'Modifier' : 'Aperçu'}</span>
+            </button>
+
+            <button
+              onClick={() => setShowMentionDetection(true)}
+              disabled={!editor || isPreview || sheets.length === 0}
+              title="Repérer les noms de fiches dans le chapitre"
+              aria-label="Détecter les fiches"
+              className="flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-amber-800/50 bg-amber-950/40 px-3 font-sans text-xs font-medium text-amber-200 transition-colors hover:bg-amber-900/50 disabled:opacity-40 sm:text-sm"
+            >
+              <span aria-hidden="true">✦</span>
+              <span className="hidden sm:inline">Détecter les fiches</span>
             </button>
 
             <button
@@ -321,6 +334,14 @@ export function ChapterEditorPage() {
           </button>
         </div>
       </div>
+
+      {showMentionDetection && editor && (
+        <MentionDetection
+          editor={editor}
+          sheets={sheets}
+          onClose={() => setShowMentionDetection(false)}
+        />
+      )}
     </div>
   );
 }
