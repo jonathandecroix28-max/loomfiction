@@ -6,6 +6,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import Image from '@tiptap/extension-image';
 import { ChapterContent, ChapterHeading, READING_COLUMN, READING_TEXT } from '../components/ChapterReading';
 import { useKeyboardViewport } from '../../../hooks/useKeyboardViewport';
+import { useLatestGetter } from '../../../hooks/useLatestGetter';
 import { offlineChapterService } from '../../../services/offlineChapterService';
 import { offlineChapterVersionService } from '../../../services/offlineChapterVersionService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
@@ -50,8 +51,8 @@ export function ChapterEditorPage() {
   const [showMentionDetection, setShowMentionDetection] = useState(false);
 
   const rootRef = useRef<HTMLDivElement>(null);
-  const sheetsRef = useRef<SheetResponse[]>([]);
-  sheetsRef.current = sheets;
+  // Les extensions de l'éditeur ne sont créées qu'une fois : ce getter leur donne toujours les fiches à jour
+  const getSheets = useLatestGetter(sheets);
 
   const { updateChapter, isUpdating, error: updateError } = useUpdateChapter();
   const { versions: chapterVersions, refetch: refetchChapterVersions } = useChapterVersions(chapterIdNumber);
@@ -63,7 +64,7 @@ export function ChapterEditorPage() {
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
-      createSheetMentionExtension(() => sheetsRef.current),
+      createSheetMentionExtension(getSheets),
     ],
     content: '',
     editorProps: {

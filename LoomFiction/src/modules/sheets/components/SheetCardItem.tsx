@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetResponse } from '../../../types/sheet';
 import { offlineSheetService } from '../../../services/offlineSheetService';
+import { useLatestGetter } from '../../../hooks/useLatestGetter';
 import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
 import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
 import { MentionDetection } from '../../editor/components/MentionDetection';
@@ -43,8 +44,8 @@ export function SheetCardItem({
   const [showMentionDetection, setShowMentionDetection] = useState(false);
 
   const cardContainerRef = useRef<HTMLDivElement>(null);
-  const sheetsRef = useRef<SheetResponse[]>([]);
-  sheetsRef.current = sheets;
+  // L'extension de l'éditeur n'est créée qu'une fois : ce getter lui donne toujours les fiches à jour
+  const getSheets = useLatestGetter(sheets);
 
   const valueRef = useRef(incoming);
   const savedRef = useRef(incoming);
@@ -85,7 +86,7 @@ export function SheetCardItem({
   }, []);
 
   const editor = useEditor({
-    extensions: [StarterKit, createSheetMentionExtension(() => sheetsRef.current)],
+    extensions: [StarterKit, createSheetMentionExtension(getSheets)],
     content: incoming,
     editorProps: {
       attributes: {
