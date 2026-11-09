@@ -15,6 +15,7 @@ import { SheetPage } from './modules/sheets/pages/SheetPage';
 // import DonatePage from './pages/DonatePage';
 import ExportPage from './pages/ExportPage';
 import { SheetVersionsPage } from './modules/sheets/pages/SheetVersionPage';
+import { FeedbackProvider } from './components/feedback/FeedbackProvider';
 //import { TermsPage } from './pages/TermsPage';
 //import { PrivacyPage } from './pages/PrivacyPage';
 //import { SupportPage } from './pages/SupportPage';
@@ -70,7 +71,10 @@ function AppContent() {
 function App() {
   return (
     <BrowserRouter>
+    <FeedbackProvider>
+
       <AppContent />
+    </FeedbackProvider>
     </BrowserRouter>
   );
 }
