@@ -14,6 +14,35 @@
   [class*='animate-[toast-in'] { animation: none; }
 }
 
+
+.hide-worldbuilding-links [data-type="mention"] {
+  background-color: transparent !important;
+  text-decoration: none !important;
+  color: inherit !important;
+  font-weight: inherit !important;
+  pointer-events: none !important;
+  padding: 0 !important;
+}
+
+.tippy-box[data-theme~='transparent'] {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.tippy-box[data-theme~='transparent'] .tippy-content {
+  padding: 0 !important;
+}
+
+
+.mention-at {
+  display: none !important;
+}
+
+
+[data-type="mention"] p {
+  display: inline;
+}
 /* ═══════════════════════════════════════════════════════════════
    THÈMES LoomFiction
 
