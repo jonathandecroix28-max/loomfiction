@@ -7,6 +7,7 @@ import type { SheetResponse } from '../../../types/sheet';
 import { offlineSheetService } from '../../../services/offlineSheetService';
 import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
 import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
+import { MentionDetection } from '../../editor/components/MentionDetection';
 import { IconDelete, IconDown, IconEdit, IconUp } from '../../../components/icons';
 import { ActionMenu } from './ActionMenu';
 
@@ -39,6 +40,7 @@ export function SheetCardItem({
   const incoming = card.description ?? '';
   const [state, setState] = useState<SaveState>('idle');
   const [sheets, setSheets] = useState<SheetResponse[]>([]);
+  const [showMentionDetection, setShowMentionDetection] = useState(false);
 
   const cardContainerRef = useRef<HTMLDivElement>(null);
   const sheetsRef = useRef<SheetResponse[]>([]);
@@ -181,8 +183,27 @@ export function SheetCardItem({
       </div>
 
       <div className="mt-3 border-t border-amber-900/20 pt-3">
+        {editor && (
+          <div className="mb-2 flex sm:justify-end">
+            <button
+              type="button"
+              onClick={() => setShowMentionDetection(true)}
+              className="inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-amber-800/50 bg-amber-950/40 px-3 py-1.5 font-sans text-xs font-medium text-amber-200 transition hover:bg-amber-900/50 sm:min-h-9 sm:w-auto"
+            >
+              <span aria-hidden="true">✦</span>
+              Détecter les fiches
+            </button>
+          </div>
+        )}
         <EditorContent editor={editor} />
       </div>
+      {showMentionDetection && editor && (
+        <MentionDetection
+          editor={editor}
+          sheets={sheets}
+          onClose={() => setShowMentionDetection(false)}
+        />
+      )}
     </div>
   );
 }
