@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { offlineSheetVersionService } from '../../../services/offlineSheetVersionService';
 import type { SheetVersion } from '../../../types/sheetVersion';
 
-/** Même forme que useIdeaVersions / useChapterVersions, pour les versions d'une fiche. */
 export function useSheetVersions(sheetId: number | null, selectedVersionId: number | null = null) {
   const [versions, setVersions] = useState<SheetVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -17,6 +16,7 @@ export function useSheetVersions(sheetId: number | null, selectedVersionId: numb
 
     try {
       setError(null);
+      setIsLoading(true);
       const data = await offlineSheetVersionService.getBySheet(sheetId);
       setVersions([...data].sort((a, b) => Number(b.versionNumber) - Number(a.versionNumber)));
     } catch (err) {
@@ -28,8 +28,15 @@ export function useSheetVersions(sheetId: number | null, selectedVersionId: numb
   }, [sheetId]);
 
   useEffect(() => {
-    setIsLoading(true);
-    void load();
+    let isMounted = true;
+    queueMicrotask(() => {
+      if (isMounted) {
+        void load();
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
   }, [load]);
 
   const selectedVersion = useMemo(

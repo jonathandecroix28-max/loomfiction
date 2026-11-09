@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from 'react';
 
-
 type ToastTone = 'success' | 'error' | 'info';
 
 interface ToastItem {
@@ -36,22 +35,22 @@ interface ToastApi {
   info: (message: string) => void;
 }
 
-
 const ToastContext = createContext<ToastApi | null>(null);
 const ConfirmContext = createContext<((options: ConfirmOptions) => Promise<boolean>) | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useToast(): ToastApi {
   const ctx = useContext(ToastContext);
   if (!ctx) throw new Error('useToast doit être utilisé dans <FeedbackProvider>');
   return ctx;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useConfirm() {
   const ctx = useContext(ConfirmContext);
   if (!ctx) throw new Error('useConfirm doit être utilisé dans <FeedbackProvider>');
   return ctx;
 }
-
 
 const MAX_TOASTS = 4;
 const DURATION: Record<ToastTone, number> = { success: 3500, info: 4000, error: 6000 };
@@ -95,7 +94,6 @@ function ToastCard({ toast, onClose }: { toast: ToastItem; onClose: (id: number)
   );
 }
 
-
 function ConfirmDialog({
   pending,
   onAnswer,
@@ -111,7 +109,6 @@ function ConfirmDialog({
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    // Focus sur « Annuler » : une action destructrice ne doit pas partir sur un Entrée distrait.
     cancelRef.current?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -119,7 +116,6 @@ function ConfirmDialog({
         e.preventDefault();
         onAnswer(false);
       } else if (e.key === 'Tab') {
-        // Piège à focus minimal entre les deux boutons
         const first = cancelRef.current;
         const last = confirmRef.current;
         if (!first || !last) return;
@@ -189,13 +185,15 @@ function ConfirmDialog({
   );
 }
 
-
 export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [pending, setPending] = useState<PendingConfirm | null>(null);
   const nextId = useRef(1);
   const pendingRef = useRef<PendingConfirm | null>(null);
-  pendingRef.current = pending;
+
+  useEffect(() => {
+    pendingRef.current = pending;
+  }, [pending]);
 
   const closeToast = useCallback((id: number) => {
     setToasts((list) => list.filter((t) => t.id !== id));

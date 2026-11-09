@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { IdeaResponse } from '../../../types/idea';
 import { IconDelete, IconDown, IconEdit, IconUp } from '../../../components/icons';
 import { ActionMenu } from './ActionMenu';
@@ -42,8 +42,11 @@ export function SheetCardItem({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardRef = useRef(card);
   const saveRef = useRef(onSaveDescription);
-  cardRef.current = card;
-  saveRef.current = onSaveDescription;
+
+  useLayoutEffect(() => {
+    cardRef.current = card;
+    saveRef.current = onSaveDescription;
+  }, [card, onSaveDescription]);
 
   useEffect(() => {
     if (valueRef.current === savedRef.current && incoming !== savedRef.current) {
@@ -53,7 +56,7 @@ export function SheetCardItem({
     }
   }, [incoming]);
 
-  const flush = async () => {
+  const flush = useCallback(async () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -69,23 +72,21 @@ export function SheetCardItem({
     }
     savedRef.current = next;
     setState(valueRef.current === next ? 'saved' : 'idle');
-  };
-  const flushRef = useRef(flush);
-  flushRef.current = flush;
+  }, []);
 
   const handleChange = (text: string) => {
     setValue(text);
     valueRef.current = text;
     setState('idle');
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => void flushRef.current(), SAVE_DELAY);
+    timerRef.current = setTimeout(() => void flush(), SAVE_DELAY);
   };
 
   useEffect(
     () => () => {
-      void flushRef.current();
+      void flush();
     },
-    []
+    [flush]
   );
 
   useEffect(() => {
