@@ -8,6 +8,7 @@ import type { BookResponse } from '../../../types/book';
 import type { CategoryResponse } from '../../../types/category';
 import type { LucideIcon } from '../../../components/icons';
 import { IconGlobe, IconMic, IconUser, IconZap } from '../../../components/icons';
+import { useToast } from '../../../components/feedback/FeedbackProvider';
 
 interface IdeaModalProps {
   isOpen: boolean;
@@ -76,6 +77,7 @@ export function IdeaModal({
 
   const { createIdea, isCreating } = useCreateIdea();
   const { updateIdea, isUpdating } = useUpdateIdea();
+  const toast = useToast();
 
   const categoryLocked =
     lockedCategoryId != null || ideaToEdit?.sheetId != null;
@@ -153,7 +155,7 @@ export function IdeaModal({
       speechWindow.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert("La dictée vocale n'est pas supportée par votre navigateur.");
+      toast.info("La dictée vocale n'est pas supportée par votre navigateur.");
       return;
     }
 
@@ -180,7 +182,7 @@ export function IdeaModal({
     if (!name.trim()) return;
 
     if (!categoryId || categoryId === 0) {
-      alert('Veuillez sélectionner une catégorie valide.');
+      toast.error('Veuillez sélectionner une catégorie valide.');
       return;
     }
 
@@ -212,7 +214,7 @@ export function IdeaModal({
       onSuccess(result);
       onClose();
     } else {
-      alert("Une erreur est survenue lors de l'enregistrement de l'idée.");
+      toast.error("Une erreur est survenue lors de l'enregistrement de l'idée.");
     }
   };
 

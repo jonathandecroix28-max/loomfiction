@@ -17,6 +17,7 @@ import {
 import { VersionList } from '../../../components/versions/VersionList';
 import { ComparePanel, CompareCards } from '../../../components/versions/ComparePanel';
 import { LineDiffView } from '../../../components/versions/LineDiffView';
+import { useConfirm } from '../../../components/feedback/FeedbackProvider';
 
 const MERGE_FIELDS = [
   { key: 'title', label: 'Titre' },
@@ -33,6 +34,7 @@ const BODY_CLASS =
 export function ChapterVersionsPage() {
   const { bookId, chapterId, versionId } = useParams<{ bookId: string; chapterId: string; versionId?: string }>();
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const numBookId = bookId ? Number(bookId) : null;
   const numChapterId = chapterId ? Number(chapterId) : null;
@@ -84,7 +86,12 @@ export function ChapterVersionsPage() {
   };
 
   const handleDelete = async (version: ChapterVersionResponse) => {
-    if (!confirm(`Supprimer la version ${version.versionNumber} ?`)) return;
+    const ok = await confirm({
+      title: `Supprimer la version ${version.versionNumber} ?`,
+      message: 'Cette action est irréversible.',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     const success = await offlineChapterVersionService.remove(version.id);
     if (success) {

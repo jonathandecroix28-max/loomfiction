@@ -17,6 +17,7 @@ import {
 import { VersionList } from '../../../components/versions/VersionList';
 import { ComparePanel, CompareCards } from '../../../components/versions/ComparePanel';
 import { LineDiffView } from '../../../components/versions/LineDiffView';
+import { useConfirm } from '../../../components/feedback/FeedbackProvider';
 
 const MERGE_FIELDS = [
   { key: 'name', label: 'Nom' },
@@ -33,6 +34,7 @@ const BODY_CLASS =
 export function IdeaVersionsPage() {
   const { ideaId, versionId } = useParams<{ ideaId: string; versionId?: string }>();
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const numIdeaId = ideaId ? Number(ideaId) : null;
   const numVersionId = versionId ? Number(versionId) : null;
@@ -103,7 +105,12 @@ export function IdeaVersionsPage() {
   };
 
   const handleDelete = async (version: IdeaVersionResponse) => {
-    if (!confirm(`Supprimer la version ${version.versionNumber} ?`)) return;
+    const ok = await confirm({
+      title: `Supprimer la version ${version.versionNumber} ?`,
+      message: 'Cette action est irréversible.',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     const success = await offlineIdeaVersionService.remove(version.id);
     if (success) {

@@ -5,6 +5,7 @@ import { useDeleteBook } from '../hooks/useDeleteBook';
 import { useChapterCounts } from '../hooks/useChapterCounts';
 import { BookCard } from '../components/BookCard';
 import { BookModal } from '../components/BookModal';
+import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
 //import { ImportBookButton } from '../components/ImportBookButton';
 
 export function BooksPage() {
@@ -16,6 +17,8 @@ export function BooksPage() {
   const { books, isLoading, error, setBooks } = useBooks();
   const { deleteBook } = useDeleteBook();
   const chapterCountOf = useChapterCounts(books);
+  const confirm = useConfirm();
+  const toast = useToast();
 
   if (searchParams.get('action') === 'new' && !isModalOpen) {
     setIsModalOpen(true);
@@ -33,15 +36,20 @@ export function BooksPage() {
   };
 
   const handleDeleteBook = async (bookId: number) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce livre ? Cette action est irréversible.")) {
-      return;
-    }
+    const title = books.find((b) => b.id === bookId)?.title;
+    const ok = await confirm({
+      title: title ? `Supprimer « ${title} » ?` : 'Supprimer ce livre ?',
+      message: 'Le livre et tous ses chapitres seront supprimés. Cette action est irréversible.',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     const updatedBooks = await deleteBook(bookId);
     if (updatedBooks) {
       setBooks(updatedBooks);
+      toast.success('Livre supprimé');
     } else {
-      alert("Erreur lors de la suppression du livre.");
+      toast.error('Erreur lors de la suppression du livre.');
     }
   };
 

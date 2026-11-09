@@ -25,12 +25,15 @@ import { NewSheetModal } from '../../sheets/components/NewSheetModal';
 import { AttachToSheetModal } from '../../sheets/components/AttachToSheetModal';
 import { AttachNotesModal } from '../../sheets/components/AttachNotesModal';
 import { ImportSheetModal } from '../../sheets/components/ImportSheetModal';
+import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
 import { ExportSheetsModal } from '../../sheets/components/ExportSheetsModal';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n > 1 ? many : one}`;
 
 export function IdeasPage() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const { ideas, setIdeas, isLoading: areIdeasLoading, error: ideasError, refreshIdeas } = useIdeas(null);
   const { deleteIdea } = useDeleteIdea();
@@ -154,11 +157,20 @@ export function IdeasPage() {
 
   const handleDeleteIdea = async (ideaId: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('Voulez-vous vraiment supprimer cette note ?')) return;
+    const ok = await confirm({
+      title: 'Supprimer cette note ?',
+      message: 'Cette action est irréversible.',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     const success = await deleteIdea(ideaId);
-    if (success) setIdeas(ideas.filter((i) => i.id !== ideaId));
-    else alert('Impossible de supprimer.');
+    if (success) {
+      setIdeas(ideas.filter((i) => i.id !== ideaId));
+      toast.success('Note supprimée');
+    } else {
+      toast.error('Impossible de supprimer la note.');
+    }
   };
 
   const flash = (text: string) => {

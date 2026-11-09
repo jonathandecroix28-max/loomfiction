@@ -6,6 +6,7 @@ import { useDeleteChapter } from '../../chapters/hooks/useDeleteChapter';
 import { ChapterModal } from '../../chapters/components/ChapterModal'; 
 import { formatDate } from '../../../utils/date/dateFormatter';
 import { BookEditModal } from '../components/BookEditModal';
+import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
 import {
   IconAdd,
   IconBack,
@@ -23,6 +24,8 @@ export function BookDetailPage() {
   const { book, refreshBook, isLoading: isBookLoading, error } = useBook(bookId!);
   const { chapters, isLoadingChapters, setChapters } = useChapters(bookId); 
   const { deleteChapter } = useDeleteChapter();
+  const confirm = useConfirm();
+  const toast = useToast();
 
   const [isChapterModalOpen, setIsChapterModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -37,13 +40,20 @@ export function BookDetailPage() {
 
   const handleDeleteChapter = async (chapterId: number, e: React.MouseEvent) => {
     e.stopPropagation(); 
-    if (!confirm("Voulez-vous vraiment supprimer ce chapitre ?")) return;
+    const chapterTitle = chapters.find((c) => c.id === chapterId)?.title;
+    const ok = await confirm({
+      title: chapterTitle ? `Supprimer « ${chapterTitle} » ?` : 'Supprimer ce chapitre ?',
+      message: 'Cette action est irréversible.',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     const success = await deleteChapter(chapterId);
     if (success) {
       setChapters(chapters.filter(c => c.id !== chapterId));
+      toast.success('Chapitre supprimé');
     } else {
-      alert("Impossible de supprimer le chapitre.");
+      toast.error('Impossible de supprimer le chapitre.');
     }
   };
 

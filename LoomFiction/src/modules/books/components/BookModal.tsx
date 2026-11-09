@@ -4,6 +4,7 @@ import { useCoverImage } from '../../../hooks/images/useCoverImage';
 import type { BookResponse } from '../../../types/book';
 import { CoverImageField } from '../../../components/images/CoverImageField';
 import { IconClose } from '../../../components/icons';
+import { useToast } from '../../../components/feedback/FeedbackProvider';
 
 interface BookModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export function BookModal({ isOpen, onClose, onBookCreated }: BookModalProps) {
   
   const { url: coverImage, setUrl: setCoverImage, error: urlError, validate } = useCoverImage('');
   const { createBook, isCreating, error } = useCreateBook();
+  const toast = useToast();
 
   const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
   if (prevIsOpen !== isOpen) {
@@ -40,7 +42,7 @@ export function BookModal({ isOpen, onClose, onBookCreated }: BookModalProps) {
       onBookCreated(updatedBooks); 
       onClose();
     } else {
-      alert(error || "Erreur lors de la création du roman.");
+      toast.error(error || "Erreur lors de la création du roman.");
     }
   };
 

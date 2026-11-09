@@ -12,6 +12,7 @@ import { offlineSheetVersionService } from '../../../services/offlineSheetVersio
 import { exportSheetToJson, exportSheetToMarkdownFile } from '../services/sheetExchange';
 import { toUpsert } from '../sheetLinks';
 import type { IdeaResponse } from '../../../types/idea';
+import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
 import {
   IconAdd,
   IconAttach,
@@ -32,6 +33,8 @@ const toolbarBtn = 'cursor-pointer rounded-xl border px-4 py-2.5 text-sm font-me
 export function SheetPage() {
   const { sheetId } = useParams<{ sheetId: string }>();
   const navigate = useNavigate();
+  const confirm = useConfirm();
+  const toast = useToast();
   const numSheetId = sheetId ? Number(sheetId) : null;
 
   const { sheet, category, cards, setCards, isLoading, error, reload } = useSheetPage(numSheetId);
@@ -113,14 +116,20 @@ export function SheetPage() {
   };
 
   const deleteCard = async (card: IdeaResponse) => {
-    if (!confirm(`Supprimer la carte « ${card.name} » ?`)) return;
+    const ok = await confirm({
+      title: `Supprimer la carte « ${card.name} » ?`,
+      message: 'Cette action est irréversible.',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await offlineIdeaService.remove(card.id);
       await reload();
+      toast.success('Carte supprimée');
     } catch (err) {
       console.error('Erreur lors de la suppression de la carte :', err);
-      alert('Impossible de supprimer cette carte.');
+      toast.error('Impossible de supprimer cette carte.');
     }
   };
 
@@ -134,21 +143,32 @@ export function SheetPage() {
       await reload();
     } catch (err) {
       console.error('Erreur lors du renommage de la fiche :', err);
-      alert('Impossible de renommer la fiche.');
+      toast.error('Impossible de renommer la fiche.');
     }
   };
 
   const deleteSheet = async () => {
-    const detail = cards.length > 0 ? ` et ses ${cards.length} ${cards.length > 1 ? 'cartes' : 'carte'}` : '';
+    const cardsNote =
+      cards.length === 0
+        ? ''
+        : cards.length === 1
+          ? 'Sa carte sera supprimée avec elle. '
+          : `Ses ${cards.length} cartes seront supprimées avec elle. `;
 
-    if (!confirm(`Supprimer la fiche « ${sheet.name} »${detail} ? Cette action est irréversible.`)) return;
+    const ok = await confirm({
+      title: `Supprimer la fiche « ${sheet.name} » ?`,
+      message: `${cardsNote}Cette action est irréversible.`,
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     try {
       await offlineSheetService.remove(sheet.id);
+      toast.success('Fiche supprimée');
       navigate('/ideas', { replace: true });
     } catch (err) {
       console.error('Erreur lors de la suppression de la fiche :', err);
-      alert('Impossible de supprimer la fiche.');
+      toast.error('Impossible de supprimer la fiche.');
     }
   };
 

@@ -3,6 +3,7 @@ import { useUpdateBook } from '../hooks/useUpdateBook';
 import type { BookResponse } from '../../../types/book';
 import { CoverImageField } from '../../../components/images/CoverImageField';
 import { IconClose } from '../../../components/icons';
+import { useToast } from '../../../components/feedback/FeedbackProvider';
 
 interface BookEditModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export function BookEditModal({ isOpen, onClose, book, onBookUpdated }: BookEdit
   const [urlError, setUrlError] = useState<string | null>(null);
   
   const { updateBook, isUpdating, error } = useUpdateBook();
+  const toast = useToast();
 
   const [prevInputs, setPrevInputs] = useState({ book, isOpen });
   if (prevInputs.book !== book || prevInputs.isOpen !== isOpen) {
@@ -57,7 +59,7 @@ export function BookEditModal({ isOpen, onClose, book, onBookUpdated }: BookEdit
       onBookUpdated(updatedBooksList);
       onClose();
     } else {
-      alert(error || "Erreur lors de la modification du roman.");
+      toast.error(error || "Erreur lors de la modification du roman.");
     }
   };
 

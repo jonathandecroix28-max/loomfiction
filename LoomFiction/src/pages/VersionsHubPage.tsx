@@ -17,6 +17,7 @@ import type { IdeaVersionResponse } from '../types/ideaVersion';
 import type { SheetResponse } from '../types/sheet';
 import type { SheetVersion } from '../types/sheetVersion';
 import { IconBooks, IconDelete, IconGlobe, IconSheet } from '../components/icons';
+import { useConfirm, useToast } from '../components/feedback/FeedbackProvider';
 
 interface VersionRow {
   key: string;
@@ -202,6 +203,8 @@ function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows,
 
 export function VersionsHubPage() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
+  const toast = useToast();
   const { categories } = useCategories();
 
   const [loaded, setLoaded] = useState<Loaded>({
@@ -296,9 +299,12 @@ export function VersionsHubPage() {
   }, []);
 
   const handleDeleteVersion = async (row: VersionRow) => {
-    if (!window.confirm('Voulez-vous vraiment supprimer définitivement cette version ? Cette action est irréversible.')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Supprimer définitivement cette version ?',
+      message: 'Cette action est irréversible.',
+      tone: 'danger',
+    });
+    if (!ok) return;
 
     try {
       if (row.kind === 'chapter') {
@@ -323,7 +329,7 @@ export function VersionsHubPage() {
       }
     } catch (err) {
       console.error('Erreur lors de la suppression de la version :', err);
-      alert('Impossible de supprimer la version.');
+      toast.error('Impossible de supprimer la version.');
     }
   };
 
