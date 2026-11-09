@@ -8,18 +8,23 @@ import { ChapterContent, ChapterHeading, READING_COLUMN, READING_TEXT } from '..
 import { useKeyboardViewport } from '../../../hooks/useKeyboardViewport';
 import { offlineChapterService } from '../../../services/offlineChapterService';
 import { offlineChapterVersionService } from '../../../services/offlineChapterVersionService';
+import { offlineSheetService } from '../../../services/offlineSheetService';
 import { useUpdateChapter } from '../../chapters/hooks/UseUpdateChapter';
 import { useChapterVersions } from '../hooks/useChapterVersions';
 import { EditorToolbar } from '../../../components/tools/EditorToolbar';
 import { imageFilesFrom, insertImageFiles } from '../../../utils/images/editorImages';
+import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
+import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
 import type { ChapterResponse } from '../../../types/chapter';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
+import type { SheetResponse } from '../../../types/sheet';
 import {
   IconAdd,
   IconBack,
   IconEdit,
   IconHistory,
   IconSave,
+  IconSheet,
   IconView,
 } from '../../../components/icons';
 
@@ -34,12 +39,17 @@ export function ChapterEditorPage() {
   const chapterIdNumber = chapterId ? Number(chapterId) : null;
 
   const [chapter, setChapter] = useState<ChapterResponse | null>(null);
+  const [sheets, setSheets] = useState<SheetResponse[]>([]);
   const [title, setTitle] = useState('');
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [saveMessage, setSaveMessage] = useState('');
-  const [isPreview, setIsPreview] = useState(false); 
+  const [isPreview, setIsPreview] = useState(false);
+  const [worldbuildingEnabled, setWorldbuildingEnabled] = useState(true);
   const [imageError, setImageError] = useState<string | null>(null);
+
   const rootRef = useRef<HTMLDivElement>(null);
+  const sheetsRef = useRef<SheetResponse[]>([]);
+  sheetsRef.current = sheets;
 
   const { updateChapter, isUpdating, error: updateError } = useUpdateChapter();
   const { versions: chapterVersions, refetch: refetchChapterVersions } = useChapterVersions(chapterIdNumber);
@@ -50,7 +60,8 @@ export function ChapterEditorPage() {
       Image.configure({ allowBase64: true }),
       TextAlign.configure({
         types: ['heading', 'paragraph'],
-      })
+      }),
+      createSheetMentionExtension(() => sheetsRef.current),
     ],
     content: '',
     editorProps: {
@@ -76,6 +87,18 @@ export function ChapterEditorPage() {
     },
   });
 
+  useEffect(() => {
+  if (!rootRef.current) return;
+  const tippyDelegate = setupMentionPopovers(
+    rootRef.current,
+    (path) => navigate(path),
+    editor
+  );
+  return () => {
+    tippyDelegate.destroy();
+  };
+}, [editor, isPreview, navigate]);
+
   const keyboardOpen = useKeyboardViewport(rootRef, !isPageLoading && !!chapter);
 
   useEffect(() => {
@@ -93,28 +116,32 @@ export function ChapterEditorPage() {
   }, [imageError]);
 
   useEffect(() => {
-    const fetchChapter = async () => {
+    const loadData = async () => {
       if (!chapterId) return;
       try {
         setIsPageLoading(true);
-        const data = await offlineChapterService.getById(Number(chapterId));
-        
-        if (!data) {
+        const [chapterData, loadedSheets] = await Promise.all([
+          offlineChapterService.getById(Number(chapterId)),
+          offlineSheetService.getAll(),
+        ]);
+
+        if (!chapterData) {
           navigate('/404', { replace: true });
           return;
         }
 
-        setChapter(data);
-        setTitle(data.title);
+        setChapter(chapterData);
+        setTitle(chapterData.title);
+        setSheets(loadedSheets);
       } catch (error) {
-        console.error("Erreur lors du chargement du chapitre :", error);
+        console.error('Erreur lors du chargement des données :', error);
         navigate('/404', { replace: true });
       } finally {
         setIsPageLoading(false);
       }
     };
 
-    fetchChapter();
+    void loadData();
   }, [chapterId, navigate]);
 
   useEffect(() => {
@@ -145,9 +172,10 @@ export function ChapterEditorPage() {
   const handleCreateVersion = async () => {
     if (!chapterId || !chapter || !editor) return;
 
-    const nextVersionNumber = chapterVersions.length > 0
-      ? Math.max(...chapterVersions.map((version: ChapterVersionResponse) => Number(version.versionNumber))) + 1
-      : 1;
+    const nextVersionNumber =
+      chapterVersions.length > 0
+        ? Math.max(...chapterVersions.map((version: ChapterVersionResponse) => Number(version.versionNumber))) + 1
+        : 1;
 
     try {
       await offlineChapterVersionService.create({
@@ -167,7 +195,7 @@ export function ChapterEditorPage() {
 
   if (isPageLoading) {
     return (
-      <div className="h-[100dvh] bg-[#1c1411] flex items-center justify-center font-serif text-amber-200/60">
+      <div className="flex h-[100dvh] items-center justify-center bg-[#1c1411] font-serif text-amber-200/60">
         Ouverture de l'écritoire...
       </div>
     );
@@ -178,28 +206,27 @@ export function ChapterEditorPage() {
   const chapterNum = chapter?.chapter_number ?? 1;
 
   return (
-    <div ref={rootRef} className="h-[100dvh] bg-[#1c1411] text-[#fcf9f2] flex flex-col font-serif overflow-hidden">
-      
-      <header className="shrink-0 z-20 bg-[#1c1411]/95 backdrop-blur-md border-b border-amber-900/40 px-3 sm:px-6 py-2.5 flex items-center justify-between shadow-md">
+    <div ref={rootRef} className="flex h-[100dvh] flex-col overflow-hidden bg-[#1c1411] font-serif text-[#fcf9f2]">
+      <header className="z-20 flex shrink-0 items-center justify-between border-b border-amber-900/40 bg-[#1c1411]/95 px-3 py-2.5 shadow-md backdrop-blur-md sm:px-6">
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => navigate(-1)}
             title="Retour"
-            className="h-9 px-2 sm:px-2.5 rounded-lg text-amber-200/70 hover:text-amber-100 hover:bg-neutral-900 text-xs sm:text-sm font-sans flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+            className="flex h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 text-xs font-sans text-amber-200/70 transition-colors hover:bg-neutral-900 hover:text-amber-100 sm:px-2.5 sm:text-sm"
           >
             <IconBack className="size-4" aria-hidden="true" /> <span className="hidden sm:inline">Retour</span>
           </button>
-          
-          <span className="text-amber-900/50 text-xs">|</span>
-          
-          <span className="text-xs sm:text-sm font-sans text-amber-200/80 font-medium whitespace-nowrap">
+
+          <span className="text-xs text-amber-900/50">|</span>
+
+          <span className="whitespace-nowrap font-sans text-xs font-medium text-amber-200/80 sm:text-sm">
             Ch. {chapterNum}
           </span>
-          
+
           <button
             onClick={() => navigate(`/books/${bookId}/chapters/${chapterId}/versions`)}
             title="Historique des versions"
-            className="h-9 px-2 sm:px-3 rounded-lg border border-amber-900/30 bg-neutral-900 hover:bg-neutral-800 text-amber-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+            className="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-amber-900/30 bg-neutral-900 px-2 text-xs font-medium text-amber-200 transition-colors hover:bg-neutral-800 sm:px-3"
           >
             <IconHistory className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">Versions</span>
@@ -207,7 +234,7 @@ export function ChapterEditorPage() {
         </div>
 
         {saveMessage && (
-          <span className="text-[11px] font-sans text-emerald-400 font-medium animate-pulse truncate max-w-[120px] sm:max-w-none">
+          <span className="max-w-[120px] animate-pulse truncate font-sans text-[11px] font-medium text-emerald-400 sm:max-w-none">
             {saveMessage}
           </span>
         )}
@@ -220,42 +247,41 @@ export function ChapterEditorPage() {
             <ChapterContent html={previewHtml} />
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto w-full flex-1 flex flex-col">
+          <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Titre du chapitre..."
-              className="text-2xl sm:text-3xl md:text-4xl font-bold font-serif text-amber-100 bg-transparent border-b border-amber-900/30 pb-3 mb-4 focus:outline-none focus:border-amber-600 placeholder:text-amber-200/30 shrink-0"
+              className="mb-4 shrink-0 border-b border-amber-900/30 bg-transparent pb-3 font-serif text-2xl font-bold text-amber-100 placeholder:text-amber-200/30 focus:border-amber-600 focus:outline-none sm:text-3xl md:text-4xl"
             />
 
             {imageError && (
-              <p role="alert" className="text-sm font-sans text-red-400 mb-3 shrink-0">
+              <p role="alert" className="mb-3 shrink-0 font-sans text-sm text-red-400">
                 {imageError}
               </p>
             )}
-            <div className="flex-1 w-full bg-transparent cursor-text mt-2">
+            <div className={`mt-2 flex-1 w-full bg-transparent cursor-text ${worldbuildingEnabled ? '' : 'hide-worldbuilding-links'}`}>
               <EditorContent editor={editor} />
             </div>
           </div>
         )}
       </main>
 
-      <div className="shrink-0 z-30 bg-[#1c1411]/95 backdrop-blur-md border-t border-amber-900/40 p-2 sm:p-3 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.5)] space-y-2">
-        
+      <div className="z-30 shrink-0 space-y-2 border-t border-amber-900/40 bg-[#1c1411]/95 p-2 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.5)] backdrop-blur-md sm:p-3">
         {!isPreview && (
-          <div className="max-w-4xl mx-auto overflow-x-auto no-scrollbar" onMouseDown={keepEditorFocus}>
+          <div className="no-scrollbar mx-auto max-w-4xl overflow-x-auto" onMouseDown={keepEditorFocus}>
             <EditorToolbar editor={editor} onImageError={setImageError} />
           </div>
         )}
 
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2 pt-1 border-t border-amber-900/20">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-2 border-t border-amber-900/20 pt-1">
           <div className="flex items-center gap-2">
             <button
               onClick={handleCreateVersion}
               disabled={isUpdating || isPreview}
               title="Créer une nouvelle version"
-              className="h-9 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-200 font-sans text-xs sm:text-sm font-medium transition-colors cursor-pointer border border-amber-900/30 disabled:opacity-40 flex items-center justify-center gap-1.5 shrink-0"
+              className="flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-amber-900/30 bg-neutral-900 px-3 font-sans text-xs font-medium text-amber-200 transition-colors hover:bg-neutral-800 disabled:opacity-40 sm:text-sm"
             >
               <IconAdd className="size-4" aria-hidden="true" />
               <span className="hidden sm:inline">Nouvelle version</span>
@@ -263,11 +289,24 @@ export function ChapterEditorPage() {
 
             <button
               onClick={() => setIsPreview(!isPreview)}
-              title={isPreview ? "Passer en mode édition" : "Passer en mode aperçu"}
-              className="h-9 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-amber-200 font-sans text-xs sm:text-sm font-medium transition-colors cursor-pointer border border-amber-900/30 flex items-center justify-center gap-1.5 shrink-0"
+              title={isPreview ? 'Passer en mode édition' : 'Passer en mode aperçu'}
+              className="flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-amber-900/30 bg-neutral-900 px-3 font-sans text-xs font-medium text-amber-200 transition-colors hover:bg-neutral-800 sm:text-sm"
             >
               {isPreview ? <IconEdit className="size-4" aria-hidden="true" /> : <IconView className="size-4" aria-hidden="true" />}
-              <span className="hidden sm:inline">{isPreview ? "Modifier" : "Aperçu"}</span>
+              <span className="hidden sm:inline">{isPreview ? 'Modifier' : 'Aperçu'}</span>
+            </button>
+
+            <button
+              onClick={() => setWorldbuildingEnabled(!worldbuildingEnabled)}
+              title={worldbuildingEnabled ? "Masquer le surlignage des liens d'univers" : "Afficher le surlignage des liens d'univers"}
+              className={`flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 font-sans text-xs font-medium transition-colors sm:text-sm ${
+                worldbuildingEnabled
+                  ? 'border-amber-600/60 bg-amber-950/80 text-amber-200'
+                  : 'border-amber-900/30 bg-neutral-900 text-amber-200/50 hover:text-amber-200'
+              }`}
+            >
+              <IconSheet className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Worldbuilding</span>
             </button>
           </div>
 
@@ -275,14 +314,13 @@ export function ChapterEditorPage() {
             onClick={handleSave}
             disabled={isUpdating || isPreview}
             title="Enregistrer les modifications"
-            className="h-9 px-4 sm:px-6 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 font-sans text-xs sm:text-sm font-medium transition-colors shadow-md cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5 shrink-0"
+            className="flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-amber-700 px-4 font-sans text-xs font-medium text-amber-50 shadow-md transition-colors hover:bg-amber-600 disabled:opacity-40 sm:px-6 sm:text-sm"
           >
             <IconSave className="size-4" aria-hidden="true" />
-            <span>{isUpdating ? "Enregistrement..." : "Enregistrer"}</span>
+            <span>{isUpdating ? 'Enregistrement...' : 'Enregistrer'}</span>
           </button>
         </div>
       </div>
-
     </div>
   );
 }
