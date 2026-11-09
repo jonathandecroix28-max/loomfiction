@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { useNavigate } from 'react-router-dom';
 import type { IdeaResponse } from '../../../types/idea';
+import type { SheetResponse } from '../../../types/sheet';
+import { offlineSheetService } from '../../../services/offlineSheetService';
+import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
+import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
 import { IconDelete, IconDown, IconEdit, IconUp } from '../../../components/icons';
 import { ActionMenu } from './ActionMenu';
 
@@ -15,9 +22,7 @@ interface SheetCardItemProps {
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
-
 const SAVE_DELAY = 900;
-
 const iconBtn =
   'touch-target inline-flex min-w-9 cursor-pointer items-center justify-center rounded-lg border px-2.5 transition disabled:cursor-not-allowed disabled:opacity-30';
 
@@ -25,18 +30,20 @@ export function SheetCardItem({
   card,
   index,
   total,
-  autoFocus = false,
   onMove,
   onEdit,
   onDelete,
   onSaveDescription,
 }: SheetCardItemProps) {
+  const navigate = useNavigate();
   const incoming = card.description ?? '';
-  const [value, setValue] = useState(incoming);
   const [state, setState] = useState<SaveState>('idle');
+  const [sheets, setSheets] = useState<SheetResponse[]>([]);
 
-  const areaRef = useRef<HTMLTextAreaElement>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
+  const cardContainerRef = useRef<HTMLDivElement>(null);
+  const sheetsRef = useRef<SheetResponse[]>([]);
+  sheetsRef.current = sheets;
+
   const valueRef = useRef(incoming);
   const savedRef = useRef(incoming);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,14 +56,10 @@ export function SheetCardItem({
   }, [card, onSaveDescription]);
 
   useEffect(() => {
-    if (valueRef.current === savedRef.current && incoming !== savedRef.current) {
-      savedRef.current = incoming;
-      valueRef.current = incoming;
-      setValue(incoming);
-    }
-  }, [incoming]);
+    void offlineSheetService.getAll().then(setSheets);
+  }, []);
 
-  const flush = useCallback(async () => {
+  const flush = async () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -72,44 +75,45 @@ export function SheetCardItem({
     }
     savedRef.current = next;
     setState(valueRef.current === next ? 'saved' : 'idle');
-  }, []);
-
-  const handleChange = (text: string) => {
-    setValue(text);
-    valueRef.current = text;
-    setState('idle');
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => void flush(), SAVE_DELAY);
   };
 
-  useEffect(
-    () => () => {
-      void flush();
+  const flushRef = useRef(flush);
+  useLayoutEffect(() => {
+    flushRef.current = flush;
+  }, []);
+
+  const editor = useEditor({
+    extensions: [StarterKit, createSheetMentionExtension(() => sheetsRef.current)],
+    content: incoming,
+    editorProps: {
+      attributes: {
+        class:
+          'block w-full rounded-xl border border-transparent bg-transparent px-3 py-2 font-serif leading-relaxed text-amber-200/90 transition focus:border-amber-600/60 focus:bg-neutral-900/60 focus:outline-none min-h-[4rem]',
+      },
     },
-    [flush]
-  );
+    onUpdate: ({ editor: ed }) => {
+      const text = ed.getHTML();
+      valueRef.current = text;
+      setState('idle');
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => void flushRef.current(), SAVE_DELAY);
+    },
+  });
 
   useEffect(() => {
-    if (!autoFocus) return;
-    const area = areaRef.current;
-    if (!area) return;
-    area.focus();
-    area.setSelectionRange(area.value.length, area.value.length);
-  }, [autoFocus]);
-
-  useLayoutEffect(() => {
-    const area = areaRef.current;
-    const box = boxRef.current;
-    if (!area || !box) return;
-
-    box.style.minHeight = `${box.offsetHeight}px`;
-    area.style.height = 'auto';
-    area.style.height = `${area.scrollHeight}px`;
-    box.style.minHeight = '';
-  }, [value]);
+    if (!cardContainerRef.current || !editor) return;
+    
+    const tippyDelegate = setupMentionPopovers(
+      cardContainerRef.current, 
+      (path: string) => navigate(path), 
+      editor
+    );
+    
+    return () => tippyDelegate.destroy();
+  }, [editor, navigate]);
 
   return (
-    <div className="rounded-2xl border border-amber-900/25 bg-neutral-950/70 p-4 shadow-xl sm:p-5">
+    <div ref={cardContainerRef} className="rounded-2xl border border-amber-900/25 bg-neutral-950/70 p-4 shadow-xl sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-serif text-lg font-bold text-amber-100 wrap-break-word sm:text-xl">{card.name}</h3>
@@ -127,14 +131,12 @@ export function SheetCardItem({
           </p>
         </div>
 
-        {/* Grand écran : les actions restent visibles */}
         <div className="hidden shrink-0 items-center gap-1.5 font-sans sm:flex">
           <button
             type="button"
             disabled={index === 0}
             onClick={() => onMove(index, -1)}
             aria-label="Monter la carte"
-            title="Monter"
             className={`${iconBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
             <IconUp className="size-4" aria-hidden="true" />
@@ -144,7 +146,6 @@ export function SheetCardItem({
             disabled={index === total - 1}
             onClick={() => onMove(index, 1)}
             aria-label="Descendre la carte"
-            title="Descendre"
             className={`${iconBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
             <IconDown className="size-4" aria-hidden="true" />
@@ -153,7 +154,6 @@ export function SheetCardItem({
             type="button"
             onClick={() => onEdit(card)}
             aria-label="Modifier le titre"
-            title="Modifier le titre"
             className={`${iconBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
             <IconEdit className="size-4" aria-hidden="true" />
@@ -162,14 +162,12 @@ export function SheetCardItem({
             type="button"
             onClick={() => onDelete(card)}
             aria-label="Supprimer la carte"
-            title="Supprimer la carte"
             className={`${iconBtn} border-red-900/30 bg-red-950/50 text-red-300 hover:bg-red-900/80`}
           >
             <IconDelete className="size-4" aria-hidden="true" />
           </button>
         </div>
 
-        {/* Mobile : un seul bouton, les actions sont dans le menu */}
         <ActionMenu
           className="shrink-0 sm:hidden"
           label={`Actions de la carte ${card.name}`}
@@ -182,17 +180,8 @@ export function SheetCardItem({
         />
       </div>
 
-      <div ref={boxRef} className="mt-3 border-t border-amber-900/20 pt-3">
-        <textarea
-          ref={areaRef}
-          value={value}
-          rows={2}
-          onChange={(event) => handleChange(event.target.value)}
-          onBlur={() => void flush()}
-          aria-label={`Texte de la caractéristique ${card.name}`}
-          placeholder="À compléter… écrivez directement ici"
-          className="block w-full resize-none overflow-hidden rounded-xl border border-transparent bg-transparent px-3 py-2 font-serif leading-relaxed text-amber-200/90 transition placeholder:italic placeholder:text-amber-200/30 hover:border-amber-900/30 focus:border-amber-600/60 focus:bg-neutral-900/60 focus:outline-none"
-        />
+      <div className="mt-3 border-t border-amber-900/20 pt-3">
+        <EditorContent editor={editor} />
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import type { CategoryResponse } from '../../../types/category';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetResponse } from '../../../types/sheet';
@@ -8,14 +9,22 @@ interface SheetDocumentProps {
   cards: IdeaResponse[];
 }
 
+/**
+ * Le contenu est produit par Tiptap. DOMPurify retire les balises/attributs
+ * dangereux et conserve les attributs data-* utilisés par les mentions.
+ */
+const sanitizeDescription = (html: string) =>
+  DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ADD_ATTR: ['data-type', 'data-id', 'data-label'],
+  });
+
 export function SheetDocument({
   sheet,
   category,
   cards,
 }: SheetDocumentProps) {
-  const completedCards = cards.filter(
-    (card) => card.description?.trim()
-  );
+  const completedCards = cards.filter((card) => card.description?.trim());
 
   return (
     <article className="
@@ -29,7 +38,6 @@ export function SheetDocument({
       print:bg-white print:text-neutral-900
       print:shadow-none
     ">
-      {/* En-tête */}
       <header className="
         relative border-b border-amber-900/30
         bg-gradient-to-br from-neutral-900 to-neutral-950
@@ -81,7 +89,6 @@ export function SheetDocument({
         </p>
       </header>
 
-      {/* Contenu */}
       <div className="
         space-y-5 p-6 sm:p-10
         print:space-y-0 print:px-0 print:py-5
@@ -124,21 +131,30 @@ export function SheetDocument({
                 </h2>
               </div>
 
-              <div className="
-                whitespace-pre-wrap break-words pl-10
-                font-serif text-[15px] leading-7
-                text-amber-200/80
-                print:pl-10 print:text-[11pt]
-                print:leading-relaxed print:text-neutral-800
-              ">
-                {card.description}
-              </div>
+              <div
+                className="
+                  sheet-rich-content min-w-0 break-words pl-10
+                  font-serif text-[15px] leading-7 text-amber-200/80
+                  [&_p]:mb-2 [&_p:last-child]:mb-0
+                  [&_strong]:font-bold [&_em]:italic
+                  [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6
+                  [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6
+                  [&_a]:text-amber-300 [&_a]:underline
+                  [&_.mention-item]:font-semibold
+                  [&_.mention-item]:text-amber-300
+                  [&_.mention-item]:underline
+                  print:pl-10 print:text-[11pt]
+                  print:leading-relaxed print:text-neutral-800
+                "
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeDescription(card.description ?? ''),
+                }}
+              />
             </section>
           ))
         )}
       </div>
 
-      {/* Pied de page */}
       <footer className="
         flex items-center justify-between
         border-t border-neutral-800 px-6 py-4
