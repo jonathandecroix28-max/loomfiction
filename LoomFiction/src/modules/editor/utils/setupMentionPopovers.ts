@@ -1,75 +1,121 @@
-import { delegate, type Instance, type Props } from 'tippy.js';
-import 'tippy.js/dist/tippy.css';
-import { ReactRenderer, type Editor } from '@tiptap/react';
+import { delegate, type Instance } from 'tippy.js';
+import { createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import type { Editor } from '@tiptap/core';
 import { SheetPopover } from '../components/SheetPopover';
 
-type CustomTippyInstance = Instance<Props> & {
-  _reactRenderer?: ReactRenderer;
-};
+const MENTION_SELECTOR = '[data-type="mention"]';
 
-const isMobileViewport = () =>
-  typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
+const TOUCH_QUERY = '(hover: none), (pointer: coarse)';
 
-const positionMobilePopover = (instance: Instance<Props>) => {
-  if (!isMobileViewport()) return;
+const toArray = (value: Instance | Instance[]): Instance[] => (Array.isArray(value) ? value : [value]);
 
-  Object.assign(instance.popper.style, {
-    position: 'fixed',
-    top: 'auto',
-    right: '12px',
-    bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-    left: '12px',
-    width: 'auto',
-    maxWidth: 'none',
-    transform: 'none',
-    zIndex: '9999',
-  });
-};
 
 export function setupMentionPopovers(
-  container: HTMLElement,
-  onNavigate: (path: string) => void,
+  root: HTMLElement,
+  navigate: (path: string) => void,
   editor?: Editor | null
 ) {
-  const mobile = isMobileViewport();
+  const media = window.matchMedia(TOUCH_QUERY);
+  const open = new Map<Instance, Root>();
+  let delegated: Instance[] = [];
 
-  return delegate(container, {
-    target: '[data-type="mention"]',
-    interactive: true,
-    appendTo: () => document.body,
-    placement: mobile ? 'bottom' : 'top-start',
-    trigger: mobile ? 'click' : 'mouseenter focus',
-    hideOnClick: mobile,
-    delay: mobile ? 0 : [180, 120],
-    theme: 'transparent mention-mobile',
-    onShow(instance) {
-      if (instance.reference.closest('.hide-worldbuilding-links')) return false;
-    },
-    onMount(instance) {
-      positionMobilePopover(instance);
-    },
-    onCreate(instance) {
-      const idAttr = instance.reference.getAttribute('data-id');
-      if (!idAttr) return;
+  const unmountLater = (reactRoot: Root) => setTimeout(() => reactRoot.unmount(), 0);
 
-      const component = new ReactRenderer(SheetPopover, {
-        editor: editor as Editor,
-        props: {
-          sheetId: Number(idAttr),
-          onNavigate: (path: string) => {
-            instance.hide();
-            onNavigate(path);
-          },
+  const build = () => {
+    const touch = media.matches;
+
+    delegated = toArray(
+      delegate(root, {
+        target: MENTION_SELECTOR,
+        // Souris : survol ou focus clavier. Mobile : un toucher ouvre, un toucher ailleurs ferme.
+        trigger: touch ? 'click' : 'mouseenter focus',
+        placement: touch ? 'bottom' : 'top',
+        delay: touch ? 0 : [150, 100],
+        interactive: true,
+        hideOnClick: true,
+        arrow: false,
+        offset: [0, 8],
+        maxWidth: 'none',
+        ignoreAttributes: true,
+        appendTo: () => document.body,
+        popperOptions: {
+          modifiers: [
+            { name: 'preventOverflow', options: { padding: 8 } },
+            { name: 'flip', options: { padding: 8 } },
+          ],
         },
-      });
 
-      instance.setContent(component.element);
-      (instance as unknown as CustomTippyInstance)._reactRenderer = component;
-      positionMobilePopover(instance);
+        onShow(instance) {
+          const sheetId = Number(instance.reference.getAttribute('data-id'));
+          if (!Number.isFinite(sheetId)) return false;
+
+          const previous = open.get(instance);
+          if (previous) unmountLater(previous);
+
+          const container = document.createElement('div');
+          container.style.width = 'min(18rem, calc(100vw - 1rem))';
+
+          const reactRoot = createRoot(container);
+          reactRoot.render(
+            createElement(SheetPopover, {
+              sheetId,
+              onNavigate: (path: string) => {
+                instance.hide();
+                navigate(path);
+              },
+              onClose: () => instance.hide(),
+            })
+          );
+
+          open.set(instance, reactRoot);
+          instance.setContent(container);
+        },
+
+        onMount(instance) {
+          const box = instance.popper.querySelector<HTMLElement>('.tippy-box');
+          if (box) {
+            box.style.background = 'transparent';
+            box.style.boxShadow = 'none';
+          }
+          const content = instance.popper.querySelector<HTMLElement>('.tippy-content');
+          if (content) content.style.padding = '0';
+        },
+
+        onHidden(instance) {
+          const reactRoot = open.get(instance);
+          if (!reactRoot) return;
+          open.delete(instance);
+          unmountLater(reactRoot);
+        },
+      })
+    );
+  };
+
+  const teardown = () => {
+    delegated.forEach((instance) => instance.destroy());
+    delegated = [];
+    open.forEach((reactRoot) => unmountLater(reactRoot));
+    open.clear();
+  };
+
+  const onMediaChange = () => {
+    teardown();
+    build();
+  };
+
+
+  const hideOpen = () => open.forEach((_, instance) => instance.hide());
+
+  build();
+  media.addEventListener('change', onMediaChange);
+  editor?.on('update', hideOpen);
+
+  return {
+    destroy() {
+      media.removeEventListener('change', onMediaChange);
+      editor?.off('update', hideOpen);
+      teardown();
     },
-    onDestroy(instance) {
-      const customInstance = instance as unknown as CustomTippyInstance;
-      customInstance._reactRenderer?.destroy();
-    },
-  });
+  };
 }
