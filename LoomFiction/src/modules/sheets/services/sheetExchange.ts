@@ -3,6 +3,100 @@ import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import type { SheetResponse } from '../../../types/sheet';
 import type { CategoryResponse } from '../../../types/category';
 import type { IdeaResponse } from '../../../types/idea';
+import DOMPurify from 'dompurify';
+
+
+
+function htmlToMarkdown(html: string): string {
+  if (!html.trim()) return '';
+
+  const safeHtml = DOMPurify.sanitize(html, {
+    ADD_ATTR: ['data-type', 'data-id', 'data-label'],
+  });
+  const parsed = new DOMParser().parseFromString(safeHtml, 'text/html');
+
+  const inline = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+    if (!(node instanceof Element)) return '';
+
+    if (node.matches('[data-type="mention"]')) {
+      const label = node.getAttribute('data-label')?.trim() || node.textContent?.trim() || '';
+      return label ? `@${label.replace(/^@/, '')}` : '';
+    }
+
+    const content = Array.from(node.childNodes).map(inline).join('');
+    switch (node.tagName.toLowerCase()) {
+      case 'br': return '\n';
+      case 'strong':
+      case 'b': return content ? `**${content}**` : '';
+      case 'em':
+      case 'i': return content ? `*${content}*` : '';
+      case 'code': return content ? `\`${content.replace(/`/g, '\\`')}\`` : '';
+      case 'a': {
+        const href = node.getAttribute('href')?.trim();
+        return href ? `[${content}](${href})` : content;
+      }
+      default: return content;
+    }
+  };
+
+  const block = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+    if (!(node instanceof Element)) return '';
+
+    if (node.matches('[data-type="mention"]')) return inline(node);
+
+    const tag = node.tagName.toLowerCase();
+    const children = Array.from(node.childNodes);
+
+    if (tag === 'br') return '\n';
+
+    if (tag === 'ul' || tag === 'ol') {
+      return children
+        .filter((child): child is Element => child instanceof Element && child.tagName.toLowerCase() === 'li')
+        .map((item, index) => {
+          const text = Array.from(item.childNodes).map(block).join('').trim();
+          return text ? `${tag === 'ol' ? `${index + 1}.` : '-'} ${text}` : '';
+        })
+        .filter(Boolean)
+        .join('\n');
+    }
+
+    if (tag === 'li') return children.map(block).join('');
+
+    if (tag === 'blockquote') {
+      const text = children.map(block).join('').trim();
+      return text ? text.split('\n').map((line) => `> ${line}`).join('\n') : '';
+    }
+
+    if (/^h[1-6]$/.test(tag)) {
+      return `${'#'.repeat(Number(tag.slice(1)))} ${children.map(inline).join('').trim()}`;
+    }
+
+    if (['p', 'div', 'section'].includes(tag)) {
+      return children.map((child) => {
+        if (child instanceof Element && /^(ul|ol|blockquote)$/.test(child.tagName.toLowerCase())) {
+          return block(child);
+        }
+        return inline(child);
+      }).join('').trim();
+    }
+
+    return children.map((child) => {
+      if (child instanceof Element && /^(p|div|section|ul|ol|blockquote|h[1-6])$/.test(child.tagName.toLowerCase())) {
+        return block(child);
+      }
+      return inline(child);
+    }).join('');
+  };
+
+  return Array.from(parsed.body.childNodes)
+    .map(block)
+    .join('\n\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 
 export interface ExportedSheetCard {
   name: string;
@@ -67,7 +161,8 @@ export function exportSheetToMarkdownFile(
 
   for (const card of cards) {
     if (card.description?.trim() || card.name) {
-      lines.push(`## ${card.name}\n\n${(card.description || '').trim()}\n`);
+      const description = htmlToMarkdown(card.description || '');
+      lines.push(`## ${card.name}\n\n${description}\n`);
     }
   }
 
