@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import DOMPurify from 'dompurify';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSheetPage } from '../hooks/useSheetPage';
 import { SheetCardItem } from '../components/SheetCardItem';
@@ -29,6 +30,110 @@ import {
 type Mode = 'cards' | 'document';
 
 const toolbarBtn = 'cursor-pointer rounded-xl border px-4 py-2.5 text-sm font-medium transition touch-target';
+
+
+/**
+ * Convertit le HTML produit par Tiptap en Markdown lisible.
+ * Les mentions deviennent du texte (@nom) : leurs attributs HTML ne sont
+ * jamais copiés dans le Markdown.
+ */
+function htmlToMarkdown(html: string): string {
+  if (!html.trim()) return '';
+
+  const cleanHtml = DOMPurify.sanitize(html, {
+    ADD_ATTR: ['data-type', 'data-id', 'data-label'],
+  });
+
+  const document = new DOMParser().parseFromString(cleanHtml, 'text/html');
+
+  const inline = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+    if (!(node instanceof Element)) return '';
+
+    if (node.matches('[data-type="mention"]')) {
+      const label = node.getAttribute('data-label')?.trim() || node.textContent?.trim() || '';
+      return label ? `@${label.replace(/^@/, '')}` : '';
+    }
+
+    const content = Array.from(node.childNodes).map(inline).join('');
+
+    switch (node.tagName.toLowerCase()) {
+      case 'br':
+        return '\n';
+      case 'strong':
+      case 'b':
+        return content ? `**${content}**` : '';
+      case 'em':
+      case 'i':
+        return content ? `*${content}*` : '';
+      case 'code':
+        return content ? `\`${content.replace(/`/g, '\\`')}\`` : '';
+      case 'a': {
+        const href = node.getAttribute('href')?.trim();
+        return href ? `[${content}](${href})` : content;
+      }
+      default:
+        return content;
+    }
+  };
+
+  const blocks = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+    if (!(node instanceof Element)) return '';
+
+    if (node.matches('[data-type="mention"]')) return inline(node);
+
+    const tag = node.tagName.toLowerCase();
+    const children = Array.from(node.childNodes);
+
+    if (tag === 'ul' || tag === 'ol') {
+      const items = children
+        .filter((child): child is Element => child instanceof Element && child.tagName.toLowerCase() === 'li')
+        .map((item, index) => {
+          const text = Array.from(item.childNodes).map(blocks).join('').trim();
+          const prefix = tag === 'ol' ? `${index + 1}. ` : '- ';
+          return text ? `${prefix}${text}` : '';
+        })
+        .filter(Boolean);
+      return items.join('\n');
+    }
+
+    if (tag === 'li') return children.map(blocks).join('');
+    if (tag === 'blockquote') {
+      const content = children.map(blocks).join('').trim();
+      return content.split('\n').map((line) => `> ${line}`).join('\n');
+    }
+    if (/^h[1-6]$/.test(tag)) {
+      const level = Number(tag.slice(1));
+      return `${'#'.repeat(level)} ${children.map(inline).join('').trim()}`;
+    }
+    if (tag === 'p' || tag === 'div' || tag === 'section') {
+      const content = children.map((child) => {
+        if (child instanceof Element && ['ul', 'ol', 'blockquote'].includes(child.tagName.toLowerCase())) {
+          return blocks(child);
+        }
+        return inline(child);
+      }).join('').trim();
+      return content;
+    }
+
+    if (tag === 'br') return '\n';
+    return children.map((child) => {
+      if (child instanceof Element && /^(p|div|section|ul|ol|blockquote|h[1-6])$/.test(child.tagName.toLowerCase())) {
+        return blocks(child);
+      }
+      return inline(child);
+    }).join('');
+  };
+
+  return Array.from(document.body.childNodes)
+    .map(blocks)
+    .join('\n\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 
 export function SheetPage() {
   const { sheetId } = useParams<{ sheetId: string }>();
@@ -176,8 +281,9 @@ export function SheetPage() {
     const parts = [`# ${sheet.name}`, category ? `*${category.name}*` : ''];
 
     for (const card of cards) {
-      if (card.description?.trim()) {
-        parts.push(`## ${card.name}\n\n${card.description.trim()}`);
+      const description = htmlToMarkdown(card.description ?? '');
+      if (description) {
+        parts.push(`## ${card.name}\n\n${description}`);
       }
     }
 
@@ -206,7 +312,12 @@ export function SheetPage() {
     { key: 'attach', label: 'Ajouter des notes existantes', icon: IconAttach, separatorBefore: true, onSelect: () => setIsAttachOpen(true) },
     { key: 'print', label: 'Imprimer / PDF', icon: IconPrint, onSelect: () => { setMode('document'); setTimeout(() => window.print(), 100); } },
     { key: 'json', label: 'Exporter en JSON', icon: IconFile, separatorBefore: true, onSelect: () => exportSheetToJson(sheet, category, cards) },
-    { key: 'md', label: 'Exporter en Markdown', icon: IconFile, onSelect: () => exportSheetToMarkdownFile(sheet, category, cards) },
+    {
+      key: 'md',
+      label: 'Exporter en Markdown',
+      icon: IconFile,
+      onSelect: () => exportSheetToMarkdownFile(sheet, category, cards),
+    },
     { key: 'copy', label: 'Copier le Markdown', icon: IconCopy, onSelect: () => void copyMarkdown() },
     { key: 'delete', label: 'Supprimer la fiche', icon: IconDelete, danger: true, separatorBefore: true, onSelect: () => void deleteSheet() },
   ];
