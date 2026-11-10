@@ -424,3 +424,56 @@ html.sunrise-mode .bg-amber-900\/70.text-amber-50 {
   outline: 3px solid var(--c-a500);
   outline-offset: 3px;
 }
+
+mark.annot {
+  --hl: 245 176 40;
+  background-color: rgb(var(--hl) / 0.32);
+  color: inherit;
+  border-radius: 0.2em;
+  padding: 0.04em 0.06em;
+  cursor: pointer;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-color 0.15s ease;
+}
+
+mark.annot[data-hl='amber'] { --hl: 245 176 40; }
+mark.annot[data-hl='rose']  { --hl: 236 100 120; }
+mark.annot[data-hl='green'] { --hl: 90 194 130; }
+mark.annot[data-hl='blue']  { --hl: 100 150 240; }
+
+mark.annot:hover,
+mark.annot[data-active='true'] {
+  background-color: rgb(var(--hl) / 0.5);
+}
+
+mark.annot:focus-visible {
+  outline: 2px solid var(--c-a500);
+  outline-offset: 2px;
+}
+
+mark.annot[data-note-end='true']::after {
+  content: '✎';
+  font-size: 0.7em;
+  margin-left: 0.2em;
+  opacity: 0.75;
+  vertical-align: super;
+  line-height: 0;
+}
+
+html.sunrise-mode mark.annot {
+  background-color: rgb(var(--hl) / 0.42);
+}
+html.sunrise-mode mark.annot:hover,
+html.sunrise-mode mark.annot[data-active='true'] {
+  background-color: rgb(var(--hl) / 0.62);
+}
+
+@media print {
+  mark.annot {
+    background: none !important;
+  }
+  mark.annot::after {
+    display: none !important;
+  }
+}
