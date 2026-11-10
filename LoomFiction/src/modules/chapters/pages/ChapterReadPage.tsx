@@ -1,10 +1,12 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChapterReader } from '../hooks/useChapterReader';
 import { useEdgeSwipeNavigation } from '../hooks/useEdgeSwipeNavigation';
 import { EdgeSwipeHint } from '../components/EdgeSwipeHint';
-import { ChapterContent, ChapterHeading, READING_COLUMN } from '../components/ChapterReading';
+import { ChapterHeading, READING_COLUMN, READING_TEXT } from '../components/ChapterReading';
 import { IconBack, IconNext } from '../../../components/icons';
+import { useBook } from '../../books/hooks/useBook';
+import { AnnotatedChapter } from '../../annotations/components/AnnotedChapter';
 
 export function ChapterReadPage() {
   const { bookId, chapterId } = useParams<{ bookId: string; chapterId: string }>();
@@ -14,6 +16,8 @@ export function ChapterReadPage() {
   const numChapterId = chapterId ? Number(chapterId) : null;
 
   const { chapter, isLoading, error, prevChapter, nextChapter } = useChapterReader(numBookId, numChapterId);
+  const { book } = useBook(numBookId!);
+  const [isAnnotating, setIsAnnotating] = useState(false);
 
   const goToChapter = useCallback(
     (id: number) => navigate(`/books/${bookId}/chapters/${id}/read`),
@@ -21,7 +25,7 @@ export function ChapterReadPage() {
   );
 
   const pull = useEdgeSwipeNavigation({
-    enabled: !isLoading && !!chapter,
+    enabled: !isLoading && !!chapter && !isAnnotating,
     onPrev: prevChapter ? () => goToChapter(prevChapter.id) : undefined,
     onNext: nextChapter ? () => goToChapter(nextChapter.id) : undefined,
   });
@@ -61,7 +65,15 @@ export function ChapterReadPage() {
       <main className={`flex-1 flex flex-col ${READING_COLUMN}`}>
         <ChapterHeading>{chapter.title}</ChapterHeading>
 
-        <ChapterContent html={chapter.content || ''} />
+        <AnnotatedChapter
+          html={chapter.content || ''}
+          chapterId={chapter.id}
+          bookId={numBookId}
+          bookTitle={book?.title ?? 'Mon roman'}
+          chapterTitle={chapter.title}
+          className={READING_TEXT}
+          onBusyChange={setIsAnnotating}
+        />
 
       <div className="hidden sm:flex border-t border-amber-900/30 pt-6 flex-row items-center justify-between gap-3 font-sans">
       {prevChapter ? (
