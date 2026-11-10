@@ -31,7 +31,7 @@ function htmlToMarkdown(html: string): string {
       case 'b': return content ? `**${content}**` : '';
       case 'em':
       case 'i': return content ? `*${content}*` : '';
-      case 'code': return content ? `\`${content.replace(/`/g, '\\`')}\`` : '';
+      case 'code': return content ? `\`${content.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`` : '';
       case 'a': {
         const href = node.getAttribute('href')?.trim();
         return href ? `[${content}](${href})` : content;
