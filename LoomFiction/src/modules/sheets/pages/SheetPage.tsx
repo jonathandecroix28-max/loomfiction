@@ -66,7 +66,7 @@ function htmlToMarkdown(html: string): string {
       case 'i':
         return content ? `*${content}*` : '';
       case 'code':
-        return content ? `\`${content.replace(/`/g, '\\`')}\`` : '';
+        return content ? `\`${content.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`` : '';
       case 'a': {
         const href = node.getAttribute('href')?.trim();
         return href ? `[${content}](${href})` : content;
