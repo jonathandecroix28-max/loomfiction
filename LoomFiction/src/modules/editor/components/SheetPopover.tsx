@@ -9,7 +9,6 @@ import { IconSheet } from '../../../components/icons';
 interface SheetPopoverProps {
   sheetId: number;
   onNavigate: (path: string) => void;
-  /** Sur mobile, il n'y a pas de survol pour refermer : un bouton « Fermer » apparaît si cette fonction est fournie. */
   onClose?: () => void;
 }
 
@@ -25,7 +24,6 @@ export function SheetPopover({ sheetId, onNavigate, onClose }: SheetPopoverProps
   const [cards, setCards] = useState<IdeaResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Autre fiche : on repasse en « chargement » (ajustement pendant le rendu, sans effet)
   const [prevSheetId, setPrevSheetId] = useState(sheetId);
   if (sheetId !== prevSheetId) {
     setPrevSheetId(sheetId);
@@ -58,7 +56,7 @@ export function SheetPopover({ sheetId, onNavigate, onClose }: SheetPopoverProps
 
   if (loading) {
     return (
-      <div className="w-full max-w-[calc(100vw-1rem)] rounded-2xl border border-amber-900/40 bg-[#1c1411] p-4 font-serif text-xs text-amber-200/60 shadow-2xl sm:w-64">
+      <div className="w-full max-w-[calc(100vw-1rem)] rounded-2xl border border-amber-900/40 bg-neutral-950 p-4 font-serif text-xs text-amber-200/60 shadow-2xl sm:w-64">
         Chargement de la fiche…
       </div>
     );
@@ -66,7 +64,7 @@ export function SheetPopover({ sheetId, onNavigate, onClose }: SheetPopoverProps
 
   if (!sheet) {
     return (
-      <div className="w-full max-w-[calc(100vw-1rem)] rounded-2xl border border-red-900/40 bg-[#1c1411] p-4 font-serif text-xs text-red-300 shadow-2xl sm:w-64">
+      <div className="w-full max-w-[calc(100vw-1rem)] rounded-2xl border border-red-900/40 bg-neutral-950 p-4 font-serif text-xs text-red-300 shadow-2xl sm:w-64">
         Fiche introuvable.
       </div>
     );
@@ -75,7 +73,7 @@ export function SheetPopover({ sheetId, onNavigate, onClose }: SheetPopoverProps
   const filledCards = cards.filter((c) => c.description?.trim()).slice(0, 2);
 
   return (
-    <div className="max-h-[min(55dvh,32rem)] w-full max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-2xl border border-amber-900/50 bg-[#1c1411] p-4 font-sans text-amber-50 shadow-2xl backdrop-blur-md sm:max-h-none sm:w-72">
+    <div className="max-h-[min(55dvh,32rem)] w-full max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-2xl border border-amber-900/50 bg-neutral-950 p-4 font-sans text-amber-100 shadow-2xl sm:max-h-none sm:w-72">
       <div className="flex items-center justify-between gap-3 border-b border-amber-900/30 pb-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <IconSheet className="size-4 shrink-0 text-amber-400" aria-hidden="true" />
@@ -85,7 +83,7 @@ export function SheetPopover({ sheetId, onNavigate, onClose }: SheetPopoverProps
           <button
             type="button"
             onClick={() => onNavigate(`/ideas/fiches/${sheet.id}`)}
-            className="min-h-10 cursor-pointer rounded-lg bg-amber-800/60 px-3 py-1.5 text-xs font-medium text-amber-200 transition hover:bg-amber-700 sm:min-h-9"
+            className="min-h-10 cursor-pointer rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-medium text-amber-50 transition hover:bg-amber-600 sm:min-h-9"
           >
             Ouvrir
           </button>
@@ -108,7 +106,6 @@ export function SheetPopover({ sheetId, onNavigate, onClose }: SheetPopoverProps
         ) : (
           filledCards.map((card) => (
             <div key={card.id} className="rounded-lg border border-amber-900/20 bg-neutral-900/60 p-2 text-xs">
-              {/* Le conteneur est un bloc (line-clamp ne fonctionne pas sur un <span>) et les paragraphes de la description restent en ligne */}
               <div className="line-clamp-3 sm:line-clamp-2">
                 <span className="font-serif font-semibold text-amber-200">{card.name} : </span>
                 <span

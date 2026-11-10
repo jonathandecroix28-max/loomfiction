@@ -16,7 +16,6 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
     const listRef = useRef<HTMLDivElement>(null);
     const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-    // Nouvelle liste de résultats : on revient au premier choix (ajustement pendant le rendu, sans effet)
     const [prevItems, setPrevItems] = useState(items);
     if (items !== prevItems) {
       setPrevItems(items);
@@ -38,7 +37,6 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
       setSelectedIndex((prev) => (prev + 1) % items.length);
     };
 
-    // Au clavier, garde le choix visible dans la liste (sans faire défiler la page)
     useEffect(() => {
       const list = listRef.current;
       const item = itemRefs.current[selectedIndex];
@@ -69,7 +67,7 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
 
     if (items.length === 0) {
       return (
-        <div className="w-full max-w-[calc(100vw-1rem)] rounded-xl border border-amber-900/40 bg-[#1c1411] px-4 py-3 font-serif text-sm text-amber-200/60 shadow-xl sm:w-56 sm:text-xs">
+        <div className="w-full max-w-[calc(100vw-1rem)] rounded-xl border border-amber-900/40 bg-neutral-950 px-4 py-3 font-serif text-sm text-amber-200/60 shadow-xl sm:w-56 sm:text-xs">
           Aucune fiche trouvée
         </div>
       );
@@ -78,9 +76,8 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
     return (
       <div
         ref={listRef}
-        // Garde le focus dans l'éditeur : sans ça, toucher un choix ferme le clavier avant la sélection
         onMouseDown={(event) => event.preventDefault()}
-        className="relative max-h-[min(40dvh,18rem)] w-full max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-xl border border-amber-900/40 bg-[#1c1411] p-2 font-serif shadow-2xl backdrop-blur-md sm:max-h-48 sm:w-56 sm:p-1"
+        className="relative max-h-[min(40dvh,18rem)] w-full max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-xl border border-amber-900/40 bg-neutral-950 p-2 font-serif shadow-2xl backdrop-blur-md sm:max-h-48 sm:w-56 sm:p-1"
       >
         <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200/40 sm:hidden">
           Sélectionner une fiche
@@ -95,7 +92,7 @@ export const MentionList = forwardRef<MentionListRef, MentionListProps>(
             onClick={() => selectItem(index)}
             className={`flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors sm:min-h-0 sm:gap-2 sm:py-2 sm:text-xs ${
               index === selectedIndex
-                ? 'bg-amber-800/60 font-medium text-amber-100'
+                ? 'bg-amber-900/60 font-medium text-amber-100'
                 : 'text-amber-200/80 hover:bg-neutral-900'
             }`}
           >

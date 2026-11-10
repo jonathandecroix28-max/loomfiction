@@ -172,14 +172,14 @@ export function MentionDetection({ editor, targets, sheets, onClose }: MentionDe
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/65 p-0 sm:items-center sm:p-4" role="presentation" onMouseDown={(event) => {
+    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="mention-detection-title"
-        className="flex max-h-[85dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-amber-800/50 bg-[#211713] text-amber-50 shadow-2xl sm:max-h-[80dvh] sm:rounded-2xl"
+        className="flex max-h-[85dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-amber-900/40 bg-neutral-950 text-amber-100 shadow-2xl sm:max-h-[80dvh] sm:rounded-2xl"
       >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-amber-900/40 px-4 py-3">
           <div>
@@ -188,12 +188,12 @@ export function MentionDetection({ editor, targets, sheets, onClose }: MentionDe
               {matches.length} correspondance{matches.length > 1 ? 's' : ''} trouvée{matches.length > 1 ? 's' : ''}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="min-h-10 shrink-0 cursor-pointer rounded-lg px-3 py-2 text-sm text-amber-200/70 hover:bg-white/5">Fermer</button>
+          <button type="button" onClick={onClose} className="min-h-10 shrink-0 cursor-pointer rounded-lg px-3 py-2 text-sm text-amber-200/70 hover:bg-neutral-900">Fermer</button>
         </header>
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4">
           {matches.length === 0 ? (
-            <p className="rounded-xl bg-white/5 p-4 text-sm text-amber-100/70">
+            <p className="rounded-xl bg-neutral-900 p-4 text-sm text-amber-200/70">
               {allTargets.length > 1 ? 'Aucune fiche trouvée dans les cartes.' : 'Aucune fiche trouvée dans ce texte.'}
             </p>
           ) : matches.map((match, index) => (
@@ -203,7 +203,7 @@ export function MentionDetection({ editor, targets, sheets, onClose }: MentionDe
                   {allTargets.find((target) => target.id === match.targetId)?.label}
                 </p>
               )}
-            <div className="rounded-xl border border-amber-900/40 bg-black/20 p-3">
+            <div className="rounded-xl border border-amber-900/40 bg-neutral-900/60 p-3">
               <label className="flex cursor-pointer items-start gap-3 py-0.5">
                 <input
                   type="checkbox"
@@ -223,7 +223,7 @@ export function MentionDetection({ editor, targets, sheets, onClose }: MentionDe
                 <select
                   value={match.selectedId}
                   onChange={(event) => updateMatch(index, { selectedId: event.target.value })}
-                  className="mt-3 min-h-11 w-full rounded-lg border border-amber-900/50 bg-[#160f0c] px-3 py-2 text-base text-amber-100 sm:min-h-0 sm:text-sm"
+                  className="mt-3 min-h-11 w-full rounded-lg border border-amber-900/50 bg-neutral-900 px-3 py-2 text-base text-amber-100 sm:min-h-0 sm:text-sm"
                   aria-label={`Choisir la fiche pour ${match.text}`}
                 >
                   {match.options.map((option) => (
@@ -241,12 +241,12 @@ export function MentionDetection({ editor, targets, sheets, onClose }: MentionDe
         <footer className="flex shrink-0 flex-col gap-3 border-t border-amber-900/40 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between">
           <span className="text-xs text-amber-200/60">{selectedCount} sélectionnée{selectedCount > 1 ? 's' : ''}</span>
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="min-h-11 flex-1 cursor-pointer rounded-xl border border-amber-900/50 px-4 py-2 text-sm text-amber-100/80 sm:min-h-0 sm:flex-none">Annuler</button>
+            <button type="button" onClick={onClose} className="min-h-11 flex-1 cursor-pointer rounded-xl border border-amber-900/40 px-4 py-2 text-sm text-amber-200/80 transition hover:bg-neutral-900 sm:min-h-0 sm:flex-none">Annuler</button>
             <button
               type="button"
               disabled={selectedCount === 0}
               onClick={convert}
-              className="min-h-11 flex-1 cursor-pointer rounded-xl bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:flex-none"
+              className="min-h-11 flex-1 cursor-pointer rounded-xl bg-amber-700 px-4 py-2 text-sm font-semibold text-amber-50 hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-0 sm:flex-none"
             >
               Convertir la sélection
             </button>
