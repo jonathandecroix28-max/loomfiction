@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import DOMPurify from 'dompurify';
 import { useChapterVersions } from '../hooks/useChapterVersions';
 import { offlineChapterService } from '../../../services/offlineChapterService';
 import { offlineChapterVersionService } from '../../../services/offlineChapterVersionService';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
 import { useParentItem, useVersionCompare } from '../../../hooks/versions/useVersionCompare';
+import { htmlToText } from '../../../utils/versions/htmlText';
 import {
   FeedbackBanner,
   MergeOptions,
@@ -26,10 +26,10 @@ const MERGE_FIELDS = [
 
 const getContent = (version: ChapterVersionResponse) => version.content ?? '';
 
-const renderHtml = (body: string) => <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(body || '') }} />;
+const renderPlain = (body: string) => htmlToText(body) || 'Aucun contenu.';
 
 const BODY_CLASS =
-  'max-h-64 md:max-h-96 overflow-y-auto prose prose-invert max-w-none wrap-break-word text-amber-100/90 font-serif text-sm sm:text-base [&_img]:max-w-full';
+  'max-h-64 md:max-h-96 overflow-y-auto max-w-none whitespace-pre-wrap leading-relaxed wrap-break-word text-amber-100/90 font-serif text-sm sm:text-base';
 
 export function ChapterVersionsPage() {
   const { bookId, chapterId, versionId } = useParams<{ bookId: string; chapterId: string; versionId?: string }>();
@@ -50,6 +50,7 @@ export function ChapterVersionsPage() {
     selectedVersion,
     currentText: chapter?.content || '',
     getText: getContent,
+    richText: true,
   });
 
   const [mergeFields, setMergeFields] = useState({ title: true, content: true });
@@ -154,7 +155,7 @@ export function ChapterVersionsPage() {
                 mode={compare.compareMode}
                 current={{ label: 'Chapitre actuel', name: chapter.title, body: chapter.content ?? '' }}
                 version={{ label: 'Version sélectionnée', name: versionToCompare.name, body: versionToCompare.content ?? '' }}
-                renderBody={renderHtml}
+                renderBody={renderPlain}
                 bodyClassName={BODY_CLASS}
               />
 
@@ -194,7 +195,7 @@ export function ChapterVersionsPage() {
                       Rendu final du contenu
                     </h4>
                     <div className={BODY_CLASS}>
-                      {renderHtml(compare.mergeFor(versionToCompare))}
+                      {renderPlain(compare.mergeFor(versionToCompare))}
                     </div>
                   </div>
                 ) : (

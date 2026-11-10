@@ -2,8 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import type { SheetResponse } from '../../../types/sheet';
 
-interface MentionDetectionProps {
+export interface DetectionTarget {
+  id: string | number;
+  label: string;
   editor: Editor;
+}
+
+interface MentionDetectionProps {
+  editor?: Editor;
+  targets?: DetectionTarget[];
   sheets: SheetResponse[];
   onClose: () => void;
 }
@@ -15,11 +22,12 @@ interface Match {
   options: SheetResponse[];
   selectedId: string;
   checked: boolean;
+  targetId: string | number;
 }
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-function findMatches(editor: Editor, sheets: SheetResponse[]): Match[] {
+function findMatches(editor: Editor, sheets: SheetResponse[], targetId: string | number): Match[] {
   const names = [...sheets]
     .filter((sheet) => sheet.name?.trim())
     .sort((a, b) => b.name.trim().length - a.name.trim().length);
@@ -42,7 +50,6 @@ function findMatches(editor: Editor, sheets: SheetResponse[]): Match[] {
         const after = end < text.length ? text[end] : '';
         const isWord = (char: string) => !!char && /[\p{L}\p{N}_]/u.test(char);
 
-        // Ne détecte pas un nom au milieu d'un autre mot.
         if (isWord(before) || isWord(after)) continue;
 
         raw.push({
@@ -82,6 +89,7 @@ function findMatches(editor: Editor, sheets: SheetResponse[]): Match[] {
         options: [item.sheet],
         selectedId: String(item.sheet.id),
         checked: true,
+        targetId,
       });
     }
   }
@@ -89,16 +97,22 @@ function findMatches(editor: Editor, sheets: SheetResponse[]): Match[] {
   return [...grouped.values()].sort((a, b) => a.from - b.from);
 }
 
-export function MentionDetection({ editor, sheets, onClose }: MentionDetectionProps) {
-  const initialMatches = useMemo(() => findMatches(editor, sheets), [editor, sheets]);
+export function MentionDetection({ editor, targets, sheets, onClose }: MentionDetectionProps) {
+  const allTargets = useMemo<DetectionTarget[]>(
+    () => targets ?? (editor ? [{ id: 'main', label: '', editor }] : []),
+    [targets, editor]
+  );
+  const initialMatches = useMemo(
+    () => allTargets.flatMap((target) => findMatches(target.editor, sheets, target.id)),
+    [allTargets, sheets]
+  );
   const [matches, setMatches] = useState(initialMatches);
 
   const selectedCount = matches.filter((match) => match.checked).length;
 
-  // Mobile : on ferme le clavier à l'ouverture, sinon il recouvre le bas de la fenêtre
   useEffect(() => {
-    editor.commands.blur();
-  }, [editor]);
+    allTargets.forEach((target) => target.editor.commands.blur());
+  }, [allTargets]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -127,22 +141,32 @@ export function MentionDetection({ editor, sheets, onClose }: MentionDetectionPr
       return;
     }
 
-    editor.chain().focus().command(({ tr, state }) => {
-      const mentionType = state.schema.nodes.mention;
-      if (!mentionType) return false;
+    for (const target of allTargets) {
+      const mine = chosen.filter((match) => match.targetId === target.id);
+      if (mine.length === 0) continue;
 
-      for (const match of chosen) {
-        tr.replaceWith(
-          match.from,
-          match.to,
-          mentionType.create({
-            id: String(match.sheet!.id),
-            label: match.sheet!.name,
-          }),
-        );
-      }
-      return true;
-    }).run();
+      const chain = target.editor.chain();
+      if (allTargets.length === 1) chain.focus();
+
+      chain
+        .command(({ tr, state }) => {
+          const mentionType = state.schema.nodes.mention;
+          if (!mentionType) return false;
+
+          for (const match of mine) {
+            tr.replaceWith(
+              match.from,
+              match.to,
+              mentionType.create({
+                id: String(match.sheet!.id),
+                label: match.sheet!.name,
+              }),
+            );
+          }
+          return true;
+        })
+        .run();
+    }
 
     onClose();
   };
@@ -170,10 +194,16 @@ export function MentionDetection({ editor, sheets, onClose }: MentionDetectionPr
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4">
           {matches.length === 0 ? (
             <p className="rounded-xl bg-white/5 p-4 text-sm text-amber-100/70">
-              Aucune fiche trouvée dans ce texte.
+              {allTargets.length > 1 ? 'Aucune fiche trouvée dans les cartes.' : 'Aucune fiche trouvée dans ce texte.'}
             </p>
           ) : matches.map((match, index) => (
-            <div key={`${match.from}-${match.to}`} className="rounded-xl border border-amber-900/40 bg-black/20 p-3">
+            <div key={`${match.targetId}-${match.from}-${match.to}`}>
+              {allTargets.length > 1 && (index === 0 || matches[index - 1].targetId !== match.targetId) && (
+                <p className="mb-1.5 mt-2 truncate font-sans text-[11px] font-semibold uppercase tracking-wider text-amber-200/50 first:mt-0">
+                  {allTargets.find((target) => target.id === match.targetId)?.label}
+                </p>
+              )}
+            <div className="rounded-xl border border-amber-900/40 bg-black/20 p-3">
               <label className="flex cursor-pointer items-start gap-3 py-0.5">
                 <input
                   type="checkbox"
@@ -203,6 +233,7 @@ export function MentionDetection({ editor, sheets, onClose }: MentionDetectionPr
                   ))}
                 </select>
               )}
+            </div>
             </div>
           ))}
         </div>

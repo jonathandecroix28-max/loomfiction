@@ -5,6 +5,7 @@ import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineIdeaVersionService } from '../../../services/offlineIdeaVersionService';
 import type { IdeaVersionResponse } from '../../../types/ideaVersion';
 import { useParentItem, useVersionCompare } from '../../../hooks/versions/useVersionCompare';
+import { htmlToText } from '../../../utils/versions/htmlText';
 import {
   FeedbackBanner,
   MergeOptions,
@@ -26,7 +27,7 @@ const MERGE_FIELDS = [
 
 const getDescription = (version: IdeaVersionResponse) => version.description ?? '';
 
-const renderText = (body: string) => body || 'Aucune description.';
+const renderText = (body: string) => htmlToText(body) || 'Aucune description.';
 
 const BODY_CLASS =
   'max-h-56 md:max-h-72 overflow-y-auto text-sm sm:text-base text-amber-100/90 font-serif whitespace-pre-wrap wrap-break-word leading-relaxed';
@@ -48,6 +49,7 @@ export function IdeaVersionsPage() {
     selectedVersion,
     currentText: idea?.description || '',
     getText: getDescription,
+    richText: true,
   });
 
   const [mergeFields, setMergeFields] = useState({ name: true, description: true });

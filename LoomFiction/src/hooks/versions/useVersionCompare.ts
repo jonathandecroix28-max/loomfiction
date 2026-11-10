@@ -7,6 +7,7 @@ import {
   type LineChoice,
   type LineChoices,
 } from '../../utils/versions/lineDiff';
+import { htmlToText, textToHtml } from '../../utils/versions/htmlText';
 
 export type SortBy = 'newest' | 'oldest' | 'version';
 export type CompareMode = 'current-left' | 'version-left';
@@ -20,28 +21,39 @@ export interface BaseVersion {
 
 
 export function useParentItem<T>(id: number | null, load: (id: number) => Promise<T>) {
-  const [result, setResult] = useState<{ id: number; item: T | null } | null>(null);
+  const [item, setItem] = useState<T | null>(null);
+  const [loading, setLoading] = useState(!!id);
+
+  const [prev, setPrev] = useState({ id, load });
+  if (prev.id !== id || prev.load !== load) {
+    setPrev({ id, load });
+    if (id) {
+      setLoading(true);
+    } else {
+      setItem(null);
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!id) return;
-
     let cancelled = false;
 
     load(id)
       .then((value) => {
-        if (!cancelled) setResult({ id, item: value });
+        if (!cancelled) setItem(value);
       })
       .catch(() => {
-        if (!cancelled) setResult({ id, item: null });
+        if (!cancelled) setItem(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
   }, [id, load]);
-
-  const item = id ? (result?.item ?? null) : null;
-  const loading = !!id && result?.id !== id;
 
   return { item, loading };
 }
@@ -51,6 +63,7 @@ interface Options<V extends BaseVersion> {
   selectedVersion: V | null;
   currentText: string;
   getText: (version: V) => string;
+  richText?: boolean;
 }
 
 
@@ -59,10 +72,13 @@ export function useVersionCompare<V extends BaseVersion>({
   selectedVersion,
   currentText,
   getText,
+  richText = false,
 }: Options<V>) {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
   const [compareMode, setCompareMode] = useState<CompareMode>('current-left');
+  const [choices, setChoices] = useState<LineChoices>({});
+
   const visibleVersions = useMemo(() => {
     const query = search.trim().toLowerCase();
     const filtered = versions.filter((version) => {
@@ -85,11 +101,14 @@ export function useVersionCompare<V extends BaseVersion>({
   const versionToCompare = selectedVersion ?? visibleVersions[0] ?? null;
   const versionText = versionToCompare ? getText(versionToCompare) : '';
 
-  const rows = useMemo(() => buildLineDiff(currentText, versionText), [currentText, versionText]);
+  const currentDiffText = richText ? htmlToText(currentText) : currentText;
+  const versionDiffText = richText ? htmlToText(versionText) : versionText;
 
-  const [choices, setChoices] = useState<LineChoices>(() => defaultLineChoices(rows));
-  const [prevRows, setPrevRows] = useState(rows);
-  if (prevRows !== rows) {
+  const rows = useMemo(() => buildLineDiff(currentDiffText, versionDiffText), [currentDiffText, versionDiffText]);
+
+  
+  const [prevRows, setPrevRows] = useState<typeof rows | null>(null);
+  if (rows !== prevRows) {
     setPrevRows(rows);
     setChoices(defaultLineChoices(rows));
   }
@@ -101,8 +120,14 @@ export function useVersionCompare<V extends BaseVersion>({
   const mergedText = useMemo(() => composeLineMerge(rows, choices), [rows, choices]);
 
 
-  const mergeFor = (version: V): string =>
-    version.id === versionToCompare?.id ? mergedText : mergeWithDefaults(currentText, getText(version));
+  const mergeFor = (version: V): string => {
+    const raw = getText(version);
+    const plain =
+      version.id === versionToCompare?.id
+        ? mergedText
+        : mergeWithDefaults(richText ? htmlToText(currentText) : currentText, richText ? htmlToText(raw) : raw);
+    return richText ? textToHtml(plain, currentText, raw) : plain;
+  };
 
   return {
     search,

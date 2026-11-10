@@ -7,6 +7,7 @@ import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
 import { offlineSheetVersionService } from '../../../services/offlineSheetVersionService';
 import { useVersionCompare } from '../../../hooks/versions/useVersionCompare';
+import { htmlToText } from '../../../utils/versions/htmlText';
 import {
   FeedbackBanner,
   MergeOptions,
@@ -57,7 +58,9 @@ const CHOICE_LABELS: Record<Exclude<CardStatus, 'same'>, { current: string; vers
   removed: { current: 'Garder la carte', version: 'Retirer de la fiche' },
 };
 
-const norm = (text?: string | null) => (text ?? '').replace(/\r\n/g, '\n').trimEnd();
+// Les descriptions des cartes sont du HTML : on compare et on affiche des phrases sans balises
+const norm = (text?: string | null) => htmlToText(text).trimEnd();
+const plain = (text?: string | null) => htmlToText(text).trim();
 const bySort = (a: { sortOrder?: number }, b: { sortOrder?: number }) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
 
 function buildRows(cards: IdeaResponse[], version: SheetVersion): CardRow[] {
@@ -295,7 +298,7 @@ export function SheetVersionsPage() {
             <>
               <div className={`font-semibold ${dropped ? 'line-through' : ''}`}>{text.name}</div>
               <div className={`mt-1 whitespace-pre-wrap leading-relaxed ${dropped ? 'line-through' : ''}`}>
-                {text.description?.trim() ? text.description : <span className="italic text-amber-200/30">(vide)</span>}
+                {plain(text.description) || <span className="italic text-amber-200/30">(vide)</span>}
               </div>
             </>
           ) : (
@@ -401,7 +404,7 @@ export function SheetVersionsPage() {
                             )}
                           </div>
                           <p className="mt-1 whitespace-pre-wrap leading-relaxed text-amber-100/90 wrap-break-word">
-                            {card.description.trim() || <span className="italic text-amber-200/30">À compléter…</span>}
+                            {plain(card.description) || <span className="italic text-amber-200/30">À compléter…</span>}
                           </p>
                         </li>
                       ))}
@@ -448,7 +451,7 @@ export function SheetVersionsPage() {
 
                             {row.status === 'same' ? (
                               <p className="line-clamp-3 whitespace-pre-wrap text-sm text-amber-100/70 wrap-break-word">
-                                {row.current?.description?.trim() || <span className="italic text-amber-200/30">(vide)</span>}
+                                {plain(row.current?.description) || <span className="italic text-amber-200/30">(vide)</span>}
                               </p>
                             ) : (
                               <>

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import type { Editor } from '@tiptap/core';
 import { useNavigate } from 'react-router-dom';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetResponse } from '../../../types/sheet';
@@ -8,7 +9,7 @@ import { offlineSheetService } from '../../../services/offlineSheetService';
 import { useLatestGetter } from '../../../hooks/useLatestGetter';
 import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
 import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
-import { MentionDetection } from '../../editor/components/MentionDetection';
+import { htmlToText } from '../../../utils/versions/htmlText';
 import { IconDelete, IconDown, IconEdit, IconUp } from '../../../components/icons';
 import { ActionMenu } from './ActionMenu';
 
@@ -21,6 +22,7 @@ interface SheetCardItemProps {
   onEdit: (card: IdeaResponse) => void;
   onDelete: (card: IdeaResponse) => void;
   onSaveDescription: (card: IdeaResponse, description: string) => Promise<boolean>;
+  onEditorChange?: (cardId: number, editor: Editor | null) => void;
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -36,15 +38,15 @@ export function SheetCardItem({
   onEdit,
   onDelete,
   onSaveDescription,
+  onEditorChange,
 }: SheetCardItemProps) {
   const navigate = useNavigate();
   const incoming = card.description ?? '';
   const [state, setState] = useState<SaveState>('idle');
+  const [isEmpty, setIsEmpty] = useState(() => htmlToText(incoming).trim() === '');
   const [sheets, setSheets] = useState<SheetResponse[]>([]);
-  const [showMentionDetection, setShowMentionDetection] = useState(false);
 
   const cardContainerRef = useRef<HTMLDivElement>(null);
-  // L'extension de l'éditeur n'est créée qu'une fois : ce getter lui donne toujours les fiches à jour
   const getSheets = useLatestGetter(sheets);
 
   const valueRef = useRef(incoming);
@@ -97,6 +99,7 @@ export function SheetCardItem({
     onUpdate: ({ editor: ed }) => {
       const text = ed.getHTML();
       valueRef.current = text;
+      setIsEmpty(ed.isEmpty);
       setState('idle');
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => void flushRef.current(), SAVE_DELAY);
@@ -114,6 +117,12 @@ export function SheetCardItem({
     
     return () => tippyDelegate.destroy();
   }, [editor, navigate]);
+
+  useEffect(() => {
+    if (!editor) return;
+    onEditorChange?.(card.id, editor);
+    return () => onEditorChange?.(card.id, null);
+  }, [editor, card.id, onEditorChange]);
 
   return (
     <div ref={cardContainerRef} className="rounded-2xl border border-amber-900/25 bg-neutral-950/70 p-4 shadow-xl sm:p-5">
@@ -184,27 +193,19 @@ export function SheetCardItem({
       </div>
 
       <div className="mt-3 border-t border-amber-900/20 pt-3">
-        {editor && (
-          <div className="mb-2 flex sm:justify-end">
-            <button
-              type="button"
-              onClick={() => setShowMentionDetection(true)}
-              className="inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-amber-800/50 bg-amber-950/40 px-3 py-1.5 font-sans text-xs font-medium text-amber-200 transition hover:bg-amber-900/50 sm:min-h-9 sm:w-auto"
+        <div className="relative">
+          {/* Placeholder : visible tant que la carte est vide, ne gêne pas le toucher (l'éditeur reste cliquable dessous) */}
+          {isEmpty && (
+            <p
+              aria-hidden="true"
+              className="pointer-events-none absolute left-[calc(0.75rem+1px)] right-3 top-[calc(0.5rem+1px)] font-serif italic leading-relaxed text-amber-200/35"
             >
-              <span aria-hidden="true">✦</span>
-              Détecter les fiches
-            </button>
-          </div>
-        )}
-        <EditorContent editor={editor} />
+              À compléter… écrivez directement ici (@ pour citer une fiche)
+            </p>
+          )}
+          <EditorContent editor={editor} />
+        </div>
       </div>
-      {showMentionDetection && editor && (
-        <MentionDetection
-          editor={editor}
-          sheets={sheets}
-          onClose={() => setShowMentionDetection(false)}
-        />
-      )}
     </div>
   );
 }

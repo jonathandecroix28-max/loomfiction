@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSheetPage } from '../hooks/useSheetPage';
+import { useSheets } from '../hooks/useSheets';
 import { SheetCardItem } from '../components/SheetCardItem';
 import { SheetDocument } from '../components/SheetDocument';
 import { ActionMenu, type ActionMenuItem } from '../components/ActionMenu';
 import { AttachNotesModal } from '../components/AttachNotesModal';
 import { IdeaModal } from '../../ideas/components/IdeaModal';
+import { MentionDetection, type DetectionTarget } from '../../editor/components/MentionDetection';
+import type { Editor } from '@tiptap/core';
 import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
 import { offlineSheetVersionService } from '../../../services/offlineSheetVersionService';
@@ -32,11 +35,7 @@ type Mode = 'cards' | 'document';
 const toolbarBtn = 'cursor-pointer rounded-xl border px-4 py-2.5 text-sm font-medium transition touch-target';
 
 
-/**
- * Convertit le HTML produit par Tiptap en Markdown lisible.
- * Les mentions deviennent du texte (@nom) : leurs attributs HTML ne sont
- * jamais copiés dans le Markdown.
- */
+
 function htmlToMarkdown(html: string): string {
   if (!html.trim()) return '';
 
@@ -152,6 +151,16 @@ export function SheetPage() {
   const [draftName, setDraftName] = useState('');
   const [feedback, setFeedback] = useState('');
 
+  // « Détecter les fiches » sur toutes les cartes à la fois : chaque carte donne son éditeur à la page
+  const { sheets: allSheets } = useSheets();
+  const editorsRef = useRef(new Map<number, Editor>());
+  const [detectTargets, setDetectTargets] = useState<DetectionTarget[] | null>(null);
+
+  const registerEditor = useCallback((cardId: number, editor: Editor | null) => {
+    if (editor) editorsRef.current.set(cardId, editor);
+    else editorsRef.current.delete(cardId);
+  }, []);
+
   useEffect(() => {
     if (!isLoading && (error || !sheet)) {
       navigate('/404', { replace: true });
@@ -179,6 +188,14 @@ export function SheetPage() {
   const openCreate = () => {
     setCardToEdit(null);
     setIsModalOpen(true);
+  };
+
+  const openDetection = () => {
+    const targets = cards.flatMap((card) => {
+      const editor = editorsRef.current.get(card.id);
+      return editor ? [{ id: card.id, label: card.name, editor }] : [];
+    });
+    setDetectTargets(targets);
   };
 
   const openEdit = (card: IdeaResponse) => {
@@ -295,7 +312,6 @@ export function SheetPage() {
     }
   };
 
-  /** Une version enregistre la fiche entière : son nom et toutes ses cartes. */
   const saveVersion = async () => {
     try {
       const version = await offlineSheetVersionService.createFromSheet(sheet, cards);
@@ -425,15 +441,28 @@ export function SheetPage() {
           </div>
         )}
 
-        {/* Une seule action principale : pleine largeur sur mobile */}
+        {/* Action principale (pleine largeur sur mobile) + détection des fiches sur toute la fiche (icône seule sur mobile) */}
         {mode === 'cards' && cards.length > 0 && (
-          <button
-            onClick={openCreate}
-            className={`${toolbarBtn} flex w-full items-center justify-center gap-1.5 border-amber-600 bg-amber-700 font-sans text-amber-50 shadow-md hover:bg-amber-600 sm:w-auto print:hidden`}
-          >
-            <IconAdd className="size-4" aria-hidden="true" />
-            Ajouter une caractéristique
-          </button>
+          <div className="flex gap-2 print:hidden">
+            <button
+              onClick={openCreate}
+              className={`${toolbarBtn} flex flex-1 items-center justify-center gap-1.5 border-amber-600 bg-amber-700 font-sans text-amber-50 shadow-md hover:bg-amber-600 sm:flex-none`}
+            >
+              <IconAdd className="size-4" aria-hidden="true" />
+              Ajouter une caractéristique
+            </button>
+
+            <button
+              onClick={openDetection}
+              disabled={allSheets.length === 0}
+              title="Repérer les noms de fiches dans toutes les cartes"
+              aria-label="Détecter les fiches dans toutes les cartes"
+              className={`${toolbarBtn} flex shrink-0 items-center justify-center gap-1.5 border-amber-800/50 bg-amber-950/40 font-sans text-amber-200 hover:bg-amber-900/50 disabled:cursor-not-allowed disabled:opacity-40`}
+            >
+              <span aria-hidden="true">✦</span>
+              <span className="hidden sm:inline">Détecter les fiches</span>
+            </button>
+          </div>
         )}
 
         {cards.length === 0 ? (
@@ -460,6 +489,7 @@ export function SheetPage() {
                 onEdit={openEdit}
                 onDelete={(target) => void deleteCard(target)}
                 onSaveDescription={saveCardDescription}
+                onEditorChange={registerEditor}
               />
             ))}
           </div>
@@ -486,6 +516,10 @@ export function SheetPage() {
         onClose={() => setIsAttachOpen(false)}
         onAttached={reload}
       />
+
+      {detectTargets && (
+        <MentionDetection targets={detectTargets} sheets={allSheets} onClose={() => setDetectTargets(null)} />
+      )}
     </div>
   );
 }
