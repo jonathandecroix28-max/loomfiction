@@ -161,18 +161,18 @@ export function ChapterVersionsPage() {
 
               <div className="border-t border-amber-900/30 pt-6 mt-2 flex flex-col gap-4">
                 <div className="flex flex-wrap items-center justify-between gap-4 font-sans">
-                  <div className="flex p-1 bg-neutral-950/50 rounded-lg border border-amber-900/30">
+                  <div className="flex w-full sm:w-auto p-1 bg-neutral-950/50 rounded-lg border border-amber-900/30">
                     <button
                       onClick={() => setShowPreview(false)}
-                      className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${!showPreview ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'}`}
+                      className={`flex-1 sm:flex-none px-2 sm:px-4 py-2 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${!showPreview ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'}`}
                     >
-                      Comparatif par ligne
+                      Ligne par ligne
                     </button>
                     <button
                       onClick={() => setShowPreview(true)}
-                      className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${showPreview ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'}`}
+                      className={`flex-1 sm:flex-none px-2 sm:px-4 py-2 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${showPreview ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'}`}
                     >
-                      Aperçu de la fusion
+                      Aperçu final
                     </button>
                   </div>
 

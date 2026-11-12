@@ -178,8 +178,11 @@ export function VersionsSection({
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-1.5 pl-6 md:pl-0 min-w-0">
-                      {renderContext(folder.sampleRow)}
+                    {/* Pastilles sur une ligne scrollable pour mobile */}
+                    <div className="pl-6 md:pl-0 min-w-0 overflow-x-auto snap-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      <div className="flex items-center gap-1.5 min-w-max pb-0.5 pr-2">
+                        {renderContext(folder.sampleRow)}
+                      </div>
                     </div>
 
                     <div className="pl-6 md:pl-0 flex items-center gap-2">
@@ -193,7 +196,7 @@ export function VersionsSection({
                     </div>
 
                     <div
-                      className="pl-6 md:pl-0 flex items-center justify-end gap-2"
+                      className="pl-6 md:pl-0 flex items-center justify-start md:justify-end gap-2"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {isFolderComparing && selectedCount === 2 && (

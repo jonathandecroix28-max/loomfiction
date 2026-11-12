@@ -269,12 +269,12 @@ export function SheetVersionsPage() {
   if (error || sheetError || !sheet) return <VersionsError message={error ?? 'Cette fiche n’existe plus ou est introuvable.'} />;
 
   const segment = (active: boolean) =>
-    `px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+    `flex-1 sm:flex-none px-2 sm:px-4 py-2 sm:py-1.5 text-[11px] sm:text-sm font-medium rounded-md transition-colors cursor-pointer text-center ${
       active ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'
     }`;
 
   const bulkBtn =
-    'cursor-pointer rounded-lg border border-amber-900/30 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-amber-200 transition-colors hover:bg-neutral-800';
+    'flex-1 sm:flex-none cursor-pointer rounded-lg border border-amber-900/30 bg-neutral-900 px-3 py-2 sm:py-1.5 text-xs font-medium text-amber-200 transition-colors hover:bg-neutral-800 text-center';
 
   const sideBox = (kind: 'current' | 'version', row: CardRow) => {
     const isCurrent = kind === 'current';
@@ -365,7 +365,7 @@ export function SheetVersionsPage() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 font-sans">
-                <div className="flex p-1 bg-neutral-950/50 rounded-lg border border-amber-900/30">
+                <div className="flex w-full sm:w-auto p-1 bg-neutral-950/50 rounded-lg border border-amber-900/30">
                   <button onClick={() => setShowPreview(false)} className={segment(!showPreview)}>
                     Comparatif par carte
                   </button>
@@ -420,7 +420,7 @@ export function SheetVersionsPage() {
                         : `${counts.changed} modifiée${counts.changed > 1 ? 's' : ''} · ${counts.added} supprimée${counts.added > 1 ? 's' : ''} depuis · ${counts.removed} ajoutée${counts.removed > 1 ? 's' : ''} depuis · ${counts.same} identique${counts.same > 1 ? 's' : ''}`}
                     </p>
                     {differences > 0 && (
-                      <div className="flex gap-2">
+                      <div className="flex w-full sm:w-auto gap-2">
                         <button onClick={() => applyAll('current')} className={bulkBtn}>
                           Tout l’actuel
                         </button>
@@ -465,7 +465,7 @@ export function SheetVersionsPage() {
                                       key={value}
                                       onClick={() => setChoices((current) => ({ ...current, [row.key]: value }))}
                                       aria-pressed={choice === value}
-                                      className={`px-3 py-2 rounded-md text-xs border cursor-pointer touch-target ${
+                                      className={`px-3 py-2 rounded-md text-xs border cursor-pointer touch-target flex-1 sm:flex-none text-center ${
                                         choice === value
                                           ? 'bg-amber-700 text-amber-50 border-amber-600'
                                           : 'bg-neutral-900 text-amber-200 border-amber-900/30'
