@@ -16,25 +16,12 @@ import type { IdeaResponse } from '../types/idea';
 import type { IdeaVersionResponse } from '../types/ideaVersion';
 import type { SheetResponse } from '../types/sheet';
 import type { SheetVersion } from '../types/sheetVersion';
-import { IconBooks, IconDelete, IconGlobe, IconSheet } from '../components/icons';
+import { IconBooks, IconGlobe, IconSheet } from '../components/icons';
 import { useConfirm, useToast } from '../components/feedback/FeedbackProvider';
-
-interface VersionRow {
-  key: string;
-  versionId: number;
-  kind: 'chapter' | 'idea' | 'sheet';
-  versionNumber: number | string;
-  versionName: string;
-  updatedAt: string;
-  parentTitle: string;
-  missing: boolean;
-  bookId: number | null;
-  chapterNumber?: number;
-  categoryId?: number | null;
-  sheetId?: number | null;
-  cardCount?: number;
-  openPath: string | null;
-}
+import { VersionsSection } from '../components/versions/VersionsSection';
+import { HubCompareModal } from '../components/versions/HubCompareModal';
+import type { VersionRow } from '../components/versionsHubTypes';
+import { htmlToPlainText } from '../utils/versions/sanitizeHtml';
 
 interface Loaded {
   books: BookResponse[];
@@ -42,7 +29,6 @@ interface Loaded {
   ideas: { version: IdeaVersionResponse; idea: IdeaResponse | null }[];
   sheets: SheetResponse[];
   sheetVersions: SheetVersion[];
-  /** Roman de chaque fiche, déduit de ses cartes. */
   sheetBooks: Map<number, number | null>;
 }
 
@@ -57,149 +43,8 @@ function cached<T>(cache: Map<number, Promise<T | null>>, id: number, fetch: (id
   return promise;
 }
 
-const pill = 'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[11px] font-medium';
-
-type VersionsSectionProps = {
-  title: string;
-  subtitle: string;
-  tag: string;
-  emptyLabel: string;
-  contextLabel: string;
-  rows: VersionRow[];
-  renderContext: (row: VersionRow) => ReactNode;
-  onOpen: (path: string) => void;
-  onDelete: (row: VersionRow) => void;
-};
-
-function VersionsSection({ title, subtitle, tag, emptyLabel, contextLabel, rows, renderContext, onOpen, onDelete }: VersionsSectionProps) {
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
-  const totalPages = Math.ceil(rows.length / pageSize);
-
-  const [prevRows, setPrevRows] = useState(rows);
-  if (rows !== prevRows) {
-    setPrevRows(rows);
-    setPage(1);
-  }
-
-  const paginatedRows = rows.slice((page - 1) * pageSize, page * pageSize);
-
-  const actionButtons = (row: VersionRow, className = '') => (
-    <div className={`flex items-center gap-1.5 sm:gap-2 ${className}`}>
-      <button
-        onClick={() => row.openPath && onOpen(row.openPath)}
-        disabled={!row.openPath}
-        className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-amber-700 hover:bg-amber-600 text-amber-50 text-[10px] sm:text-xs font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-      >
-        {row.openPath ? 'Ouvrir' : 'N/A'}
-      </button>
-      <button
-        onClick={() => onDelete(row)}
-        className="px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg bg-red-950/40 hover:bg-red-900/80 text-red-400 border border-red-900/30 text-[10px] sm:text-xs transition-colors cursor-pointer"
-        title="Supprimer cette version"
-        aria-label="Supprimer cette version"
-      >
-        <IconDelete className="size-4" aria-hidden="true" />
-      </button>
-    </div>
-  );
-
-  return (
-    <section className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/55 shadow-xl overflow-hidden">
-      <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-amber-900/20 flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl font-bold text-amber-100">{title}</h2>
-          <p className="text-xs sm:text-sm text-amber-200/50">{subtitle}</p>
-        </div>
-        <div className="hidden sm:block text-xs text-amber-200/40 uppercase tracking-[0.22em] shrink-0">{tag}</div>
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="px-5 py-10 text-center text-amber-200/60">{emptyLabel}</div>
-      ) : (
-        <>
-          {/* Mobile : liste extrêmement compacte sur une seule ligne */}
-          <ul className="md:hidden divide-y divide-amber-900/10">
-            {paginatedRows.map((row) => (
-              <li key={row.key} className="p-2.5 sm:p-3 flex items-start gap-2.5">
-                <span className="mt-0.5 inline-flex h-7 min-w-7 sm:h-9 sm:min-w-9 px-1 shrink-0 items-center justify-center rounded-full border border-amber-800/40 bg-amber-950 text-amber-300 text-[10px] sm:text-xs font-bold">
-                  v{row.versionNumber}
-                </span>
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="font-semibold text-amber-100 truncate text-xs sm:text-sm">{row.parentTitle}</div>
-                  <div className="flex flex-wrap gap-1">{renderContext(row)}</div>
-                  <div className="text-[9px] sm:text-[11px] text-amber-200/50">
-                    {new Date(row.updatedAt).toLocaleDateString()}
-                    {row.versionName && ` · ${row.versionName}`}
-                  </div>
-                </div>
-                {actionButtons(row, 'shrink-0')}
-              </li>
-            ))}
-          </ul>
-
-          <div className="hidden md:block overflow-x-auto">
-            <table className="min-w-full divide-y divide-amber-900/20">
-              <thead className="bg-neutral-950/80">
-                <tr className="text-left text-xs uppercase tracking-[0.22em] text-amber-200/40">
-                  <th className="px-5 py-4 font-medium">Nom</th>
-                  <th className="px-5 py-4 font-medium">{contextLabel}</th>
-                  <th className="px-5 py-4 font-medium">Version</th>
-                  <th className="px-5 py-4 font-medium">Mise à jour</th>
-                  <th className="px-5 py-4 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-amber-900/10">
-                {paginatedRows.map((row) => (
-                  <tr key={row.key} className="hover:bg-neutral-900/50 transition-colors">
-                    <td className="px-5 py-4 max-w-xs">
-                      <div className="font-semibold text-amber-100 truncate">{row.parentTitle}</div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex flex-wrap gap-1.5">{renderContext(row)}</div>
-                    </td>
-                    <td className="px-5 py-4 text-amber-100 whitespace-nowrap">
-                      v{row.versionNumber}
-                      {row.versionName && <div className="max-w-40 truncate text-xs text-amber-200/40">{row.versionName}</div>}
-                    </td>
-                    <td className="px-5 py-4 text-amber-200/70 text-sm whitespace-nowrap">
-                      {new Date(row.updatedAt).toLocaleString()}
-                    </td>
-                    <td className="px-5 py-4">{actionButtons(row)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {totalPages > 1 && (
-            <div className="px-5 py-4 border-t border-amber-900/20 flex items-center justify-between">
-              <span className="text-[10px] sm:text-xs text-amber-200/50">
-                Page {page}/{totalPages} ({rows.length})
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-200/80 text-[10px] sm:text-xs disabled:opacity-50 transition-colors cursor-pointer"
-                >
-                  Précédent
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-amber-200/80 text-[10px] sm:text-xs disabled:opacity-50 transition-colors cursor-pointer"
-                >
-                  Suivant
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </section>
-  );
-}
+const pill =
+  'inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border px-2 sm:px-2.5 py-0.5 text-[10px] sm:text-[11px] font-sans font-medium whitespace-nowrap';
 
 export function VersionsHubPage() {
   const navigate = useNavigate();
@@ -221,6 +66,12 @@ export function VersionsHubPage() {
   const [search, setSearch] = useState('');
   const [bookFilter, setBookFilter] = useState('all');
 
+  const [activeCompare, setActiveCompare] = useState<{
+    parentTitle: string;
+    versionA: VersionRow;
+    versionB: VersionRow;
+  } | null>(null);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -235,7 +86,6 @@ export function VersionsHubPage() {
           offlineBookService.getAll(),
         ]);
 
-        // Fiches : un souci ici ne doit pas empêcher d'afficher les chapitres et les idées
         const [sheetVersions, sheets, allIdeas] = await Promise.all([
           offlineSheetVersionService.getAll(),
           offlineSheetService.getAll(),
@@ -245,7 +95,6 @@ export function VersionsHubPage() {
           return [[], [], []];
         });
 
-        // Le roman d'une fiche est celui de ses cartes
         const cardsBySheet = new Map<number, IdeaResponse[]>();
         for (const idea of allIdeas ?? []) {
           if (idea.sheetId == null) continue;
@@ -292,7 +141,6 @@ export function VersionsHubPage() {
     };
 
     load();
-
     return () => {
       cancelled = true;
     };
@@ -327,24 +175,39 @@ export function VersionsHubPage() {
           sheetVersions: prev.sheetVersions.filter((v) => v.id !== row.versionId),
         }));
       }
+      toast.success(`Version v${row.versionNumber} supprimée.`);
     } catch (err) {
       console.error('Erreur lors de la suppression de la version :', err);
       toast.error('Impossible de supprimer la version.');
     }
   };
 
-  const bookTitleById = useMemo(() => new Map(loaded.books.map((book) => [book.id, book.title] as const)), [loaded.books]);
-  const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category] as const)), [categories]);
-  const sheetById = useMemo(() => new Map(loaded.sheets.map((sheet) => [sheet.id, sheet] as const)), [loaded.sheets]);
-  const sheetNameById = useMemo(() => new Map(loaded.sheets.map((sheet) => [sheet.id, sheet.name] as const)), [loaded.sheets]);
+  const bookTitleById = useMemo(
+    () => new Map(loaded.books.map((book) => [book.id, book.title] as const)),
+    [loaded.books]
+  );
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category] as const)),
+    [categories]
+  );
+  const sheetById = useMemo(
+    () => new Map(loaded.sheets.map((sheet) => [sheet.id, sheet] as const)),
+    [loaded.sheets]
+  );
+  const sheetNameById = useMemo(
+    () => new Map(loaded.sheets.map((sheet) => [sheet.id, sheet.name] as const)),
+    [loaded.sheets]
+  );
 
-  const byNewest = (a: VersionRow, b: VersionRow) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  const byNewest = (a: VersionRow, b: VersionRow) =>
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
 
   const chapterRows = useMemo<VersionRow[]>(
     () =>
       loaded.chapters
         .map(({ version, chapter }): VersionRow => ({
           key: `chapter-${version.id}`,
+          parentKey: `chapter-parent-${version.chapterId}`,
           versionId: version.id,
           kind: 'chapter',
           versionNumber: version.versionNumber,
@@ -355,6 +218,9 @@ export function VersionsHubPage() {
           bookId: chapter ? Number(chapter.book_id) : null,
           chapterNumber: chapter?.chapter_number,
           openPath: chapter ? `/books/${chapter.book_id}/chapters/${chapter.id}/versions/${version.id}` : null,
+          parentEditorPath: chapter ? `/books/${chapter.book_id}/chapters/${chapter.id}` : null,
+          rawTextContent: version.content ?? '',
+          isRichText: true,
         }))
         .sort(byNewest),
     [loaded.chapters]
@@ -365,6 +231,7 @@ export function VersionsHubPage() {
       loaded.ideas
         .map(({ version, idea }): VersionRow => ({
           key: `idea-${version.id}`,
+          parentKey: `idea-parent-${version.ideaId}`,
           versionId: version.id,
           kind: 'idea',
           versionNumber: version.versionNumber,
@@ -376,6 +243,12 @@ export function VersionsHubPage() {
           categoryId: idea?.categoryId ?? null,
           sheetId: idea?.sheetId ?? null,
           openPath: idea ? `/ideas/${idea.id}/versions/${version.id}` : null,
+          parentEditorPath: idea ? `/ideas/${idea.id}` : null,
+          rawTextContent:
+            (version as unknown as { content?: string; description?: string }).content ??
+            (version as unknown as { description?: string }).description ??
+            '',
+          isRichText: true,
         }))
         .sort(byNewest),
     [loaded.ideas]
@@ -386,12 +259,15 @@ export function VersionsHubPage() {
       loaded.sheetVersions
         .map((version): VersionRow => {
           const sheet = sheetById.get(version.sheetId);
+          const cardsSummary = version.cards.map(
+            (c) => `— ${c.name}${c.description ? ` : ${htmlToPlainText(c.description)}` : ''}`
+          );
           return {
             key: `sheet-${version.id}`,
+            parentKey: `sheet-parent-${version.sheetId}`,
             versionId: version.id,
             kind: 'sheet',
             versionNumber: version.versionNumber,
-            // le nom de la version est celui de la fiche à l'époque : utile seulement s'il a changé
             versionName: sheet && version.name !== sheet.name ? version.name ?? '' : '',
             updatedAt: version.updatedAt,
             parentTitle: sheet ? sheet.name : version.name || 'Fiche supprimée',
@@ -401,13 +277,18 @@ export function VersionsHubPage() {
             sheetId: sheet?.id ?? null,
             cardCount: version.cards.length,
             openPath: sheet ? `/ideas/fiches/${sheet.id}/versions/${version.id}` : null,
+            parentEditorPath: sheet ? `/ideas/fiches/${sheet.id}` : null,
+            rawTextContent: cardsSummary.join('\n') || 'Aucune carte dans cette version.',
+            isRichText: false,
+            sheetCardsSummary: cardsSummary,
           };
         })
         .sort(byNewest),
     [loaded.sheetVersions, loaded.sheetBooks, sheetById]
   );
 
-  const bookLabel = (row: VersionRow): string | null => (row.bookId == null ? null : bookTitleById.get(row.bookId) ?? 'Roman introuvable');
+  const bookLabel = (row: VersionRow): string | null =>
+    row.bookId == null ? null : bookTitleById.get(row.bookId) ?? 'Roman introuvable';
 
   const query = fold(search.trim());
   const matches = (row: VersionRow) => {
@@ -420,7 +301,9 @@ export function VersionsHubPage() {
     if (!query) return true;
     const category = row.categoryId != null ? categoryById.get(row.categoryId)?.name : '';
     const sheet = row.sheetId != null ? sheetNameById.get(row.sheetId) : '';
-    return fold([row.parentTitle, row.versionName, bookLabel(row) ?? '', category ?? '', sheet ?? ''].join('\n')).includes(query);
+    return fold(
+      [row.parentTitle, row.versionName, bookLabel(row) ?? '', category ?? '', sheet ?? ''].join('\n')
+    ).includes(query);
   };
 
   const visibleChapters = chapterRows.filter(matches);
@@ -444,39 +327,34 @@ export function VersionsHubPage() {
     return (
       <>
         {book ? (
-          <span className={`${pill} border-amber-800/40 bg-amber-950 text-amber-300`}>
-            <IconBooks className="size-3.5" aria-hidden="true" />
-            <span className="truncate">{book}</span>
+          <span className={`${pill} border-amber-800/40 bg-amber-950 text-amber-300`} title={book}>
+            <IconBooks className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="truncate max-w-[10rem] sm:max-w-[13rem]">{book}</span>
           </span>
         ) : (
           <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200/70`}>
-            <IconGlobe className="size-3.5" aria-hidden="true" />
-            {row.kind === 'chapter' ? 'Roman inconnu' : 'Carnet global'}
+            <IconGlobe className="size-3.5 shrink-0" aria-hidden="true" />
+            <span>{row.kind === 'chapter' ? 'Roman inconnu' : 'Carnet global'}</span>
           </span>
         )}
 
         {row.kind === 'chapter' && row.chapterNumber != null && (
-          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>Chap {row.chapterNumber}</span>
-        )}
-
-        {(row.kind === 'idea' || row.kind === 'sheet') && category && (
           <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>
-            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: category.color }} />
-            <span className="truncate">{category.name}</span>
+            Chap {row.chapterNumber}
           </span>
         )}
 
-        {row.kind === 'sheet' && row.cardCount != null && (
-          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>
-            <IconSheet className="size-3.5" aria-hidden="true" />
-            {row.cardCount} {row.cardCount > 1 ? 'cartes' : 'carte'}
+        {(row.kind === 'idea' || row.kind === 'sheet') && category && (
+          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`} title={category.name}>
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: category.color }} />
+            <span className="truncate max-w-[9rem] sm:max-w-[11rem]">{category.name}</span>
           </span>
         )}
 
         {row.kind === 'idea' && row.sheetId != null && (
-          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`}>
-            <IconSheet className="size-3.5" aria-hidden="true" />
-            <span className="truncate">{sheet ?? 'Fiche introuvable'}</span>
+          <span className={`${pill} border-amber-900/30 bg-neutral-900 text-amber-200`} title={sheet ?? 'Fiche introuvable'}>
+            <IconSheet className="size-3.5 shrink-0" aria-hidden="true" />
+            <span className="truncate max-w-[9rem] sm:max-w-[11rem]">{sheet ?? 'Fiche introuvable'}</span>
           </span>
         )}
 
@@ -502,17 +380,22 @@ export function VersionsHubPage() {
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-5 sm:py-10 space-y-5 sm:space-y-8">
         <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-amber-200/40 mb-1 sm:mb-2">Administration</p>
+            <p className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-amber-200/40 mb-1 sm:mb-2">
+              Administration
+            </p>
             <h1 className="text-2xl sm:text-4xl font-bold text-amber-100">Versions</h1>
             <p className="text-sm sm:text-base text-amber-200/55 mt-1 sm:mt-2 max-w-2xl">
-              Accédez aux tableaux de versions pour les chapitres, les idées et les fiches depuis un point d’entrée unique.
+              Explorez les dossiers de versions des chapitres, des idées et des fiches, et comparez leurs révisions.
             </p>
           </div>
         </section>
 
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
           {stats.map((stat) => (
-            <div key={stat.label} className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/60 p-3 sm:p-6 shadow-xl">
+            <div
+              key={stat.label}
+              className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/60 p-3 sm:p-6 shadow-xl"
+            >
               <div className="text-[10px] sm:text-xs uppercase tracking-[0.18em] sm:tracking-[0.28em] text-amber-200/40 mb-1 sm:mb-2 truncate">
                 {stat.label}
               </div>
@@ -524,7 +407,9 @@ export function VersionsHubPage() {
         <section className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/55 p-3 sm:p-5 shadow-xl">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,16rem)_auto] sm:items-end">
             <div>
-              <label className="block text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-1.5">Rechercher</label>
+              <label className="block text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-1.5">
+                Rechercher
+              </label>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -533,8 +418,14 @@ export function VersionsHubPage() {
               />
             </div>
             <div>
-              <label className="block text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-1.5">Roman</label>
-              <select value={bookFilter} onChange={(event) => setBookFilter(event.target.value)} className={`${inputClass} cursor-pointer`}>
+              <label className="block text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-1.5">
+                Roman
+              </label>
+              <select
+                value={bookFilter}
+                onChange={(event) => setBookFilter(event.target.value)}
+                className={`${inputClass} cursor-pointer`}
+              >
                 <option value="all">Tous les romans</option>
                 <option value="none">Sans roman (carnet global)</option>
                 {[...loaded.books]
@@ -572,7 +463,7 @@ export function VersionsHubPage() {
           <>
             <VersionsSection
               title="Versions des chapitres"
-              subtitle="Accès direct à chaque chapitre et à son historique"
+              subtitle="Cliquez sur un chapitre pour déplier ses versions et les comparer"
               tag="Chapter versions"
               emptyLabel={filtering ? 'Aucune version de chapitre ne correspond.' : 'Aucune version de chapitre.'}
               contextLabel="Roman / chapitre"
@@ -580,11 +471,14 @@ export function VersionsHubPage() {
               renderContext={renderContext}
               onOpen={navigate}
               onDelete={handleDeleteVersion}
+              onComparePair={(parentTitle, versionA, versionB) =>
+                setActiveCompare({ parentTitle, versionA, versionB })
+              }
             />
 
             <VersionsSection
               title="Versions des idées"
-              subtitle="Accès direct à chaque idée et à son historique"
+              subtitle="Cliquez sur une idée pour déplier ses versions et les comparer"
               tag="Idea versions"
               emptyLabel={filtering ? 'Aucune version d’idée ne correspond.' : 'Aucune version d’idée.'}
               contextLabel="Roman / catégorie / fiche"
@@ -592,11 +486,14 @@ export function VersionsHubPage() {
               renderContext={renderContext}
               onOpen={navigate}
               onDelete={handleDeleteVersion}
+              onComparePair={(parentTitle, versionA, versionB) =>
+                setActiveCompare({ parentTitle, versionA, versionB })
+              }
             />
 
             <VersionsSection
               title="Versions des fiches"
-              subtitle="Accès direct à chaque fiche et à son historique"
+              subtitle="Cliquez sur une fiche pour déplier ses versions et comparer leurs cartes"
               tag="Sheet versions"
               emptyLabel={filtering ? 'Aucune version de fiche ne correspond.' : 'Aucune version de fiche.'}
               contextLabel="Roman / catégorie"
@@ -604,10 +501,26 @@ export function VersionsHubPage() {
               renderContext={renderContext}
               onOpen={navigate}
               onDelete={handleDeleteVersion}
+              onComparePair={(parentTitle, versionA, versionB) =>
+                setActiveCompare({ parentTitle, versionA, versionB })
+              }
             />
           </>
         )}
       </main>
+
+      {activeCompare && (
+        <HubCompareModal
+          parentTitle={activeCompare.parentTitle}
+          versionA={activeCompare.versionA}
+          versionB={activeCompare.versionB}
+          onClose={() => setActiveCompare(null)}
+          onOpenVersion={(path) => {
+            setActiveCompare(null);
+            navigate(path);
+          }}
+        />
+      )}
     </div>
   );
 }
