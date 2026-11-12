@@ -1,14 +1,39 @@
 import type { Annotation } from './types';
 
+export type Resolution = 'same' | 'refresh' | 'moved' | 'edited';
+
 export interface ResolvedAnnotation {
   annotation: Annotation;
   start: number;
   end: number;
+  how: Resolution;
+}
+
+export interface ResolveResult {
+  resolved: ResolvedAnnotation[];
+  lost: Annotation[];
+}
+
+export interface AnchorPatch {
+  id: string;
+  start: number;
+  end: number;
+  exact: string;
+  prefix: string;
+  suffix: string;
+  quote?: string;
 }
 
 const CONTEXT_LENGTH = 24;
+const HEAD_TAIL = 16;
 
 export const normalizeQuote = (value: string) => value.replace(/[ \t\r\n]+/g, ' ').trim();
+
+export function plainText(html: string): string {
+  const holder = document.createElement('template');
+  holder.innerHTML = html;
+  return holder.content.textContent ?? '';
+}
 
 function offsetOf(root: Node, node: Node, offset: number): number {
   const range = document.createRange();
@@ -33,41 +58,114 @@ export function anchorFor(fullText: string, start: number, end: number) {
 }
 
 
-export function resolveAnnotations(fullText: string, annotations: Annotation[]): ResolvedAnnotation[] {
-  const resolved: ResolvedAnnotation[] = [];
+const contextScore = (text: string, from: number, to: number, a: Annotation) =>
+  (a.prefix && text.slice(Math.max(0, from - a.prefix.length), from) === a.prefix ? 1 : 0) +
+  (a.suffix && text.slice(to, to + a.suffix.length) === a.suffix ? 1 : 0);
 
-  for (const annotation of annotations) {
-    const { start, end, exact, prefix, suffix } = annotation;
+function findMoved(text: string, a: Annotation): number | null {
+  const { exact, start } = a;
+  let best = -1;
+  let bestScore = -1;
+  let bestDistance = Infinity;
 
-    if (fullText.slice(start, end) === exact) {
-      resolved.push({ annotation, start, end });
-      continue;
-    }
-    if (!exact) continue;
-
-    let best = -1;
-    let bestScore = -1;
-    let bestDistance = Infinity;
-
-    for (let from = fullText.indexOf(exact); from !== -1; from = fullText.indexOf(exact, from + 1)) {
-      let score = 0;
-      if (prefix && fullText.slice(Math.max(0, from - prefix.length), from) === prefix) score += 1;
-      if (suffix && fullText.slice(from + exact.length, from + exact.length + suffix.length) === suffix) score += 1;
-      const distance = Math.abs(from - start);
-
-      if (score > bestScore || (score === bestScore && distance < bestDistance)) {
-        best = from;
-        bestScore = score;
-        bestDistance = distance;
-      }
-    }
-
-    if (best !== -1 && (bestScore > 0 || exact.length >= 20)) {
-      resolved.push({ annotation, start: best, end: best + exact.length });
+  for (let from = text.indexOf(exact); from !== -1; from = text.indexOf(exact, from + 1)) {
+    const score = contextScore(text, from, from + exact.length, a);
+    const distance = Math.abs(from - start);
+    if (score > bestScore || (score === bestScore && distance < bestDistance)) {
+      best = from;
+      bestScore = score;
+      bestDistance = distance;
     }
   }
 
-  return resolved.sort((a, b) => a.start - b.start || b.end - a.end);
+  return best !== -1 && (bestScore > 0 || exact.length >= 20) ? best : null;
+}
+
+function findEdited(text: string, a: Annotation): { from: number; to: number } | null {
+  const { exact, prefix, suffix, start } = a;
+
+  if (exact.length >= 24) {
+    const k = Math.min(HEAD_TAIL, Math.floor(exact.length / 3));
+    const head = exact.slice(0, k);
+    const tail = exact.slice(-k);
+    const maxLength = Math.round(exact.length * 1.8) + 40;
+    let best: { from: number; to: number; cost: number } | null = null;
+    let tried = 0;
+
+    for (let h = text.indexOf(head); h !== -1 && tried < 40; h = text.indexOf(head, h + 1), tried += 1) {
+      for (let t = text.indexOf(tail, h + k); t !== -1 && t + k - h <= maxLength; t = text.indexOf(tail, t + 1)) {
+        const to = t + k;
+        const cost = Math.abs(to - h - exact.length) + Math.abs(h - start) * 0.01 - contextScore(text, h, to, a) * 40;
+        if (!best || cost < best.cost) best = { from: h, to, cost };
+      }
+    }
+    if (best) return { from: best.from, to: best.to };
+  }
+
+  if (prefix.length >= 12 && suffix.length >= 12) {
+    const maxGap = Math.max(200, exact.length * 3);
+    let best: { from: number; to: number } | null = null;
+
+    for (let p = text.indexOf(prefix); p !== -1; p = text.indexOf(prefix, p + 1)) {
+      const from = p + prefix.length;
+      const s = text.indexOf(suffix, from);
+      if (s === -1 || s - from < 3 || s - from > maxGap) continue;
+      if (!best || Math.abs(from - start) < Math.abs(best.from - start)) best = { from, to: s };
+    }
+    if (best) return best;
+  }
+
+  return null;
+}
+
+
+export function resolveAnnotations(text: string, annotations: Annotation[]): ResolveResult {
+  const resolved: ResolvedAnnotation[] = [];
+  const lost: Annotation[] = [];
+
+  for (const annotation of annotations) {
+    const { start, end, exact } = annotation;
+
+    if (!exact) {
+      lost.push(annotation);
+      continue;
+    }
+
+    if (text.slice(start, end) === exact) {
+      const fresh = anchorFor(text, start, end);
+      const same = fresh.prefix === annotation.prefix && fresh.suffix === annotation.suffix;
+      resolved.push({ annotation, start, end, how: same ? 'same' : 'refresh' });
+      continue;
+    }
+
+    const moved = findMoved(text, annotation);
+    if (moved !== null) {
+      resolved.push({ annotation, start: moved, end: moved + exact.length, how: 'moved' });
+      continue;
+    }
+
+    const edited = findEdited(text, annotation);
+    if (edited) {
+      resolved.push({ annotation, start: edited.from, end: edited.to, how: 'edited' });
+      continue;
+    }
+
+    lost.push(annotation);
+  }
+
+  resolved.sort((a, b) => a.start - b.start || b.end - a.end);
+  return { resolved, lost };
+}
+
+export function toAnchorPatch(text: string, item: ResolvedAnnotation): AnchorPatch {
+  const anchor = anchorFor(text, item.start, item.end);
+  return {
+    id: item.annotation.id,
+    start: item.start,
+    end: item.end,
+    ...anchor,
+    quote: item.how === 'edited' ? normalizeQuote(anchor.exact) : undefined,
+  };
 }
 
 

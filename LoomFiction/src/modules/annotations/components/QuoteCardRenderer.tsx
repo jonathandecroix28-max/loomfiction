@@ -112,7 +112,6 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 
     if (line) {
       lines.push(line);
-      line = '';
     }
 
     if (ctx.measureText(word).width <= maxWidth) {

@@ -61,7 +61,6 @@ export function AnnotatedChapter({
   const [quoteText, setQuoteText] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [positions, setPositions] = useState<Record<string, number>>({});
-  // Ordre de lecture des annotations et numéro de chaque note : c'est ce qui permet de s'y retrouver
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [noteNumbers, setNoteNumbers] = useState<Record<string, number>>({});
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -86,8 +85,8 @@ export function AnnotatedChapter({
     const root = rootRef.current;
     if (!root) return;
     clearHighlights(root);
-    applyHighlights(root, resolveAnnotations(root.textContent ?? '', annotations));
-
+    applyHighlights(root, resolveAnnotations(root.textContent ?? '', annotations).resolved);
+    
     const byId = new Map(annotations.map((annotation) => [annotation.id, annotation]));
     const order: string[] = [];
     const numbers: Record<string, number> = {};
