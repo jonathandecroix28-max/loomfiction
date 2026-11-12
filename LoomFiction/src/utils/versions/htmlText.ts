@@ -1,10 +1,4 @@
-/**
- * Texte riche (HTML de l'éditeur) <-> phrases sans balises, pour les pages « Versions ».
- *
- * Les pages affichent et comparent des phrases ; la fusion, elle, doit rendre du HTML pour ne pas
- * perdre la mise en forme ni les mentions de fiches. On découpe donc le HTML en blocs (un paragraphe,
- * un titre, un élément de liste…) : le texte du bloc sert à comparer, son HTML d'origine sert à fusionner.
- */
+import { sanitizeRichHtml } from './sanitizeHtml';
 
 export interface TextBlock {
   text: string;
@@ -33,7 +27,8 @@ function readText(node: Node): string {
 export function htmlToBlocks(html: string): TextBlock[] {
   if (!html.trim()) return [];
 
-  const { body } = new DOMParser().parseFromString(html, 'text/html');
+  const cleanHtml = sanitizeRichHtml(html);
+  const { body } = new DOMParser().parseFromString(cleanHtml, 'text/html');
   const blocks: TextBlock[] = [];
 
   body.childNodes.forEach((node) => {
@@ -91,7 +86,6 @@ function blockPool(raw: string): Map<string, string[]> {
   return pool;
 }
 
-
 export function textToHtml(merged: string, currentRaw: string, versionRaw: string): string {
   if (!looksLikeHtml(currentRaw) && !looksLikeHtml(versionRaw)) return merged;
   if (!merged) return '';
@@ -109,5 +103,5 @@ export function textToHtml(merged: string, currentRaw: string, versionRaw: strin
     })
     .join('');
 
-  return html.replace(/<\/ul><ul>/g, '').replace(/<\/ol><ol>/g, '');
+  return sanitizeRichHtml(html.replace(/<\/ul><ul>/g, '').replace(/<\/ol><ol>/g, ''));
 }
