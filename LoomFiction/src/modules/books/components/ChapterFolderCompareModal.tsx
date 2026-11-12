@@ -87,7 +87,7 @@ export function ChapterFolderCompareModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
       <div className="bg-[#1c1411] border border-amber-700/40 rounded-3xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-amber-900/30 flex flex-wrap items-center justify-between gap-4 bg-neutral-950/90">
           <div>
@@ -123,26 +123,26 @@ export function ChapterFolderCompareModal({
 
             <div className="border-t border-amber-900/30 pt-6 mt-2 flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-4 font-sans">
-                <div className="flex p-1 bg-neutral-950/50 rounded-lg border border-amber-900/30">
+                <div className="flex p-1 bg-neutral-950/50 rounded-lg border border-amber-900/30 w-full sm:w-auto">
                   <button
                     onClick={() => setShowPreview(false)}
-                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                    className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors cursor-pointer ${
                       !showPreview
                         ? 'bg-amber-700 text-amber-50 shadow-sm'
                         : 'text-amber-200/70 hover:text-amber-200'
                     }`}
                   >
-                    Comparatif par ligne
+                    Ligne par ligne
                   </button>
                   <button
                     onClick={() => setShowPreview(true)}
-                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                    className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors cursor-pointer ${
                       showPreview
                         ? 'bg-amber-700 text-amber-50 shadow-sm'
                         : 'text-amber-200/70 hover:text-amber-200'
                     }`}
                   >
-                    Aperçu de la fusion
+                    Aperçu final
                   </button>
                 </div>
 

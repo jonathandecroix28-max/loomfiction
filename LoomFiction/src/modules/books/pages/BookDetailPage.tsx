@@ -266,7 +266,7 @@ export function BookDetailPage() {
           <div>
             <h2 className="text-2xl font-serif font-bold text-amber-100 flex items-center gap-2">
               <IconBooks className="size-5 shrink-0" aria-hidden="true" />
-              Table des matières & Dossiers de versions
+              Table des matières
             </h2>
             <p className="text-xs text-amber-200/50 mt-1">
               Ouvrez un chapitre pour explorer ses versions, les comparer ligne par ligne ou les fusionner.
@@ -384,7 +384,7 @@ export function BookDetailPage() {
                   </div>
 
                   {isOpen && (
-                    <div className="bg-black/40 border-t border-amber-900/20 px-4 sm:px-6 py-4 space-y-3">
+                    <div className="bg-neutral-950/50 border-t border-amber-900/20 px-4 sm:px-6 py-4 space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-[11px] uppercase tracking-widest text-amber-200/50 font-semibold">
                           Cochez 2 éléments pour les comparer ou les fusionner
@@ -419,7 +419,7 @@ export function BookDetailPage() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-bold text-amber-100 truncate">
-                                  Manuscrit actuel ({chapter.title})
+                                  Chapitre actuel ({chapter.title})
                                 </span>
                                 <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800/50 px-2 py-0.5 rounded-full shrink-0">
                                   En cours
@@ -570,7 +570,7 @@ export function BookDetailPage() {
               onClick={() => setIsCompareDrawerOpen(true)}
               className={`text-xs font-semibold px-4 py-2.5 rounded-xl transition ${
                 compareSelection.items.length === 2
-                  ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-md cursor-pointer'
+                  ? 'bg-amber-600 hover:bg-amber-500 text-amber-50 shadow-md cursor-pointer'
                   : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
               }`}
             >

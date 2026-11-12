@@ -205,7 +205,7 @@ export function VersionsSection({
                               selectedCompare.selected[1]
                             )
                           }
-                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-sans font-semibold shadow-md transition cursor-pointer whitespace-nowrap"
+                          className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-amber-50 text-xs font-sans font-semibold shadow-md transition cursor-pointer whitespace-nowrap"
                         >
                           Comparer (2)
                         </button>
@@ -230,7 +230,7 @@ export function VersionsSection({
                   </div>
 
                   {isOpen && (
-                    <div className="bg-black/40 border-t border-amber-900/20 px-3.5 sm:px-6 py-3.5">
+                    <div className="bg-neutral-950/50 border-t border-amber-900/20 px-3.5 sm:px-6 py-3.5">
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                         <span className="text-[11px] font-sans uppercase tracking-wider text-amber-200/50">
                           {folder.versions.length >= 2
@@ -252,7 +252,7 @@ export function VersionsSection({
                                     selectedCompare.selected[1]
                                   )
                                 }
-                                className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold cursor-pointer"
+                                className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-amber-50 text-xs font-semibold cursor-pointer"
                               >
                                 Lancer le comparatif
                               </button>

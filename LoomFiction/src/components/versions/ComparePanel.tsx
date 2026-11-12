@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { CompareMode } from '../../hooks/versions/useVersionCompare';
 import { toggleBtn } from '../../utils/versions/versionStyles';
 
@@ -7,12 +7,10 @@ import { toggleBtn } from '../../utils/versions/versionStyles';
 interface PanelProps {
   mode: CompareMode;
   onModeChange: (mode: CompareMode) => void;
-  /** « Actuel à gauche » (chapitre) ou « Actuelle à gauche » (idée). */
   currentLeftLabel: string;
   children: ReactNode;
 }
 
-/** Cadre de la comparaison : titre, bascule gauche/droite, puis le contenu (cartes, diff, fusion). */
 export function ComparePanel({ mode, onModeChange, currentLeftLabel, children }: PanelProps) {
   return (
     <section className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/70 p-3 sm:p-6 shadow-xl space-y-4 sm:space-y-6">
@@ -37,8 +35,6 @@ export function ComparePanel({ mode, onModeChange, currentLeftLabel, children }:
   );
 }
 
-/* ───────────────────────── Cartes côte à côte ───────────────────────── */
-
 export interface CardData {
   label: string;
   name: string;
@@ -55,16 +51,41 @@ interface CardsProps {
 
 export function CompareCards({ mode, current, version, renderBody, bodyClassName }: CardsProps) {
   const cards = mode === 'current-left' ? [current, version] : [version, current];
+  const [mobileTab, setMobileTab] = useState(0);
 
   return (
-    <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
-      {cards.map((card) => (
-        <article key={card.label} className="rounded-xl sm:rounded-2xl border border-amber-900/20 bg-neutral-950/60 p-3 sm:p-5 min-w-0">
-          <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-2">{card.label}</div>
-          <h3 className="text-lg sm:text-2xl font-bold text-amber-100 mb-2 wrap-break-word">{card.name}</h3>
-          <div className={bodyClassName}>{renderBody(card.body)}</div>
-        </article>
-      ))}
+    <div className="flex flex-col gap-3 sm:gap-4">
+      {/* Navigation par onglets (Uniquement sur mobile) */}
+      <div className="md:hidden flex p-1 bg-neutral-900/80 rounded-lg border border-amber-900/30">
+        {cards.map((card, idx) => (
+          <button
+            key={card.label}
+            onClick={() => setMobileTab(idx)}
+            className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+              mobileTab === idx
+                ? 'bg-amber-700 text-amber-50 shadow-sm'
+                : 'text-amber-200/70 hover:text-amber-200'
+            }`}
+          >
+            {card.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
+        {cards.map((card, idx) => (
+          <article
+            key={card.label}
+            className={`rounded-xl sm:rounded-2xl border border-amber-900/20 bg-neutral-950/60 p-3 sm:p-5 min-w-0 ${
+              mobileTab === idx ? 'block' : 'hidden md:block'
+            }`}
+          >
+            <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-2">{card.label}</div>
+            <h3 className="text-lg sm:text-2xl font-bold text-amber-100 mb-2 wrap-break-word">{card.name}</h3>
+            <div className={bodyClassName}>{renderBody(card.body)}</div>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }

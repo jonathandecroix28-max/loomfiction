@@ -51,7 +51,7 @@ export function HubCompareModal({
     htmlToPlainText(body) || 'Aucun contenu.';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
       <div className="bg-[#1c1411] border border-amber-700/40 rounded-3xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-amber-900/30 flex flex-wrap items-center justify-between gap-4 bg-neutral-950/90">
           <div>
