@@ -119,7 +119,6 @@ interface FilterBarProps {
   onSearch: (value: string) => void;
   sortBy: SortBy;
   onSort: (value: SortBy) => void;
-  /** Boutons d'action à droite (Snapshot, Tout reprendre…). */
   children?: ReactNode;
   actionsClassName?: string;
 }

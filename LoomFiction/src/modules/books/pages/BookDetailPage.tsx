@@ -190,7 +190,7 @@ export function BookDetailPage() {
   const bookCoverImage = legacyBook.cover_image || book.coverImage;
 
   return (
-    <div className="min-h-screen bg-[#1c1411] text-[#fcf9f2] px-4 sm:px-6 py-8 md:px-16 font-sans overflow-x-hidden pb-28">
+    <div className="min-h-screen bg-[#1c1411] text-[#fcf9f2] px-4 sm:px-6 py-8 md:px-16 font-sans overflow-x-hidden pb-32">
       <div className="max-w-4xl mx-auto">
         <button
           onClick={() => navigate('/books')}
@@ -540,14 +540,18 @@ export function BookDetailPage() {
       </div>
 
       {compareSelection.items.length > 0 && compareSelection.chapter && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-neutral-900/95 backdrop-blur-md border border-amber-500/50 text-amber-100 px-5 py-3.5 rounded-2xl shadow-2xl flex flex-wrap items-center justify-between gap-4 max-w-2xl w-[94%]">
-          <div className="min-w-0">
-            <p className="text-[11px] text-amber-400 font-semibold uppercase tracking-wider truncate">
+        <div className="fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-neutral-900/95 backdrop-blur-md border border-amber-500/50 text-amber-100 p-3 sm:px-5 sm:py-3.5 rounded-2xl shadow-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 max-w-2xl w-[92%] sm:w-[94%]">
+          <div className="min-w-0 text-center sm:text-left">
+            <p className="text-[10px] sm:text-[11px] text-amber-400 font-semibold uppercase tracking-wider truncate">
               Dossier : {compareSelection.chapter.title}
             </p>
-            <p className="text-sm font-serif truncate">
+            <p className="text-xs sm:text-sm font-serif truncate mt-0.5 sm:mt-0">
               {compareSelection.items.length === 1 ? (
-                `${compareSelection.items[0].label} — Sélectionnez une 2ᵉ version dans ce dossier`
+                <>
+                  {compareSelection.items[0].label}
+                  <span className="hidden sm:inline"> — Sélectionnez une 2ᵉ version dans ce dossier</span>
+                  <span className="sm:hidden text-amber-200/60"> — Cochez la 2ᵉ</span>
+                </>
               ) : (
                 <>
                   {compareSelection.items[0].label}
@@ -558,17 +562,17 @@ export function BookDetailPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 justify-center sm:justify-end">
             <button
               onClick={() => setCompareSelection({ chapter: null, items: [] })}
-              className="text-xs text-amber-200/60 hover:text-amber-100 px-3 py-2 cursor-pointer"
+              className="text-[11px] sm:text-xs text-amber-200/60 hover:text-amber-100 px-3 py-2 cursor-pointer"
             >
               Annuler
             </button>
             <button
               disabled={compareSelection.items.length < 2}
               onClick={() => setIsCompareDrawerOpen(true)}
-              className={`text-xs font-semibold px-4 py-2.5 rounded-xl transition ${
+              className={`text-[11px] sm:text-xs font-semibold px-4 py-2 sm:py-2.5 rounded-xl transition ${
                 compareSelection.items.length === 2
                   ? 'bg-amber-600 hover:bg-amber-500 text-amber-50 shadow-md cursor-pointer'
                   : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
