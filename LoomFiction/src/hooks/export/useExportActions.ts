@@ -1,3 +1,4 @@
+// src/hooks/export/useExportActions.ts
 import { useState } from 'react';
 import {
   copyBookToClipboard,
@@ -20,20 +21,35 @@ type Args = {
   canAct: boolean;
 };
 
+const cleanContent = (html: string) => {
+  if (!html) return html;
+  return html.replace(/(<span[^>]*(?:mention|sheet-link)[^>]*>)\s*@/gi, '$1');
+};
+
 export function useExportActions({ book, chapters, author, remember, format, options, canAct }: Args) {
   const [busy, setBusy] = useState(false);
   const [copying, setCopying] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [status, setStatus] = useState<Status>(null);
 
-  // Nouveau livre : on efface le message précédent (réinitialisation pendant le rendu, sans effet)
   const [prevBook, setPrevBook] = useState(book);
   if (book !== prevBook) {
     setPrevBook(book);
     setStatus(null);
   }
 
-  const payload = (): ExportBook => ({ ...(book as ExportBook), author: author.trim() || undefined, chapters });
+  const payload = (): ExportBook => {
+    const cleanedChapters = chapters.map(ch => ({
+      ...ch,
+      content: cleanContent(ch.content)
+    }));
+
+    return { 
+      ...(book as ExportBook), 
+      author: author.trim() || undefined, 
+      chapters: cleanedChapters 
+    };
+  };
 
   const run = async (
     setFlag: (v: boolean) => void,

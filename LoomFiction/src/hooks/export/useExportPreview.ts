@@ -12,6 +12,11 @@ type Args = {
   options: ExportOptions;
 };
 
+const cleanContent = (html: string) => {
+  if (!html) return html;
+  return html.replace(/(<span[^>]*(?:mention|sheet-link)[^>]*>)\s*@/gi, '$1');
+};
+
 export function useExportPreview({ book, chapters, author, options }: Args) {
   const [show, setShow] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
@@ -33,8 +38,14 @@ export function useExportPreview({ book, chapters, author, options }: Args) {
 
   const html = useMemo(() => {
     if (!(show || fullscreen) || !book || visible.length === 0) return '';
+    
+    const cleanedChapters = visible.map(ch => ({
+      ...ch,
+      content: cleanContent(ch.content)
+    }));
+
     return buildPreviewDocument(
-      { ...book, author: debouncedAuthor.trim() || undefined, chapters: visible },
+      { ...book, author: debouncedAuthor.trim() || undefined, chapters: cleanedChapters },
       options,
       { fontScale, dark }
     );
