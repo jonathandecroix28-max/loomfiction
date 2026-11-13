@@ -329,7 +329,7 @@ export function BookDetailPage() {
                         className={`w-10 h-10 rounded-xl border flex items-center justify-center font-serif font-bold text-base transition-colors shrink-0 ${
                           isOpen
                             ? 'bg-amber-700 text-amber-50 border-amber-500'
-                            : 'bg-amber-950 group-hover:bg-amber-800 text-amber-300 border-amber-800/40'
+                            : 'bg-amber-950 group-hover:bg-amber-500 text-amber-300 border-amber-800/40'
                         }`}
                       >
                         {index + 1}
