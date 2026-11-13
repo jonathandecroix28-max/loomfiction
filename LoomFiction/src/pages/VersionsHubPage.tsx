@@ -466,7 +466,6 @@ export function VersionsHubPage() {
               subtitle="Cliquez sur un chapitre pour déplier ses versions et les comparer"
               tag="Chapter versions"
               emptyLabel={filtering ? 'Aucune version de chapitre ne correspond.' : 'Aucune version de chapitre.'}
-              contextLabel="Roman / chapitre"
               rows={visibleChapters}
               renderContext={renderContext}
               onOpen={navigate}
@@ -481,7 +480,6 @@ export function VersionsHubPage() {
               subtitle="Cliquez sur une idée pour déplier ses versions et les comparer"
               tag="Idea versions"
               emptyLabel={filtering ? 'Aucune version d’idée ne correspond.' : 'Aucune version d’idée.'}
-              contextLabel="Roman / catégorie / fiche"
               rows={visibleIdeas}
               renderContext={renderContext}
               onOpen={navigate}
@@ -496,7 +494,6 @@ export function VersionsHubPage() {
               subtitle="Cliquez sur une fiche pour déplier ses versions et comparer leurs cartes"
               tag="Sheet versions"
               emptyLabel={filtering ? 'Aucune version de fiche ne correspond.' : 'Aucune version de fiche.'}
-              contextLabel="Roman / catégorie"
               rows={visibleSheets}
               renderContext={renderContext}
               onOpen={navigate}
