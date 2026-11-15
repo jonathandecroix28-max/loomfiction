@@ -93,7 +93,6 @@ export function ChapterVersionsPage() {
     setFeedback('Impossible de supprimer cette version.');
   };
 
-  // Découpage ligne par ligne pour le diff côte à côte (style VS Code)
   const diffLines = useMemo(() => {
     if (!compare.versionToCompare || !chapter) return { leftLines: [], rightLines: [] };
     
