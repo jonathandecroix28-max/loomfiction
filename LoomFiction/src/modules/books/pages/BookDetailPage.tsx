@@ -618,3 +618,5 @@ export function BookDetailPage() {
     </div>
   );
 }
+
+export default BookDetailPage;
