@@ -153,13 +153,12 @@ export function SheetPage() {
   const [draftName, setDraftName] = useState('');
   const [feedback, setFeedback] = useState('');
 
-  // Gestion des versions et du mode Diff / Revue de modifications
   const [activeVersion, setActiveVersion] = useState<SheetVersionResponse | null>(null);
   const [viewMode, setViewMode] = useState<'diff' | 'edit'>('diff');
   const [hideIdenticalLines, setHideIdenticalLines] = useState(false);
   const [reviewDecisions, setReviewDecisions] = useState<Record<number, boolean>>({});
   const [isReviewPreview, setIsReviewPreview] = useState(false);
-  const [reviewPreviewCards, setReviewPreviewCards] = useState<any[]>([]);
+  const [reviewPreviewCards, setReviewPreviewCards] = useState<IdeaResponse[]>([]);
   const [isApplyingReview, setIsApplyingReview] = useState(false);
 
   const { sheets: allSheets } = useSheets();
@@ -318,9 +317,8 @@ export function SheetPage() {
     }
   };
 
-  // Comparaison par carte : chaque décision porte sur une carte complète.
   const diffGroups = useMemo(() => {
-    type TextBlock = { text: string; raw: string; card: any };
+    type TextBlock = { text: string; raw: string; card: IdeaResponse };
     type EqualGroup = { type: 'equal'; oldBlock: TextBlock; currentBlock: TextBlock; oldLine: number; currentLine: number };
     type ChangeGroup = { type: 'change'; id: number; oldBlocks: TextBlock[]; currentBlocks: TextBlock[]; oldStart: number; currentStart: number };
 
@@ -328,17 +326,17 @@ export function SheetPage() {
       return { groups: [] as Array<EqualGroup | ChangeGroup>, rows: [] as Array<{ left: string | null; right: string | null; type: 'equal' | 'removed' | 'added'; leftLine: number | null; rightLine: number | null; hunkId: number | null }> };
     }
 
-    const cardsToBlocks = (list: any[]): TextBlock[] => list.map((card) => {
+    const cardsToBlocks = (list: IdeaResponse[]): TextBlock[] => list.map((card) => {
       const description = htmlToMarkdown(card.description || '');
       const name = String(card.name || 'Carte sans nom');
       const raw = [`### ${name}`, description].filter(Boolean).join('\n');
-      // La signature inclut le contenu et l'identifiant : une modification de nom ou
-      // de description devient donc un changement révisable pour cette carte.
       const text = JSON.stringify({ id: card.id, name, description, sortOrder: card.sortOrder });
       return { text, raw, card };
     });
 
-    const oldBlocks = cardsToBlocks(activeVersion.cards || []);
+    const oldBlocks = cardsToBlocks(
+      (activeVersion.cards || []).map((card) => ({ createdAt: '', updatedAt: '', ...card })),
+    );
     const currentBlocks = cardsToBlocks(cards);
     const maxCells = 2_000_000;
     const events: Array<{ type: 'equal' | 'removed' | 'added'; oldIndex?: number; currentIndex?: number }> = [];
@@ -398,10 +396,6 @@ export function SheetPage() {
       });
     }
 
-    // Le calcul d'alignement des cartes ci-dessus sert aux décisions (une décision
-    // par carte/hunk). Pour l'affichage, on affine ensuite chaque carte en lignes
-    // de texte afin qu'une longue description ne soit jamais rendue comme une
-    // unique ligne de diff.
     type DiffRow = {
       left: string | null; right: string | null; type: 'equal' | 'removed' | 'added';
       leftLine: number | null; rightLine: number | null; hunkId: number | null;
@@ -484,7 +478,6 @@ export function SheetPage() {
     [diffGroups],
   );
 
-  // Tous les hooks doivent être appelés avant les retours conditionnels.
   if (isLoading) {
     return (
       <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center bg-[#1c1411] font-serif text-amber-200/60">
@@ -498,7 +491,6 @@ export function SheetPage() {
   const versionsPath = `/ideas/fiches/${sheet.id}/versions`;
 
   const buildReviewPreview = () => {
-    // Par défaut, on conserve la version actuelle ; un rejet restaure la carte archivée.
     const nextCards = diffGroups.groups.flatMap((group) => {
       if (group.type === 'equal') return [group.currentBlock.card];
       const keepCurrent = reviewDecisions[group.id] !== false;
@@ -517,7 +509,6 @@ export function SheetPage() {
       const currentById = new Map(cards.map((card) => [card.id, card]));
       const targetById = new Map(reviewPreviewCards.map((card) => [card.id, card]));
 
-      // Enregistrer d'abord les cartes conservées/modifiées et les cartes restaurées.
       for (const [sortOrder, targetCard] of reviewPreviewCards.entries()) {
         const payload = { ...toUpsert(targetCard), sortOrder };
         if (currentById.has(targetCard.id)) {
@@ -532,7 +523,6 @@ export function SheetPage() {
         }
       }
 
-      // Supprimer les cartes présentes dans l'état actuel mais absentes du résultat validé.
       for (const currentCard of cards) {
         if (!targetById.has(currentCard.id)) {
           await offlineIdeaService.remove(currentCard.id);

@@ -65,7 +65,6 @@ export function SheetCardItem({
   useLayoutEffect(() => {
     cardRef.current = card;
     saveRef.current = onSaveDescription;
-    setDraftTitle(card.name);
   }, [card, onSaveDescription]);
 
   useEffect(() => {
@@ -131,6 +130,11 @@ export function SheetCardItem({
     onEditorChange?.(card.id, editor);
     return () => onEditorChange?.(card.id, null);
   }, [editor, card.id, onEditorChange]);
+
+  const startRenaming = () => {
+    setDraftTitle(card.name);
+    setIsRenaming(true);
+  };
 
   const saveTitle = async () => {
     const newName = draftTitle.trim();
@@ -230,7 +234,7 @@ export function SheetCardItem({
           </button>
           <button
             type="button"
-            onClick={() => setIsRenaming(true)}
+            onClick={startRenaming}
             aria-label="Modifier le titre"
             className={`${iconBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
@@ -252,7 +256,7 @@ export function SheetCardItem({
           items={[
             { key: 'up', label: 'Monter', icon: IconUp, disabled: index === 0, onSelect: () => onMove(index, -1) },
             { key: 'down', label: 'Descendre', icon: IconDown, disabled: index === total - 1, onSelect: () => onMove(index, 1) },
-            { key: 'edit', label: 'Modifier le titre', icon: IconEdit, onSelect: () => setIsRenaming(true) },
+            { key: 'edit', label: 'Modifier le titre', icon: IconEdit, onSelect: startRenaming },
             { key: 'delete', label: 'Supprimer la carte', icon: IconDelete, danger: true, separatorBefore: true, onSelect: () => onDelete(card) },
           ]}
         />

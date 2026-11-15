@@ -18,25 +18,27 @@ type SheetConfigModalProps = {
   onSuccess: () => void;
 };
 
-export function SheetConfigModal({
-  isOpen,
-  onClose,
-  sheet,
-  cards,
-  onSuccess,
-}: SheetConfigModalProps) {
+// Le formulaire est monté uniquement quand la modale est ouverte : son état
+// est ainsi réinitialisé à chaque ouverture à partir des props.
+export function SheetConfigModal(props: SheetConfigModalProps) {
+  if (!props.isOpen) return null;
+  return <SheetConfigForm {...props} />;
+}
+
+function SheetConfigForm({ onClose, sheet, cards, onSuccess }: SheetConfigModalProps) {
   const toast = useToast();
   const { categories } = useCategories();
-  
+
   const [books, setBooks] = useState<BookResponse[]>([]);
   const [name, setName] = useState(sheet.name);
   const [categoryId, setCategoryId] = useState(sheet.categoryId);
-  const [selectedBookId, setSelectedBookId] = useState<string>('none');
-  const [status, setStatus] = useState<IdeaStatus>('draft');
+  const [selectedBookId, setSelectedBookId] = useState<string>(() => {
+    const currentBookId = bookOfSheet(cards);
+    return currentBookId !== null ? String(currentBookId) : 'none';
+  });
+  const [status, setStatus] = useState<IdeaStatus>(cards[0]?.status || 'draft');
 
   useEffect(() => {
-    if (!isOpen) return;
-
     const loadBooks = async () => {
       try {
         const booksData = await offlineBookService.getAll();
@@ -47,20 +49,7 @@ export function SheetConfigModal({
     };
 
     void loadBooks();
-    setName(sheet.name);
-    setCategoryId(sheet.categoryId);
-
-    const currentBookId = bookOfSheet(cards);
-    setSelectedBookId(currentBookId !== null ? String(currentBookId) : 'none');
-
-    if (cards.length > 0 && cards[0].status) {
-      setStatus(cards[0].status);
-    } else {
-      setStatus('draft');
-    }
-  }, [isOpen, sheet, cards]);
-
-  if (!isOpen) return null;
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -7,6 +7,7 @@ import { offlineBookService } from '../../../services/offlineBookService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
 import type { BookResponse } from '../../../types/book';
+import type { ChapterResponse } from '../../../types/chapter';
 import type { SheetResponse } from '../../../types/sheet';
 import {
   IconChevronRight,
@@ -46,7 +47,13 @@ export function ChapterExplorer({
   const [allVersions, setAllVersions] = useState<ChapterVersionResponse[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
-  const [chaptersByBook, setChaptersByBook] = useState<Record<number, any[]>>({});
+  const [loadedChaptersByBook, setChaptersByBook] = useState<Record<number, ChapterResponse[]>>({});
+
+  // Les chapitres du livre courant (hook) priment sur ceux chargés globalement.
+  const chaptersByBook = useMemo<Record<number, ChapterResponse[]>>(
+    () => (chapters.length > 0 ? { ...loadedChaptersByBook, [bookId]: chapters } : loadedChaptersByBook),
+    [loadedChaptersByBook, chapters, bookId],
+  );
   const [isLoadingAllChapters, setIsLoadingAllChapters] = useState(false);
 
   const [isCreatingBook, setIsCreatingBook] = useState(false);
@@ -109,7 +116,7 @@ export function ChapterExplorer({
       setSheets(sheetsData ?? []);
       setAllVersions(versionsData ?? []);
 
-      const chapterMap: Record<number, any[]> = {};
+      const chapterMap: Record<number, ChapterResponse[]> = {};
       for (const b of (booksData ?? [])) {
         // Utilisation de getByBookId au lieu de getByBook
         const chs = await offlineChapterService.getByBookId(b.id).catch(() => []);
@@ -134,15 +141,6 @@ export function ChapterExplorer({
       cancelled = true;
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    if (chapters.length > 0) {
-      setChaptersByBook((prev) => ({
-        ...prev,
-        [bookId]: chapters,
-      }));
-    }
-  }, [chapters, bookId]);
 
   const versionsByChapterId = useMemo(() => {
     const map = new Map<number, ChapterVersionResponse[]>();
@@ -173,15 +171,19 @@ export function ChapterExplorer({
     return sheets.filter((sheet) => sheetIds.has(sheet.id));
   };
 
-  useEffect(() => {
-    if (isOpen && bookId) {
+  // Ouvre automatiquement le roman / chapitre courant (ajustement d'état pendant le rendu).
+  const autoExpandKey = isOpen && bookId ? `${bookId}|${currentChapterId || ''}` : '';
+  const [appliedAutoExpandKey, setAppliedAutoExpandKey] = useState('');
+  if (autoExpandKey !== appliedAutoExpandKey) {
+    setAppliedAutoExpandKey(autoExpandKey);
+    if (autoExpandKey) {
       setExpandedFolders((prev) => ({
         ...prev,
         [`book-${bookId}`]: true,
         ...(currentChapterId ? { [`chapter-${currentChapterId}`]: true } : {}),
       }));
     }
-  }, [isOpen, bookId, currentChapterId]);
+  }
 
   const toggleFolder = (key: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -233,7 +235,7 @@ export function ChapterExplorer({
       const bookChapters = chaptersByBook[targetBookId] ?? [];
       const nextNumber =
         bookChapters.length > 0
-          ? Math.max(...bookChapters.map((c: any) => c.chapter_number)) + 1
+          ? Math.max(...bookChapters.map((c) => Number(c.chapter_number))) + 1
           : 1;
 
       const updatedChapters = await offlineChapterService.create(
@@ -252,7 +254,7 @@ export function ChapterExplorer({
         setNewChapterTitle('');
         
         const createdChapter = updatedChapters.find(
-          (c: any) => Number(c.chapter_number) === nextNumber
+          (c) => Number(c.chapter_number) === nextNumber
         );
         if (createdChapter) {
           handleChapterNavigation(targetBookId, createdChapter.id);
@@ -272,11 +274,9 @@ export function ChapterExplorer({
         ? Math.max(...chapterVersions.map((v) => Number(v.versionNumber))) + 1
         : 1;
 
-    let targetChapter: any = null;
-    Object.values(chaptersByBook).forEach((chs) => {
-      const found = chs.find((c: any) => c.id === chapterId);
-      if (found) targetChapter = found;
-    });
+    const targetChapter = Object.values(chaptersByBook)
+      .flat()
+      .find((c) => c.id === chapterId);
 
     try {
       await offlineChapterVersionService.create({

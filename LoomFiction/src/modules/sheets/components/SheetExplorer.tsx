@@ -356,21 +356,30 @@ export function SheetExplorer({
     }
   };
 
-  useEffect(() => {
-    if (!isOpen || !currentSheetId || sheets.length === 0) return;
+  // Dossiers à ouvrir automatiquement pour la fiche courante.
+  const autoExpandKeys = useMemo(() => {
+    if (!isOpen || !currentSheetId || sheets.length === 0) return [];
     const currentSheet = sheets.find((sheet) => sheet.id === currentSheetId);
-    if (!currentSheet) return;
+    if (!currentSheet) return [];
 
-    const sheetCards = cardsBySheet.get(currentSheet.id) ?? [];
-    const bookId = bookOfSheet(sheetCards);
-
-    setExpandedFolders((previous) => ({
-      ...previous,
-      [`book-${bookId ?? 'none'}`]: true,
-      [`book-${bookId ?? 'none'}-cat-${currentSheet.categoryId}`]: true,
-      [`book-${bookId ?? 'none'}-cat-${currentSheet.categoryId}-sheets`]: true,
-    }));
+    const bookId = bookOfSheet(cardsBySheet.get(currentSheet.id) ?? []);
+    const bookKey = `book-${bookId ?? 'none'}`;
+    const categoryKey = `${bookKey}-cat-${currentSheet.categoryId}`;
+    return [bookKey, categoryKey, `${categoryKey}-sheets`];
   }, [isOpen, currentSheetId, sheets, cardsBySheet]);
+
+  // Ajustement d'état pendant le rendu (pas d'effet) quand les dossiers cibles changent.
+  const autoExpandId = autoExpandKeys.join('|');
+  const [appliedAutoExpandId, setAppliedAutoExpandId] = useState('');
+  if (autoExpandId !== appliedAutoExpandId) {
+    setAppliedAutoExpandId(autoExpandId);
+    if (autoExpandKeys.length > 0) {
+      setExpandedFolders((previous) => ({
+        ...previous,
+        ...Object.fromEntries(autoExpandKeys.map((key) => [key, true])),
+      }));
+    }
+  }
 
   const renderSheetVersions = (groupSheets: SheetResponse[]) => (
     <div className="ml-4 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-2">

@@ -108,6 +108,23 @@ export function ChapterEditorPage() {
     },
   });
 
+  const editorRef = useRef(editor);
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  // Le titre suit le chapitre / la version affichée (ajustement d'état pendant le rendu).
+  const titleSource =
+    activeVersion && viewMode === 'edit'
+      ? activeVersion.name || `Version ${activeVersion.versionNumber}`
+      : chapter?.title || '';
+  const titleSyncKey = chapter ? `${chapter.id}|${activeVersion?.id ?? ''}|${viewMode}|${titleSource}` : '';
+  const [appliedTitleSyncKey, setAppliedTitleSyncKey] = useState('');
+  if (chapter && titleSyncKey !== appliedTitleSyncKey) {
+    setAppliedTitleSyncKey(titleSyncKey);
+    setTitle(titleSource);
+  }
+
   const rootReady = !isPageLoading && !!chapter;
 
   useEffect(() => {
@@ -146,8 +163,9 @@ export function ChapterEditorPage() {
         setIsPreview(false);
         setActiveVersion(null);
 
-        if (editor && !editor.isDestroyed) {
-          editor.commands.clearContent(true);
+        const currentEditor = editorRef.current;
+        if (currentEditor && !currentEditor.isDestroyed) {
+          currentEditor.commands.clearContent(true);
         }
 
         const [chapterData, loadedSheets] = await Promise.all([
@@ -187,12 +205,10 @@ export function ChapterEditorPage() {
     if (!editor || editor.isDestroyed || !chapter) return;
 
     if (activeVersion && viewMode === 'edit') {
-      setTitle(activeVersion.name || `Version ${activeVersion.versionNumber}`);
       if (editor.getHTML() !== activeVersion.content) {
         editor.commands.setContent(activeVersion.content || '');
       }
     } else {
-      setTitle(chapter.title || '');
       if (editor.getHTML() !== chapter.content) {
         editor.commands.setContent(chapter.content || '');
       }
