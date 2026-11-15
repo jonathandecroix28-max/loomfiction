@@ -95,7 +95,6 @@ export function SheetConfigModal({
         });
       }
 
-      // Notifie l'explorateur du changement en direct sans avoir à recharger la page
       window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
 
       toast.success('Configuration de la fiche mise à jour');
