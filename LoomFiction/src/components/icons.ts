@@ -66,6 +66,7 @@ export {
   ListOrdered as IconListOrdered,
   Quote as IconQuote,
   Minus as IconMinus,
+  Menu as IconMenu,
 } from 'lucide-react';
 
 export type { LucideIcon } from 'lucide-react';
