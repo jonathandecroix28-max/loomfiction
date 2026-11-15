@@ -19,3 +19,5 @@ export interface SheetVersion {
   createdAt: string;
   updatedAt: string;
 }
+
+export type SheetVersionResponse = SheetVersion;
