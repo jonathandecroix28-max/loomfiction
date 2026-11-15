@@ -11,7 +11,7 @@ import { useLatestGetter } from '../../../hooks/useLatestGetter';
 import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
 import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
 import { htmlToText } from '../../../utils/versions/htmlText';
-import { IconDelete, IconDown, IconEdit, IconUp, IconSave } from '../../../components/icons';
+import { IconDelete, IconDown, IconEdit, IconUp } from '../../../components/icons';
 import { ActionMenu } from './ActionMenu';
 import { toUpsert } from '../sheetLinks';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
@@ -50,7 +50,6 @@ export function SheetCardItem({
   const [isEmpty, setIsEmpty] = useState(() => htmlToText(incoming).trim() === '');
   const [sheets, setSheets] = useState<SheetResponse[]>([]);
 
-  // État pour renommer le titre de la caractéristique directement
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftTitle, setDraftTitle] = useState(card.name);
 
