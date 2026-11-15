@@ -207,16 +207,11 @@ export function ChapterExplorer({
       return;
     }
     try {
-      const newBooks = await offlineBookService.create(title);
+      await offlineBookService.create(title);
       await loadGlobalData();
       setIsCreatingBook(false);
       setNewBookTitle('');
       toast.success(`Roman "${title}" créé`);
-      
-      const createdBook = newBooks[newBooks.length - 1];
-      if (createdBook && createdBook.id) {
-        navigate(`/books/${createdBook.id}/chapters`);
-      }
     } catch (err) {
       console.error('Erreur création roman :', err);
       toast.error('Impossible de créer le roman.');
@@ -301,7 +296,7 @@ export function ChapterExplorer({
       <div
         onClick={onClose}
         aria-hidden="true"
-        className={`fixed inset-0 z-30 bg-black/65 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
+        className={`fixed inset-0 z-[55] bg-black/65 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
       />
@@ -309,7 +304,7 @@ export function ChapterExplorer({
       <aside
         aria-label="Explorateur des romans et chapitres"
         aria-hidden={!isOpen}
-        className={`fixed inset-y-0 left-0 z-40 flex h-[100dvh] flex-col w-[min(88vw,21rem)] shrink-0 border-r border-amber-900/40 bg-[var(--c-surface)] shadow-2xl transform transition-transform duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-[60] flex h-[100dvh] flex-col w-[min(88vw,21rem)] shrink-0 border-r border-amber-900/40 bg-[var(--c-surface)] shadow-2xl transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none md:hidden'
         } md:static md:h-[100dvh] md:w-80 md:translate-x-0 md:shadow-xl`}
       >
