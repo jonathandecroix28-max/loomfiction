@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useIdeaVersions } from '../hooks/useIdeaVersions';
 import { offlineIdeaService } from '../../../services/offlineIdeaService';
@@ -16,9 +16,8 @@ import {
   VersionsLoading,
 } from '../../../components/versions/VersionParts';
 import { VersionList } from '../../../components/versions/VersionList';
-import { ComparePanel, CompareCards } from '../../../components/versions/ComparePanel';
-import { LineDiffView } from '../../../components/versions/LineDiffView';
 import { useConfirm } from '../../../components/feedback/FeedbackProvider';
+import { IconClose } from '../../../components/icons';
 
 const MERGE_FIELDS = [
   { key: 'name', label: 'Nom' },
@@ -26,11 +25,6 @@ const MERGE_FIELDS = [
 ] as const;
 
 const getDescription = (version: IdeaVersionResponse) => version.description ?? '';
-
-const renderText = (body: string) => htmlToText(body) || 'Aucune description.';
-
-const BODY_CLASS =
-  'max-h-56 md:max-h-72 overflow-y-auto text-sm sm:text-base text-amber-100/90 font-serif whitespace-pre-wrap wrap-break-word leading-relaxed';
 
 export function IdeaVersionsPage() {
   const { ideaId, versionId } = useParams<{ ideaId: string; versionId?: string }>();
@@ -41,7 +35,6 @@ export function IdeaVersionsPage() {
   const numVersionId = versionId ? Number(versionId) : null;
 
   const { versions, selectedVersion, isLoading, error, refetch } = useIdeaVersions(numIdeaId, numVersionId);
-
   const { item: idea, loading: ideaLoading } = useParentItem(numIdeaId, offlineIdeaService.getById);
 
   const compare = useVersionCompare({
@@ -55,9 +48,6 @@ export function IdeaVersionsPage() {
   const [mergeFields, setMergeFields] = useState({ name: true, description: true });
   const [isRestoring, setIsRestoring] = useState(false);
   const [feedback, setFeedback] = useState('');
-
-  const [hideEqualLines, setHideEqualLines] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !ideaLoading && (error || !idea)) {
@@ -123,14 +113,20 @@ export function IdeaVersionsPage() {
     setFeedback('Impossible de supprimer cette version.');
   };
 
+  const diffLines = useMemo(() => {
+    if (!compare.versionToCompare || !idea) return { leftLines: [], rightLines: [] };
+    
+    const stripHtml = (html: string) => htmlToText(html).split('\n');
+    const leftLines = stripHtml(compare.versionToCompare.description || '');
+    const rightLines = stripHtml(idea.description || '');
+
+    return { leftLines, rightLines };
+  }, [compare.versionToCompare, idea]);
+
   if (isLoading || ideaLoading) return <VersionsLoading />;
   if (error || !idea) return <VersionsError message={error ?? 'Cette idée n’existe plus ou est introuvable.'} />;
 
   const { versionToCompare } = compare;
-
-  const displayRows = hideEqualLines 
-    ? compare.rows.filter(row => row.kind !== 'equal') 
-    : compare.rows;
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif">
@@ -168,67 +164,58 @@ export function IdeaVersionsPage() {
           />
 
           {versionToCompare && (
-            <ComparePanel
-              mode={compare.compareMode}
-              onModeChange={compare.setCompareMode}
-              currentLeftLabel="Actuelle à gauche"
-            >
-              <CompareCards
-                mode={compare.compareMode}
-                current={{ label: 'Idée actuelle', name: idea.name, body: idea.description ?? '' }}
-                version={{ label: 'Version sélectionnée', name: versionToCompare.name, body: versionToCompare.description ?? '' }}
-                renderBody={renderText}
-                bodyClassName={BODY_CLASS}
-              />
+            <section className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/70 p-3 sm:p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-amber-200/40 mb-1">Comparaison visuelle</p>
+                  <h2 className="text-xl sm:text-2xl font-bold text-amber-100">
+                    v{versionToCompare.versionNumber} {versionToCompare.name ? `- ${versionToCompare.name}` : ''} vs Idée Actuelle
+                  </h2>
+                </div>
+                <button
+                  onClick={() => navigate('/ideas')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 border border-amber-900/30 rounded-lg text-xs font-sans text-amber-200 hover:bg-neutral-800 transition-colors"
+                >
+                  <IconClose className="size-3.5" />
+                  Fermer
+                </button>
+              </div>
 
-              <div className="border-t border-amber-900/30 pt-6 mt-2 flex flex-col gap-4">
-                <div className="flex flex-wrap items-center justify-between gap-4 font-sans">
-                  <div className="flex w-full sm:w-auto p-1 bg-neutral-950/50 rounded-lg border border-amber-900/30">
-                    <button
-                      onClick={() => setShowPreview(false)}
-                      className={`flex-1 sm:flex-none px-2 sm:px-4 py-2 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${!showPreview ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'}`}
-                    >
-                      Comparatif par ligne
-                    </button>
-                    <button
-                      onClick={() => setShowPreview(true)}
-                      className={`flex-1 sm:flex-none px-2 sm:px-4 py-2 sm:py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${showPreview ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'}`}
-                    >
-                      Aperçu de la fusion
-                    </button>
+              {/* Vue Split / Diff côte à côte façon VS Code */}
+              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-amber-900/30 bg-[#1e1e1e] rounded-xl overflow-hidden border border-amber-900/30 font-mono text-xs sm:text-sm">
+                
+                {/* Colonne Gauche : Ancienne Version (Rouge) */}
+                <div className="flex flex-col h-80 overflow-y-auto">
+                  <div className="sticky top-0 bg-[#252526] px-4 py-2 border-b border-amber-900/30 text-amber-200/60 font-sans flex justify-between items-center z-10">
+                    <span>v{versionToCompare.versionNumber}</span>
+                    <span className="text-[10px] uppercase bg-red-950/80 text-red-300 px-2 py-0.5 rounded">Ancienne version</span>
                   </div>
-
-                  {!showPreview && (
-                    <label className="flex items-center gap-2 text-sm text-amber-200/80 cursor-pointer hover:text-amber-100 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={hideEqualLines}
-                        onChange={(e) => setHideEqualLines(e.target.checked)}
-                        className="rounded border-amber-900/50 bg-neutral-900 text-amber-600 focus:ring-amber-600/50 w-4 h-4 cursor-pointer"
-                      />
-                      Masquer les lignes identiques
-                    </label>
-                  )}
+                  <div className="p-4 space-y-1">
+                    {diffLines.leftLines.map((line, idx) => (
+                      <div key={idx} className="flex bg-red-950/30 text-red-200 px-2 py-0.5 rounded">
+                        <span className="w-8 select-none text-red-500/50 text-right pr-3">{idx + 1}</span>
+                        <span className="flex-1 whitespace-pre-wrap">{line || ' '}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {showPreview ? (
-                  <div className="p-5 rounded-xl border border-amber-900/30 bg-neutral-900/40">
-                    <h4 className="text-xs font-sans font-semibold text-amber-200/50 uppercase tracking-widest mb-4">
-                      Rendu final de la description
-                    </h4>
-                    <div className={BODY_CLASS}>
-                      {renderText(compare.mergeFor(versionToCompare))}
-                    </div>
+                {/* Colonne Droite : Idée Actuelle (Vert) */}
+                <div className="flex flex-col h-80 overflow-y-auto">
+                  <div className="sticky top-0 bg-[#252526] px-4 py-2 border-b border-amber-900/30 text-amber-200/60 font-sans flex justify-between items-center z-10">
+                    <span>Actuelle</span>
+                    <span className="text-[10px] uppercase bg-emerald-950/80 text-emerald-300 px-2 py-0.5 rounded">Actuelle</span>
                   </div>
-                ) : (
-                  <LineDiffView
-                    rows={displayRows}
-                    choices={compare.choices}
-                    onChoose={compare.choose}
-                    help="Choisis pour chaque ligne modifiée celle à conserver."
-                    emptyMessage={hideEqualLines ? "Aucune différence trouvée (toutes les lignes identiques sont masquées)." : "Aucune ligne de description à comparer."}
-                  />
-                )}
+                  <div className="p-4 space-y-1">
+                    {diffLines.rightLines.map((line, idx) => (
+                      <div key={idx} className="flex bg-emerald-950/30 text-emerald-200 px-2 py-0.5 rounded">
+                        <span className="w-8 select-none text-emerald-500/50 text-right pr-3">{idx + 1}</span>
+                        <span className="flex-1 whitespace-pre-wrap">{line || ' '}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
 
               <MergeOptions
@@ -238,7 +225,7 @@ export function IdeaVersionsPage() {
                 onMerge={() => handleMerge(versionToCompare)}
                 isRestoring={isRestoring}
               />
-            </ComparePanel>
+            </section>
           )}
         </div>
       </main>
