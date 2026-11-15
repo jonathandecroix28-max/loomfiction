@@ -26,14 +26,15 @@ function AppContent() {
   const hideNavbar = ['/', '/terms', '/privacy', '/support'].includes(location.pathname);
   const hideNavbarWhenReading = location.pathname.includes('/read');
   const hideNavbarWhenEditing = location.pathname.includes('/chapters/') && !location.pathname.includes('/versions');
+  const hideNavbarSheet = location.pathname.includes('/ideas/fiches/') && !location.pathname.includes('/versions');
   
   return (
     <div className="min-h-dvh bg-[#fcf9f2] flex flex-col">
-      {!hideNavbar  && !hideNavbarWhenReading && !hideNavbarWhenEditing && <Navbar />}
+      {!hideNavbar  && !hideNavbarWhenReading && !hideNavbarWhenEditing && !hideNavbarSheet && <Navbar />}
 
       <main
         className={`grow flex flex-col ${
-          !hideNavbar && !hideNavbarWhenReading && !hideNavbarWhenEditing ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0' : ''
+          !hideNavbar && !hideNavbarWhenReading && !hideNavbarWhenEditing && !hideNavbarSheet ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0' : ''
         }`}
       >
         <Routes>
