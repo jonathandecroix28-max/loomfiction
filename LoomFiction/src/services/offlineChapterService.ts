@@ -6,7 +6,6 @@ import { createOfflineRepository, dedupeBy, nowIso } from '../db/Createofflinere
 
 type ChapterPayload = { book_id: number; chapter_number: number; title: string; content: string };
 
-// un livre ne peut avoir qu'un chapitre par numéro
 const deduplicateChapters = dedupeBy<ChapterResponse>(
   (c) => `${Number(c.book_id)}-${Number(c.chapter_number)}`
 );
@@ -43,7 +42,6 @@ const repo = createOfflineRepository<ChapterResponse, ChapterPayload>({
     ),
 
   afterReplace: async (tx, tempId, server) => {
-    // le serveur gagne sur un emplacement (livre + numéro) occupé par un chapitre temporaire
     const store = tx.objectStore('chapters');
     const sameSlot = (await store.index('by_book').getAll(server.book_id)).filter(
       (c) =>
@@ -52,11 +50,9 @@ const repo = createOfflineRepository<ChapterResponse, ChapterPayload>({
         Number(c.chapter_number) === Number(server.chapter_number)
     );
     for (const c of sameSlot) await store.delete(c.id);
-    // les versions du chapitre temporaire passent sur l'id serveur
     await remapChapterId(tx, tempId, server.id);
   },
 
-  // supprimer un chapitre supprime ses versions locales
   beforeRemove: async (tx, id) => {
     const versions = tx.objectStore('chapterVersions');
     for (const v of await versions.index('by_chapter').getAll(id)) await versions.delete(v.id);
@@ -73,7 +69,7 @@ export const offlineChapterService = {
   syncToServer: repo.syncToServer,
 
   async getByBookId(bookId: number): Promise<ChapterResponse[]> {
-    await repo.getAll(); // rafraîchit si possible, sinon on garde le local
+    await repo.getAll();
     return chaptersOfBook(bookId);
   },
 
@@ -111,6 +107,5 @@ export const offlineChapterService = {
     return repo.patch(id, (chapter) => ({ ...chapter, title, content, updated_at: nowIso() }));
   },
 
-  /** true = supprimé aussi côté serveur (ou jamais synchronisé), false = en attente. */
   remove: repo.remove,
 };

@@ -26,11 +26,9 @@ const repo = createOfflineRepository<ChapterVersionResponse, ChapterVersionUpser
   finalize: arrangeVersions,
   pendingPosition: 'end',
 
-  // une version attend que son chapitre existe côté serveur
   dependsOnPending: (v) => isTempId(v.chapterId),
   syncFirst: [() => offlineChapterService.syncToServer()],
 
-  // ne télécharge que les versions du chapitre demandé (et pas toutes, contenu compris)
   byParent: { index: 'by_chapter', fetch: chapterVersionService.getByChapterId },
 });
 
@@ -48,7 +46,6 @@ export const offlineChapterVersionService = {
     return version;
   },
 
-  /** Numéro de la prochaine version d'un chapitre (dernier numéro local + 1). */
   async nextVersionNumber(chapterId: number): Promise<number> {
     const versions = await repo.byIndex('by_chapter', chapterId);
     return versions.reduce((max, v) => Math.max(max, Number(v.versionNumber)), 0) + 1;
