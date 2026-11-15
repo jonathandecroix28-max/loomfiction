@@ -21,6 +21,7 @@ import { VersionList } from '../../../components/versions/VersionList';
 import { toUpsert } from '../sheetLinks';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetSnapshotCard, SheetVersion } from '../../../types/sheetVersion';
+import { IconClose } from '../../../components/icons';
 
 const MERGE_FIELDS = [
   { key: 'name', label: 'Nom de la fiche' },
@@ -51,14 +52,12 @@ const STATUS_STYLE: Record<CardStatus, string> = {
   removed: 'border-red-900/40 bg-red-950/40 text-red-300',
 };
 
-/** Libellés des deux choix selon le cas. */
 const CHOICE_LABELS: Record<Exclude<CardStatus, 'same'>, { current: string; version: string }> = {
   changed: { current: 'Garder l’actuelle', version: 'Prendre la version' },
   added: { current: 'Laisser supprimée', version: 'Restaurer la carte' },
   removed: { current: 'Garder la carte', version: 'Retirer de la fiche' },
 };
 
-// Les descriptions des cartes sont du HTML : on compare et on affiche des phrases sans balises
 const norm = (text?: string | null) => htmlToText(text).trimEnd();
 const plain = (text?: string | null) => htmlToText(text).trim();
 const bySort = (a: { sortOrder?: number }, b: { sortOrder?: number }) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
@@ -110,7 +109,6 @@ export function SheetVersionsPage() {
   const { versions, selectedVersion, isLoading, error, refetch } = useSheetVersions(numSheetId, numVersionId);
   const { createIdea } = useCreateIdea();
 
-  // Recherche, tri et version affichée : on réutilise le même hook que les chapitres et les idées
   const compare = useVersionCompare({
     versions,
     selectedVersion,
@@ -121,7 +119,6 @@ export function SheetVersionsPage() {
   const [mergeFields, setMergeFields] = useState({ name: true, cards: true });
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [hideSame, setHideSame] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [feedback, setFeedback] = useState('');
 
@@ -133,7 +130,6 @@ export function SheetVersionsPage() {
     }
   }, [isLoading, sheetLoading, error, sheetError, sheet, navigate]);
 
-
   const [prevVersionId, setPrevVersionId] = useState(versionToCompare?.id);
   if (versionToCompare?.id !== prevVersionId) {
     setPrevVersionId(versionToCompare?.id);
@@ -141,7 +137,6 @@ export function SheetVersionsPage() {
   }
 
   const rows = useMemo(() => (versionToCompare ? buildRows(cards, versionToCompare) : []), [cards, versionToCompare]);
-
   const choiceOf = (row: CardRow): Choice => choices[row.key] ?? 'current';
 
   const counts = useMemo(() => {
@@ -163,7 +158,6 @@ export function SheetVersionsPage() {
     setChoices(next);
   };
 
-  /** Ce que la fiche contiendra après fusion, d'après les choix et les champs cochés. */
   const result = useMemo<{ name: string; cards: ResultCard[] }>(() => {
     if (!sheet || !versionToCompare) return { name: '', cards: [] };
 
@@ -213,7 +207,6 @@ export function SheetVersionsPage() {
       }
 
       if (mergeFields.cards) {
-        // les cartes restaurées s'ajoutent à la fin de la fiche
         let order = cards.reduce((max, card) => Math.max(max, card.sortOrder ?? 0), -1) + 1;
 
         for (const row of rows) {
@@ -268,46 +261,8 @@ export function SheetVersionsPage() {
   if (isLoading || sheetLoading) return <VersionsLoading />;
   if (error || sheetError || !sheet) return <VersionsError message={error ?? 'Cette fiche n’existe plus ou est introuvable.'} />;
 
-  const segment = (active: boolean) =>
-    `flex-1 sm:flex-none px-2 sm:px-4 py-2 sm:py-1.5 text-[11px] sm:text-sm font-medium rounded-md transition-colors cursor-pointer text-center ${
-      active ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-200'
-    }`;
-
   const bulkBtn =
     'flex-1 sm:flex-none cursor-pointer rounded-lg border border-amber-900/30 bg-neutral-900 px-3 py-2 sm:py-1.5 text-xs font-medium text-amber-200 transition-colors hover:bg-neutral-800 text-center';
-
-  const sideBox = (kind: 'current' | 'version', row: CardRow) => {
-    const isCurrent = kind === 'current';
-    const text = isCurrent ? row.current : row.snap;
-    const choice = choiceOf(row);
-    const dropped = row.status !== 'same' && (isCurrent ? choice === 'version' : choice === 'current');
-
-    return (
-      <div className="min-w-0">
-        <div className="mb-1 text-[10px] uppercase tracking-widest text-amber-200/40">{isCurrent ? 'Actuelle' : 'Version'}</div>
-        <div
-          className={`rounded-lg px-3 py-2 text-sm text-amber-100/80 wrap-break-word ${
-            !text
-              ? 'italic text-amber-200/30'
-              : isCurrent
-                ? 'bg-red-950/25'
-                : 'bg-emerald-950/25'
-          } ${dropped && text ? 'opacity-45' : ''}`}
-        >
-          {text ? (
-            <>
-              <div className={`font-semibold ${dropped ? 'line-through' : ''}`}>{text.name}</div>
-              <div className={`mt-1 whitespace-pre-wrap leading-relaxed ${dropped ? 'line-through' : ''}`}>
-                {plain(text.description) || <span className="italic text-amber-200/30">(vide)</span>}
-              </div>
-            </>
-          ) : (
-            'absente'
-          )}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif">
@@ -346,143 +301,116 @@ export function SheetVersionsPage() {
             onDelete={handleDelete}
           />
 
-          {versions.length === 0 && (
-            <p className="text-center text-sm text-amber-200/50 font-sans">
-              Aucune version pour le moment. « Enregistrer une version » garde la fiche entière : son nom et toutes ses cartes.
-            </p>
-          )}
-
           {versionToCompare && (
-            <section className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/70 p-3 sm:p-6 shadow-xl space-y-4 sm:space-y-5">
-              <div>
-                <p className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-amber-200/40 mb-1">Comparaison</p>
-                <h2 className="text-xl sm:text-3xl font-bold text-amber-100">Version {versionToCompare.versionNumber} et fiche actuelle</h2>
-                {versionToCompare.name !== sheet.name && (
-                  <p className="mt-1 text-sm text-amber-200/60 font-sans">
-                    Le nom a changé : « {versionToCompare.name} » dans la version, « {sheet.name} » aujourd’hui.
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 font-sans">
-                <div className="flex w-full sm:w-auto p-1 bg-neutral-950/50 rounded-lg border border-amber-900/30">
-                  <button onClick={() => setShowPreview(false)} className={segment(!showPreview)}>
-                    Comparatif par carte
-                  </button>
-                  <button onClick={() => setShowPreview(true)} className={segment(showPreview)}>
-                    Aperçu de la fusion
-                  </button>
+            <section className="rounded-2xl sm:rounded-3xl border border-amber-900/25 bg-neutral-950/70 p-3 sm:p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] sm:text-xs uppercase tracking-[0.28em] text-amber-200/40 mb-1">Comparaison visuelle</p>
+                  <h2 className="text-xl sm:text-2xl font-bold text-amber-100">
+                    v{versionToCompare.versionNumber} {versionToCompare.name ? `- ${versionToCompare.name}` : ''} vs Fiche Actuelle
+                  </h2>
                 </div>
+                <button
+                  onClick={() => navigate(sheetPath)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-900 border border-amber-900/30 rounded-lg text-xs font-sans text-amber-200 hover:bg-neutral-800 transition-colors"
+                >
+                  <IconClose className="size-3.5" />
+                  Fermer
+                </button>
+              </div>
 
-                {!showPreview && (
-                  <label className="flex items-center gap-2 text-sm text-amber-200/80 cursor-pointer hover:text-amber-100 transition-colors">
-                    <input type="checkbox" checked={hideSame} onChange={(e) => setHideSame(e.target.checked)} className="size-4 cursor-pointer" />
-                    Masquer les cartes identiques
-                  </label>
+              <div className="flex flex-wrap items-center justify-between gap-3 font-sans pt-2">
+                <p className="text-xs sm:text-sm text-amber-200/60">
+                  {differences === 0
+                    ? 'La version est identique à la fiche actuelle.'
+                    : `${counts.changed} modifiée(s) · ${counts.added} supprimée(s) depuis · ${counts.removed} ajoutée(s) depuis · ${counts.same} identique(s)`}
+                </p>
+                {differences > 0 && (
+                  <div className="flex w-full sm:w-auto gap-2">
+                    <button onClick={() => applyAll('current')} className={bulkBtn}>
+                      Tout l’actuel
+                    </button>
+                    <button onClick={() => applyAll('version')} className={bulkBtn}>
+                      Toute la version
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {showPreview ? (
-                <div className="p-4 sm:p-5 rounded-xl border border-amber-900/30 bg-neutral-900/40">
-                  <h4 className="text-xs font-sans font-semibold text-amber-200/50 uppercase tracking-widest mb-4">
-                    Rendu final de la fiche
-                  </h4>
-                  <h3 className="mb-4 text-2xl font-bold text-amber-100 wrap-break-word">{result.name}</h3>
-
-                  {result.cards.length === 0 ? (
-                    <p className="italic text-amber-200/50">Aucune carte.</p>
-                  ) : (
-                    <ul className="space-y-4">
-                      {result.cards.map((card) => (
-                        <li key={card.key}>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h5 className="font-bold text-amber-200">{card.name}</h5>
-                            {card.tag && (
-                              <span className="rounded-full border border-amber-800/40 bg-amber-950 px-2 py-0.5 font-sans text-[10px] text-amber-300">
-                                {card.tag}
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-1 whitespace-pre-wrap leading-relaxed text-amber-100/90 wrap-break-word">
-                            {plain(card.description) || <span className="italic text-amber-200/30">À compléter…</span>}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+              {visibleRows.length === 0 ? (
+                <div className="px-4 py-6 text-center text-amber-200/50 text-sm border border-amber-900/20 rounded-xl bg-[#1e1e1e]">
+                  {rows.length === 0 ? 'Aucune carte à comparer.' : 'Aucune différence : toutes les cartes sont identiques.'}
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3 font-sans">
-                    <p className="text-xs sm:text-sm text-amber-200/60">
-                      {differences === 0
-                        ? 'La version est identique à la fiche actuelle.'
-                        : `${counts.changed} modifiée${counts.changed > 1 ? 's' : ''} · ${counts.added} supprimée${counts.added > 1 ? 's' : ''} depuis · ${counts.removed} ajoutée${counts.removed > 1 ? 's' : ''} depuis · ${counts.same} identique${counts.same > 1 ? 's' : ''}`}
-                    </p>
-                    {differences > 0 && (
-                      <div className="flex w-full sm:w-auto gap-2">
-                        <button onClick={() => applyAll('current')} className={bulkBtn}>
-                          Tout l’actuel
-                        </button>
-                        <button onClick={() => applyAll('version')} className={bulkBtn}>
-                          Toute la version
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                <ul className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                  {visibleRows.map((row) => {
+                    const title = (row.current ?? row.snap)?.name ?? '';
+                    const choice = choiceOf(row);
+                    return (
+                      <li key={row.key} className="rounded-xl border border-amber-900/30 bg-[#1e1e1e] p-4 space-y-3 font-mono text-xs sm:text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2 font-sans border-b border-amber-900/20 pb-2">
+                          <span className="min-w-0 truncate font-serif font-semibold text-amber-100 text-base">{title}</span>
+                          <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${STATUS_STYLE[row.status]}`}>
+                            {STATUS_LABEL[row.status]}
+                          </span>
+                        </div>
 
-                  {visibleRows.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-amber-200/50 text-sm">
-                      {rows.length === 0 ? 'Aucune carte à comparer.' : 'Aucune différence : toutes les cartes sont identiques.'}
-                    </div>
-                  ) : (
-                    <ul className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-                      {visibleRows.map((row) => {
-                        const title = (row.current ?? row.snap)?.name ?? '';
-                        const choice = choiceOf(row);
-                        return (
-                          <li key={row.key} className="rounded-xl border border-amber-900/20 bg-neutral-950/60 p-3 sm:p-4 space-y-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2 font-sans">
-                              <span className="min-w-0 truncate font-serif font-semibold text-amber-100">{title}</span>
-                              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${STATUS_STYLE[row.status]}`}>
-                                {STATUS_LABEL[row.status]}
-                              </span>
+                        {row.status === 'same' ? (
+                          <p className="whitespace-pre-wrap text-sm text-amber-100/70 font-serif">
+                            {plain(row.current?.description) || <span className="italic text-amber-200/30">(vide)</span>}
+                          </p>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-amber-900/30 rounded-lg overflow-hidden border border-amber-900/30">
+                              
+                              <div className="flex flex-col bg-red-950/20 p-3">
+                                <span className="text-[10px] uppercase text-red-300 mb-1 font-sans">Version v{versionToCompare.versionNumber}</span>
+                                <div className="text-red-200 font-serif whitespace-pre-wrap">
+                                  {row.snap ? (
+                                    <>
+                                      <div className="font-bold">{row.snap.name}</div>
+                                      <div className="mt-1">{plain(row.snap.description) || '(vide)'}</div>
+                                    </>
+                                  ) : <span className="italic text-amber-200/30">absente</span>}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col bg-emerald-950/20 p-3">
+                                <span className="text-[10px] uppercase text-emerald-300 mb-1 font-sans">Fiche Actuelle</span>
+                                <div className="text-emerald-200 font-serif whitespace-pre-wrap">
+                                  {row.current ? (
+                                    <>
+                                      <div className="font-bold">{row.current.name}</div>
+                                      <div className="mt-1">{plain(row.current.description) || '(vide)'}</div>
+                                    </>
+                                  ) : <span className="italic text-amber-200/30">absente</span>}
+                                </div>
+                              </div>
+
                             </div>
 
-                            {row.status === 'same' ? (
-                              <p className="line-clamp-3 whitespace-pre-wrap text-sm text-amber-100/70 wrap-break-word">
-                                {plain(row.current?.description) || <span className="italic text-amber-200/30">(vide)</span>}
-                              </p>
-                            ) : (
-                              <>
-                                <div className="grid gap-3 md:grid-cols-2">
-                                  {sideBox('current', row)}
-                                  {sideBox('version', row)}
-                                </div>
-                                <div className="flex flex-wrap gap-2 font-sans">
-                                  {(['current', 'version'] as const).map((value) => (
-                                    <button
-                                      key={value}
-                                      onClick={() => setChoices((current) => ({ ...current, [row.key]: value }))}
-                                      aria-pressed={choice === value}
-                                      className={`px-3 py-2 rounded-md text-xs border cursor-pointer touch-target flex-1 sm:flex-none text-center ${
-                                        choice === value
-                                          ? 'bg-amber-700 text-amber-50 border-amber-600'
-                                          : 'bg-neutral-900 text-amber-200 border-amber-900/30'
-                                      }`}
-                                    >
-                                      {CHOICE_LABELS[row.status as Exclude<CardStatus, 'same'>][value]}
-                                    </button>
-                                  ))}
-                                </div>
-                              </>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
+                            <div className="flex flex-wrap gap-2 font-sans pt-1">
+                              {(['current', 'version'] as const).map((value) => (
+                                <button
+                                  key={value}
+                                  onClick={() => setChoices((current) => ({ ...current, [row.key]: value }))}
+                                  aria-pressed={choice === value}
+                                  className={`px-3 py-2 rounded-md text-xs border cursor-pointer touch-target flex-1 sm:flex-none text-center ${
+                                    choice === value
+                                      ? 'bg-amber-700 text-amber-50 border-amber-600'
+                                      : 'bg-neutral-900 text-amber-200 border-amber-900/30'
+                                  }`}
+                                >
+                                  {CHOICE_LABELS[row.status as Exclude<CardStatus, 'same'>][value]}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
 
               <MergeOptions
