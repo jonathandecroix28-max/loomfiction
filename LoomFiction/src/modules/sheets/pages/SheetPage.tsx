@@ -15,7 +15,7 @@ import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
 import { offlineSheetVersionService } from '../../../services/offlineSheetVersionService';
 import { exportSheetToJson, exportSheetToMarkdownFile } from '../services/sheetExchange';
-import { toUpsert } from '../sheetLinks';
+import { bookOfSheet, toUpsert } from '../sheetLinks';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetVersionResponse } from '../../../types/sheetVersion';
 import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
@@ -226,7 +226,7 @@ export function SheetPage() {
           sheetId: currentSheet.id,
           status: 'draft',
           sortOrder: cards.length,
-          bookId: null,
+          bookId: bookOfSheet(cards),
         });
         await reload();
         notifyDataChanged('sheet-page');
@@ -543,18 +543,23 @@ export function SheetPage() {
     setFeedback('');
     try {
       const currentById = new Map(cards.map((card) => [card.id, card]));
+      // Une version archivée peut contenir l'ancienne catégorie / l'ancien roman : les cartes suivent la fiche actuelle.
+      const currentBookId = bookOfSheet(cards);
       const targetById = new Map(reviewPreviewCards.map((card) => [card.id, card]));
 
       for (const [sortOrder, targetCard] of reviewPreviewCards.entries()) {
-        const payload = { ...toUpsert(targetCard), sortOrder };
+        const payload = {
+          ...toUpsert(targetCard),
+          sortOrder,
+          categoryId: currentSheet.categoryId,
+          bookId: currentBookId,
+        };
         if (currentById.has(targetCard.id)) {
           await offlineIdeaService.update(targetCard.id, payload);
         } else {
           await offlineIdeaService.create({
             ...payload,
-            categoryId: targetCard.categoryId ?? currentSheet.categoryId,
             sheetId: currentSheet.id,
-            bookId: targetCard.bookId ?? null,
           });
         }
       }

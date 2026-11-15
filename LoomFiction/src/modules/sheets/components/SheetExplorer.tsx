@@ -7,7 +7,9 @@ import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
 import { offlineSheetVersionService } from '../../../services/offlineSheetVersionService';
 import { offlineIdeaVersionService } from '../../../services/offlineIdeaVersionService';
+import { offlineChapterService } from '../../../services/offlineChapterService';
 import type { BookResponse } from '../../../types/book';
+import type { ChapterResponse } from '../../../types/chapter';
 import type { SheetResponse } from '../../../types/sheet';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetVersionResponse } from '../../../types/sheetVersion';
@@ -18,6 +20,7 @@ import {
   IconSheet,
   IconBooks,
   IconIdea,
+  IconFile,
   IconHistory,
   IconAdd,
   IconUp,
@@ -27,6 +30,8 @@ import { formatDate } from '../../../utils/date/dateFormatter';
 import { bookOfSheet } from '../sheetLinks';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
+
+type ChapterEntry = { chapter: ChapterResponse; bookId: number };
 
 type SheetExplorerProps = {
   isOpen: boolean;
@@ -57,6 +62,7 @@ export function SheetExplorer({
   const [ideas, setIdeas] = useState<IdeaResponse[]>([]);
   const [sheetVersions, setSheetVersions] = useState<SheetVersionResponse[]>([]);
   const [ideaVersions, setIdeaVersions] = useState<IdeaVersionResponse[]>([]);
+  const [chapterEntries, setChapterEntries] = useState<ChapterEntry[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
 
   const [isCreatingBook, setIsCreatingBook] = useState(false);
@@ -99,6 +105,15 @@ export function SheetExplorer({
         offlineSheetVersionService.getAll().catch(() => []),
         offlineIdeaVersionService.getAll().catch(() => []),
       ]);
+      const chapterLists = await Promise.all(
+        (booksData || []).map(async (book) => ({
+          bookId: book.id,
+          chapters: await offlineChapterService.getByBookId(book.id).catch(() => [] as ChapterResponse[]),
+        })),
+      );
+      setChapterEntries(
+        chapterLists.flatMap(({ bookId, chapters }) => (chapters ?? []).map((chapter) => ({ chapter, bookId }))),
+      );
       setBooks(booksData || []);
       setIdeas(ideasData || []);
       setSheetVersions(sheetVerData || []);
@@ -194,6 +209,49 @@ export function SheetExplorer({
     map.forEach((list) => list.sort((a, b) => b.versionNumber - a.versionNumber));
     return map;
   }, [ideaVersions]);
+
+  // Chapitres qui mentionnent chaque fiche (mentions @ présentes dans le contenu des chapitres).
+  const chaptersBySheetId = useMemo(() => {
+    const map = new Map<number, ChapterEntry[]>();
+    if (sheets.length === 0 || chapterEntries.length === 0) return map;
+
+    const knownIds = new Set(sheets.map((sheet) => sheet.id));
+    const idByName = new Map(sheets.map((sheet) => [sheet.name.trim().toLowerCase(), sheet.id]));
+
+    for (const entry of chapterEntries) {
+      const html = entry.chapter.content;
+      if (!html || !html.includes('mention')) continue;
+
+      const mentioned = new Set<number>();
+      new DOMParser()
+        .parseFromString(html, 'text/html')
+        .querySelectorAll('[data-type="mention"]')
+        .forEach((element) => {
+          const rawId = Number((element.getAttribute('data-id') ?? '').replace(/\D/g, ''));
+          if (rawId && knownIds.has(rawId)) {
+            mentioned.add(rawId);
+            return;
+          }
+          const label = (element.getAttribute('data-label') ?? element.textContent ?? '')
+            .replace(/^@/, '')
+            .trim()
+            .toLowerCase();
+          const byName = idByName.get(label);
+          if (byName) mentioned.add(byName);
+        });
+
+      mentioned.forEach((sheetId) => {
+        const list = map.get(sheetId) ?? [];
+        list.push(entry);
+        map.set(sheetId, list);
+      });
+    }
+
+    map.forEach((list) =>
+      list.sort((a, b) => a.bookId - b.bookId || Number(a.chapter.chapter_number) - Number(b.chapter.chapter_number)),
+    );
+    return map;
+  }, [chapterEntries, sheets]);
 
   const toggleFolder = (folderKey: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -434,6 +492,69 @@ export function SheetExplorer({
     </div>
   );
 
+  const countMentionedChapters = (groupSheets: SheetResponse[]) => {
+    const ids = new Set<number>();
+    for (const sheet of groupSheets) {
+      for (const entry of chaptersBySheetId.get(sheet.id) ?? []) ids.add(entry.chapter.id);
+    }
+    return ids.size;
+  };
+
+  const renderMentionedChapters = (groupSheets: SheetResponse[]) => (
+    <div className="ml-4 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-2">
+      {groupSheets.every((sheet) => !(chaptersBySheetId.get(sheet.id)?.length)) ? (
+        <div className="py-1 text-[10px] text-amber-200/30 italic">Aucun chapitre ne mentionne ces fiches</div>
+      ) : (
+        groupSheets.map((sheet) => {
+          const entries = chaptersBySheetId.get(sheet.id) ?? [];
+          if (entries.length === 0) return null;
+          const key = `sheet-chapters-group-${sheet.id}`;
+          const expanded = !!expandedFolders[key];
+          return (
+            <div key={key} className="flex flex-col">
+              <button
+                type="button"
+                onClick={(event) => toggleFolder(key, event)}
+                aria-expanded={expanded}
+                className="flex min-h-8 items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11px] text-amber-200/60 hover:bg-amber-900/20 cursor-pointer"
+              >
+                <IconChevronRight className={`size-3 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                <IconSheet className="size-3 shrink-0 opacity-60" />
+                <span className="truncate">{sheet.name}</span>
+                <span className="ml-auto text-[10px] opacity-40">({entries.length})</span>
+              </button>
+              {expanded && (
+                <div className="ml-4 flex flex-col border-l border-amber-900/20 pl-2">
+                  {entries.map(({ chapter, bookId }) => (
+                    <button
+                      type="button"
+                      key={chapter.id}
+                      onClick={() => {
+                        navigate(`/books/${bookId}/chapters/${chapter.id}`);
+                        closeAfterNavigation();
+                      }}
+                      className="flex min-h-9 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-amber-200/60 hover:bg-amber-900/20 hover:text-amber-200 cursor-pointer"
+                    >
+                      <IconFile className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[11px] font-medium leading-tight">
+                          Chap. {chapter.chapter_number} · {chapter.title}
+                        </div>
+                        <div className="truncate text-[9px] font-sans tracking-wide opacity-60">
+                          {books.find((book) => book.id === bookId)?.title ?? `Roman #${bookId}`}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+
   const renderIdeaVersions = (groupIdeas: IdeaResponse[]) => (
     <div className="ml-4 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-2">
       {groupIdeas.length === 0 || groupIdeas.every((idea) => !(versionsByIdeaId.get(idea.id)?.length)) ? (
@@ -506,6 +627,7 @@ export function SheetExplorer({
     const ideasKey = `${categoryKey}-ideas`;
     const sheetVersionsKey = `${categoryKey}-sheet-versions`;
     const ideaVersionsKey = `${categoryKey}-idea-versions`;
+    const chaptersKey = `${categoryKey}-chapters`;
 
     const isCreatingSheetHere = creatingSheetInFolderKey === sheetsKey;
     const isCreatingIdeaHere = creatingIdeaInFolderKey === ideasKey;
@@ -628,6 +750,7 @@ export function SheetExplorer({
           </div>
         ),
       },
+      { key: chaptersKey, label: 'Chapitres mentionnant les fiches', count: countMentionedChapters(groupSheets), icon: IconFile, content: renderMentionedChapters(groupSheets) },
       { key: sheetVersionsKey, label: 'Versions des fiches', count: groupSheets.reduce((sum, sheet) => sum + (versionsBySheetId.get(sheet.id)?.length ?? 0), 0), icon: IconHistory, content: renderSheetVersions(groupSheets) },
       { key: ideaVersionsKey, label: 'Versions des idées', count: groupIdeas.reduce((sum, idea) => sum + (versionsByIdeaId.get(idea.id)?.length ?? 0), 0), icon: IconHistory, content: renderIdeaVersions(groupIdeas) },
     ];
