@@ -59,7 +59,6 @@ export function ChapterEditorPage() {
   const [isExplorerOpen, setIsExplorerOpen] = useState(false);
   const [isChapterModalOpen, setIsChapterModalOpen] = useState(false);
 
-  // Gestion des modes pour une version sélectionnée : 'diff' ou 'edit'
   const [activeVersion, setActiveVersion] = useState<ChapterVersionResponse | null>(null);
   const [viewMode, setViewMode] = useState<'diff' | 'edit'>('diff');
   const [hideIdenticalLines, setHideIdenticalLines] = useState(false);
@@ -270,8 +269,6 @@ export function ChapterEditorPage() {
     navigate(`/books/${bookId}/chapters/${newChapterId}`);
   };
 
-  // Compare les blocs HTML Tiptap (paragraphes, titres, listes, etc.) afin de
-  // pouvoir reconstruire un résultat sans aplatir la mise en forme en texte brut.
   const diffGroups = useMemo(() => {
     type HtmlBlock = { html: string; text: string };
     type EqualGroup = { type: 'equal'; oldBlock: HtmlBlock; currentBlock: HtmlBlock; oldLine: number; currentLine: number };
