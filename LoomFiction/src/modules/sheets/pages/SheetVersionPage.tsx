@@ -140,11 +140,11 @@ export function SheetVersionsPage() {
   const choiceOf = (row: CardRow): Choice => choices[row.key] ?? 'current';
 
   const counts = useMemo(() => {
-    const result: Record<CardStatus, number> = { same: 0, changed: 0, added: 0, removed: 0 };
+    const resultCount: Record<CardStatus, number> = { same: 0, changed: 0, added: 0, removed: 0 };
     rows.forEach((row) => {
-      result[row.status] += 1;
+      resultCount[row.status] += 1;
     });
-    return result;
+    return resultCount;
   }, [rows]);
 
   const differences = counts.changed + counts.added + counts.removed;
@@ -202,8 +202,8 @@ export function SheetVersionsPage() {
 
     setIsRestoring(true);
     try {
-      if (mergeFields.name && versionToCompare.name !== sheet.name) {
-        await offlineSheetService.update(sheet.id, { name: versionToCompare.name });
+      if (mergeFields.name && result.name !== sheet.name) {
+        await offlineSheetService.update(sheet.id, { name: result.name });
       }
 
       if (mergeFields.cards) {
@@ -325,16 +325,27 @@ export function SheetVersionsPage() {
                     ? 'La version est identique à la fiche actuelle.'
                     : `${counts.changed} modifiée(s) · ${counts.added} supprimée(s) depuis · ${counts.removed} ajoutée(s) depuis · ${counts.same} identique(s)`}
                 </p>
-                {differences > 0 && (
-                  <div className="flex w-full sm:w-auto gap-2">
-                    <button onClick={() => applyAll('current')} className={bulkBtn}>
-                      Tout l’actuel
-                    </button>
-                    <button onClick={() => applyAll('version')} className={bulkBtn}>
-                      Toute la version
-                    </button>
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="flex items-center gap-2 text-xs text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={hideSame}
+                      onChange={(e) => setHideSame(e.target.checked)}
+                      className="accent-amber-600"
+                    />
+                    Masquer les identiques
+                  </label>
+                  {differences > 0 && (
+                    <div className="flex w-full sm:w-auto gap-2">
+                      <button onClick={() => applyAll('current')} className={bulkBtn}>
+                        Tout l’actuel
+                      </button>
+                      <button onClick={() => applyAll('version')} className={bulkBtn}>
+                        Toute la version
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {visibleRows.length === 0 ? (
