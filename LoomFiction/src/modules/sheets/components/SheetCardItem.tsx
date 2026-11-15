@@ -15,6 +15,7 @@ import { IconDelete, IconDown, IconEdit, IconUp } from '../../../components/icon
 import { ActionMenu } from './ActionMenu';
 import { toUpsert } from '../sheetLinks';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
+import { notifyDataChanged } from '../../../hooks/useDataChanged';
 
 interface SheetCardItemProps {
   card: IdeaResponse;
@@ -152,7 +153,7 @@ export function SheetCardItem({
       setIsRenaming(false);
       toast.success('Caractéristique renommée');
       onCardUpdated();
-      window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
+      notifyDataChanged('sheet-page');
     } catch (err) {
       console.error('Erreur renommage caractéristique :', err);
       toast.error('Impossible de renommer la caractéristique.');

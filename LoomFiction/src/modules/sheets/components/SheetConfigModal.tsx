@@ -7,6 +7,7 @@ import type { SheetResponse } from '../../../types/sheet';
 import type { BookResponse } from '../../../types/book';
 import type { IdeaResponse, IdeaStatus } from '../../../types/idea';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
+import { notifyDataChanged } from '../../../hooks/useDataChanged';
 import { IconClose } from '../../../components/icons';
 import { bookOfSheet, toUpsert } from '../sheetLinks';
 
@@ -84,7 +85,7 @@ function SheetConfigForm({ onClose, sheet, cards, onSuccess }: SheetConfigModalP
         });
       }
 
-      window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
+      notifyDataChanged('sheet-page');
 
       toast.success('Configuration de la fiche mise à jour');
       onSuccess();

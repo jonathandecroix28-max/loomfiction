@@ -13,6 +13,7 @@ import { offlineSheetService } from '../../../services/offlineSheetService';
 import { useUpdateChapter } from '../../chapters/hooks/UseUpdateChapter';
 import { useChapterVersions } from '../hooks/useChapterVersions';
 import { useChapters } from '../../chapters/hooks/useChapter';
+import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
 import { EditorToolbar } from '../../../components/tools/EditorToolbar';
 import { imageFilesFrom, insertImageFiles } from '../../../utils/images/editorImages';
 import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
@@ -73,7 +74,15 @@ export function ChapterEditorPage() {
 
   const { updateChapter, isUpdating, error: updateError } = useUpdateChapter();
   const { versions: chapterVersions, refetch: refetchChapterVersions } = useChapterVersions(chapterIdNumber);
-  const { chapters, setChapters } = useChapters(bookIdNumber);
+  const { chapters, setChapters, refetch: refetchChapters } = useChapters(bookIdNumber);
+
+  // Mise à jour en direct quand l'explorateur crée un roman, un chapitre ou une version.
+  useDataChanged((source) => {
+    if (source === 'chapter-page') return;
+    void refetchChapters();
+    void refetchChapterVersions();
+    void offlineSheetService.getAll().then(setSheets).catch(() => undefined);
+  });
 
   const editor = useEditor({
     extensions: [
@@ -234,6 +243,7 @@ export function ChapterEditorPage() {
           setActiveVersion(currentUpdated);
         }
         await refetchChapterVersions();
+        notifyDataChanged('chapter-page');
         setSaveMessage('Version enregistrée');
         setTimeout(() => setSaveMessage(''), 3000);
       } catch (err) {
@@ -247,6 +257,7 @@ export function ChapterEditorPage() {
 
     if (updated) {
       setChapter(updated);
+      notifyDataChanged('chapter-page');
       setSaveMessage('Enregistré');
       setTimeout(() => setSaveMessage(''), 3000);
     } else if (updateError) {
@@ -270,6 +281,7 @@ export function ChapterEditorPage() {
         content: editor.getHTML(),
       });
       await refetchChapterVersions();
+      notifyDataChanged('chapter-page');
       setSaveMessage(`v${nextVersionNumber} créée.`);
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
@@ -420,6 +432,7 @@ export function ChapterEditorPage() {
         return;
       }
       setChapter(updated);
+      notifyDataChanged('chapter-page');
       setTitle(updated.title);
       setActiveVersion(null);
       setIsReviewPreview(false);
@@ -780,6 +793,7 @@ export function ChapterEditorPage() {
           nextChapterNumber={chapters.length > 0 ? Math.max(...chapters.map(c => c.chapter_number)) + 1 : 1}
           onChapterCreated={(newChapters) => {
             setChapters(newChapters);
+            notifyDataChanged('chapter-page');
             const newChapter = newChapters[newChapters.length - 1];
             navigate(`/books/${bookId}/chapters/${newChapter.id}`);
             setIsChapterModalOpen(false);

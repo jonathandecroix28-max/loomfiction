@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import DOMPurify from 'dompurify';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSheetPage } from '../hooks/useSheetPage';
 import { useSheets } from '../hooks/useSheets';
 import { SheetCardItem } from '../components/SheetCardItem';
@@ -19,6 +19,7 @@ import { toUpsert } from '../sheetLinks';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetVersionResponse } from '../../../types/sheetVersion';
 import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
+import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
 import {
   IconAdd,
   IconAttach,
@@ -36,6 +37,12 @@ import {
 } from '../../../components/icons';
 
 type Mode = 'cards' | 'document';
+
+// Version transmise par l'explorateur via l'état de navigation quand elle appartient à une autre fiche.
+function versionFromNavigationState(state: unknown, sheetId: number | null): SheetVersionResponse | null {
+  const version = (state as { version?: SheetVersionResponse } | null)?.version;
+  return version && sheetId !== null && version.sheetId === sheetId ? version : null;
+}
 
 const toolbarBtn = 'cursor-pointer rounded-xl border px-4 py-2.5 text-sm font-medium transition touch-target';
 
@@ -139,6 +146,7 @@ function htmlToMarkdown(html: string): string {
 export function SheetPage() {
   const { sheetId } = useParams<{ sheetId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const confirm = useConfirm();
   const toast = useToast();
   const numSheetId = sheetId ? Number(sheetId) : null;
@@ -153,7 +161,11 @@ export function SheetPage() {
   const [draftName, setDraftName] = useState('');
   const [feedback, setFeedback] = useState('');
 
-  const [activeVersion, setActiveVersion] = useState<SheetVersionResponse | null>(null);
+  // La version affichée n'est valable que pour sa propre fiche : elle est comparée à cette fiche, jamais à une autre.
+  const [storedVersion, setActiveVersion] = useState<SheetVersionResponse | null>(() =>
+    versionFromNavigationState(location.state, numSheetId),
+  );
+  const activeVersion = storedVersion && sheet && storedVersion.sheetId === sheet.id ? storedVersion : null;
   const [viewMode, setViewMode] = useState<'diff' | 'edit'>('diff');
   const [hideIdenticalLines, setHideIdenticalLines] = useState(false);
   const [reviewDecisions, setReviewDecisions] = useState<Record<number, boolean>>({});
@@ -161,7 +173,26 @@ export function SheetPage() {
   const [reviewPreviewCards, setReviewPreviewCards] = useState<IdeaResponse[]>([]);
   const [isApplyingReview, setIsApplyingReview] = useState(false);
 
-  const { sheets: allSheets } = useSheets();
+  // À chaque navigation (changement de fiche, version ouverte depuis l'explorateur), on repart d'un état propre.
+  const [appliedLocationKey, setAppliedLocationKey] = useState(location.key);
+  if (location.key !== appliedLocationKey) {
+    setAppliedLocationKey(location.key);
+    setActiveVersion(versionFromNavigationState(location.state, numSheetId));
+    setViewMode('diff');
+    setHideIdenticalLines(false);
+    setReviewDecisions({});
+    setIsReviewPreview(false);
+    setReviewPreviewCards([]);
+  }
+
+  const { sheets: allSheets, refreshSheets } = useSheets();
+
+  // Synchronisation avec l'explorateur (et les modales) sans rechargement de page.
+  useDataChanged((source) => {
+    if (source === 'sheet-page') return;
+    void refreshSheets();
+    void reload();
+  });
   const editorsRef = useRef(new Map<number, Editor>());
   const [detectTargets, setDetectTargets] = useState<DetectionTarget[] | null>(null);
 
@@ -198,6 +229,7 @@ export function SheetPage() {
           bookId: null,
         });
         await reload();
+        notifyDataChanged('sheet-page');
         toast.success('Caractéristique ajoutée');
       } catch (err) {
         console.error('Erreur lors de la création de la carte :', err);
@@ -232,6 +264,7 @@ export function SheetPage() {
           await offlineIdeaService.update(card.id, toUpsert(card));
         }
       }
+      notifyDataChanged('sheet-page');
     } catch (err) {
       console.error('Erreur lors du changement d’ordre :', err);
       await reload();
@@ -261,6 +294,7 @@ export function SheetPage() {
     try {
       await offlineIdeaService.remove(card.id);
       await reload();
+      notifyDataChanged('sheet-page');
       toast.success('Carte supprimée');
     } catch (err) {
       console.error('Erreur lors de la suppression de la carte :', err);
@@ -277,7 +311,7 @@ export function SheetPage() {
     try {
       await offlineSheetService.update(currentSheet.id, { name });
       setIsRenaming(false);
-      window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
+      notifyDataChanged('sheet-page');
       await reload();
       toast.success('Fiche renommée');
     } catch (err) {
@@ -298,6 +332,7 @@ export function SheetPage() {
 
     try {
       await offlineSheetService.remove(currentSheet.id);
+      notifyDataChanged('sheet-page');
       toast.success('Fiche supprimée');
       navigate('/ideas', { replace: true });
     } catch (err) {
@@ -310,6 +345,7 @@ export function SheetPage() {
     const currentSheet = sheet;
     try {
       const version = await offlineSheetVersionService.createFromSheet(currentSheet, cards);
+      notifyDataChanged('sheet-page');
       flash(`Version ${version.versionNumber} enregistrée (${cards.length} cartes).`);
     } catch (err) {
       console.error('Erreur version :', err);
@@ -530,6 +566,7 @@ export function SheetPage() {
       }
 
       await reload();
+      notifyDataChanged('sheet-page');
       setActiveVersion(null);
       setIsReviewPreview(false);
       setReviewPreviewCards([]);
@@ -577,6 +614,11 @@ export function SheetPage() {
         onClose={() => setIsExplorerOpen(false)}
         currentSheetId={sheet.id}
         onSelectSheetVersion={(version) => {
+          if (version.sheetId !== sheet.id) {
+            // La version appartient à une autre fiche : on ouvre cette fiche et on la compare avec ses propres cartes.
+            navigate(`/ideas/fiches/${version.sheetId}`, { state: { version } });
+            return;
+          }
           setActiveVersion(version);
           setViewMode('diff');
           setHideIdenticalLines(false);
@@ -607,12 +649,6 @@ export function SheetPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                {activeVersion && (
-                  <div className="flex p-1 bg-neutral-900/95 rounded-lg border border-amber-900/30 text-xs font-sans">
-                    <button onClick={() => setViewMode('diff')} className={`px-3 py-1 rounded-md transition-colors ${viewMode === 'diff' ? 'bg-amber-700 text-amber-50' : 'text-amber-200/70 hover:text-amber-100'}`}>Vue Diff</button>
-                    <button onClick={() => setViewMode('edit')} className={`px-3 py-1 rounded-md transition-colors ${viewMode === 'edit' ? 'bg-amber-700 text-amber-50' : 'text-amber-200/70 hover:text-amber-100'}`}>Modifier cette version</button>
-                  </div>
-                )}
                 {!isExplorerOpen && (
                   <button
                     onClick={() => setIsExplorerOpen(true)}
@@ -687,8 +723,13 @@ export function SheetPage() {
                     </button>
                   )}
                   {activeVersion && (
-                    <button onClick={() => { setActiveVersion(null); setIsReviewPreview(false); }} className="p-1 rounded bg-neutral-900 text-amber-200 hover:bg-neutral-800">
-                      <IconClose className="size-5" />
+                    <button
+                      type="button"
+                      onClick={() => { setActiveVersion(null); setIsReviewPreview(false); }}
+                      aria-label="Fermer la comparaison"
+                      className="touch-target inline-flex min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-neutral-900 text-amber-200 hover:bg-neutral-800"
+                    >
+                      <IconClose className="size-5" aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -698,6 +739,31 @@ export function SheetPage() {
                 {cards.length} {cards.length > 1 ? 'cartes' : 'carte'} · {filled} {filled > 1 ? 'remplies' : 'remplie'}
               </p>
             </div>
+
+            {activeVersion && (
+              <div className="grid grid-cols-2 gap-1 rounded-xl border border-amber-900/30 bg-neutral-950/50 p-1 font-sans sm:w-96">
+                {(['diff', 'edit'] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setViewMode(value)}
+                    aria-pressed={viewMode === value}
+                    className={`touch-target cursor-pointer rounded-lg px-3 py-2 text-sm font-medium transition ${
+                      viewMode === value ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-100'
+                    }`}
+                  >
+                    {value === 'diff' ? (
+                      'Vue Diff'
+                    ) : (
+                      <>
+                        <span className="sm:hidden">Modifier</span>
+                        <span className="hidden sm:inline">Modifier cette version</span>
+                      </>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {!activeVersion && (
               <div className="grid grid-cols-2 gap-1 rounded-xl border border-amber-900/30 bg-neutral-950/50 p-1 font-sans sm:w-72">
@@ -720,25 +786,53 @@ export function SheetPage() {
 
         {activeVersion && viewMode === 'diff' && !isReviewPreview ? (
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#1e1e1e] font-mono text-xs sm:text-sm">
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-amber-900/30 bg-[#252526] px-3 py-2 font-sans">
-              <label className="flex items-center gap-2 text-xs text-neutral-300">
-                <input type="checkbox" checked={hideIdenticalLines} onChange={(event) => setHideIdenticalLines(event.target.checked)} className="accent-amber-600" />
-                Masquer les lignes identiques
-              </label>
-              <span className="text-[11px] text-neutral-400">{changeGroups.length} changement(s) à examiner</span>
-              <button onClick={buildReviewPreview} disabled={changeGroups.length === 0} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">Prévisualiser le résultat</button>
+            <div className="flex shrink-0 flex-col gap-2 border-b border-amber-900/30 bg-[#252526] px-3 py-2 font-sans sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
+                <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                  <input type="checkbox" checked={hideIdenticalLines} onChange={(event) => setHideIdenticalLines(event.target.checked)} className="size-4 accent-amber-600" />
+                  Masquer les lignes identiques
+                </label>
+                <span className="shrink-0 text-[11px] text-neutral-400">{changeGroups.length} changement(s)</span>
+              </div>
+              <button
+                type="button"
+                onClick={buildReviewPreview}
+                disabled={changeGroups.length === 0}
+                className="touch-target w-full cursor-pointer rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+              >
+                Prévisualiser le résultat
+              </button>
             </div>
 
             {changeGroups.length > 0 && (
-              <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-amber-900/30 bg-[#222] p-2">
-                {changeGroups.map((group, index) => (
-                  <div key={group.id} className="flex shrink-0 items-center gap-2 rounded-lg border border-neutral-700 bg-[#292929] px-2 py-1.5">
-                    <span className="font-sans text-[11px] text-neutral-300">Changement {index + 1}</span>
-                    <button onClick={() => setReviewDecisions((current) => ({ ...current, [group.id]: true }))} className={`rounded px-2 py-1 font-sans text-[11px] ${reviewDecisions[group.id] === true ? 'bg-emerald-700 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-emerald-900'}`}>Accepter</button>
-                    <button onClick={() => setReviewDecisions((current) => ({ ...current, [group.id]: false }))} className={`rounded px-2 py-1 font-sans text-[11px] ${reviewDecisions[group.id] === false ? 'bg-red-800 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-red-950'}`}>Rejeter</button>
-                    <span className="font-sans text-[10px] text-neutral-500">{reviewDecisions[group.id] === undefined ? 'En attente' : reviewDecisions[group.id] ? 'Accepté' : 'Rejeté'}</span>
-                  </div>
-                ))}
+              <div className="flex shrink-0 snap-x gap-2 overflow-x-auto border-b border-amber-900/30 bg-[#222] p-2">
+                {changeGroups.map((group, index) => {
+                  const decision = reviewDecisions[group.id];
+                  return (
+                    <div key={group.id} className="flex w-44 shrink-0 snap-start flex-col gap-2 rounded-lg border border-neutral-700 bg-[#292929] p-2 sm:w-auto sm:flex-row sm:items-center">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-sans text-xs font-medium text-neutral-200">Changement {index + 1}</span>
+                        <span className="font-sans text-[10px] text-neutral-500">{decision === undefined ? 'En attente' : decision ? 'Accepté' : 'Rejeté'}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setReviewDecisions((current) => ({ ...current, [group.id]: true }))}
+                          className={`min-h-10 cursor-pointer rounded-md px-3 font-sans text-xs font-medium ${decision === true ? 'bg-emerald-700 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-emerald-900'}`}
+                        >
+                          Accepter
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReviewDecisions((current) => ({ ...current, [group.id]: false }))}
+                          className={`min-h-10 cursor-pointer rounded-md px-3 font-sans text-xs font-medium ${decision === false ? 'bg-red-800 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-red-950'}`}
+                        >
+                          Rejeter
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -828,9 +922,9 @@ export function SheetPage() {
             {isReviewPreview ? (
               <div className="space-y-4">
                 <div className="mb-4 rounded-lg border border-emerald-700/50 bg-emerald-950/30 p-3 font-sans text-sm text-emerald-200">Aperçu uniquement : la fiche n'est pas encore modifiée.</div>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setIsReviewPreview(false)} className="rounded-xl border border-amber-900/40 px-4 py-2 font-sans text-xs text-amber-200 hover:bg-amber-900/20">Revenir aux changements</button>
-                  <button onClick={handleApplyReview} disabled={isApplyingReview} className="rounded-xl bg-emerald-700 px-4 py-2 font-sans text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-50">{isApplyingReview ? 'Validation…' : 'Confirmer et appliquer'}</button>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button type="button" onClick={() => setIsReviewPreview(false)} className="touch-target w-full cursor-pointer rounded-xl border border-amber-900/40 px-4 py-2.5 font-sans text-sm text-amber-200 hover:bg-amber-900/20 sm:w-auto">Revenir aux changements</button>
+                  <button type="button" onClick={handleApplyReview} disabled={isApplyingReview} className="touch-target w-full cursor-pointer rounded-xl bg-emerald-700 px-4 py-2.5 font-sans text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50 sm:w-auto">{isApplyingReview ? 'Validation…' : 'Confirmer et appliquer'}</button>
                 </div>
                 {reviewPreviewCards.map((card, index) => (
                   <SheetCardItem

@@ -26,6 +26,7 @@ import {
 import { formatDate } from '../../../utils/date/dateFormatter';
 import { bookOfSheet } from '../sheetLinks';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
+import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
 
 type SheetExplorerProps = {
   isOpen: boolean;
@@ -107,17 +108,12 @@ export function SheetExplorer({
     }
   };
 
-  useEffect(() => {
-    const handleDataChange = () => {
-      void refreshSheets();
-      void loadData();
-    };
-
-    window.addEventListener('loomfiction-data-changed', handleDataChange);
-    return () => {
-      window.removeEventListener('loomfiction-data-changed', handleDataChange);
-    };
-  }, [refreshSheets]);
+  // Mise à jour en direct quand la page (ou une modale) modifie des données ; on ignore nos propres événements.
+  useDataChanged((source) => {
+    if (source === 'sheet-explorer') return;
+    void refreshSheets();
+    void loadData();
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -242,7 +238,7 @@ export function SheetExplorer({
       }
       await refreshSheets();
       await loadData();
-      window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
+      notifyDataChanged('sheet-explorer');
     } catch (err) {
       console.error('Erreur lors du déplacement de la fiche :', err);
       toast.error('Impossible de déplacer la fiche.');
@@ -260,7 +256,7 @@ export function SheetExplorer({
       await offlineBookService.create(title);
       await refreshSheets();
       await loadData();
-      window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
+      notifyDataChanged('sheet-explorer');
       toast.success(`Roman "${title}" créé`);
     } catch (err) {
       console.error('Erreur création roman :', err);
@@ -281,7 +277,7 @@ export function SheetExplorer({
     try {
       await createCategory({ name, color: '#d97706' });
       await refreshSheets();
-      window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
+      notifyDataChanged('sheet-explorer');
       toast.success(`Catégorie "${name}" créée`);
     } catch (err) {
       console.error('Erreur création catégorie :', err);
@@ -314,7 +310,7 @@ export function SheetExplorer({
       }
       await refreshSheets();
       await loadData();
-      window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
+      notifyDataChanged('sheet-explorer');
       toast.success(`Fiche "${name}" créée`);
       if (newSheet) {
         navigateToSheet(newSheet.id);
@@ -344,7 +340,7 @@ export function SheetExplorer({
         status: 'draft',
       });
       await loadData();
-      window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
+      notifyDataChanged('sheet-explorer');
       toast.success(`Idée "${name}" créée`);
       navigateToIdea();
     } catch (err) {

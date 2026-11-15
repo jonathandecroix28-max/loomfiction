@@ -19,6 +19,7 @@ import {
 } from '../../../components/icons';
 import { formatDate } from '../../../utils/date/dateFormatter';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
+import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
 
 type ChapterExplorerProps = {
   isOpen: boolean;
@@ -40,7 +41,7 @@ export function ChapterExplorer({
   const navigate = useNavigate();
   const toast = useToast();
 
-  const { chapters, isLoadingChapters, setChapters } = useChapters(bookId);
+  const { chapters, isLoadingChapters, setChapters, refetch: refetchChapters } = useChapters(bookId);
 
   const [books, setBooks] = useState<BookResponse[]>([]);
   const [sheets, setSheets] = useState<SheetResponse[]>([]);
@@ -123,6 +124,7 @@ export function ChapterExplorer({
         chapterMap[b.id] = chs ?? [];
       }
       setChaptersByBook(chapterMap);
+      void refetchChapters();
     } catch (err) {
       console.error('Erreur lors du chargement des données de l’explorateur :', err);
     } finally {
@@ -141,6 +143,12 @@ export function ChapterExplorer({
       cancelled = true;
     };
   }, [isOpen]);
+
+  // Mise à jour en direct quand la page modifie un chapitre ou une version ; on ignore nos propres événements.
+  useDataChanged((source) => {
+    if (source === 'chapter-explorer' || !isOpen) return;
+    void loadGlobalData();
+  });
 
   const versionsByChapterId = useMemo(() => {
     const map = new Map<number, ChapterVersionResponse[]>();
@@ -209,6 +217,7 @@ export function ChapterExplorer({
     try {
       await offlineBookService.create(title);
       await loadGlobalData();
+      notifyDataChanged('chapter-explorer');
       setIsCreatingBook(false);
       setNewBookTitle('');
       toast.success(`Roman "${title}" créé`);
@@ -247,7 +256,8 @@ export function ChapterExplorer({
         }
         setIsCreatingChapterForBookId(null);
         setNewChapterTitle('');
-        
+        notifyDataChanged('chapter-explorer');
+
         const createdChapter = updatedChapters.find(
           (c) => Number(c.chapter_number) === nextNumber
         );
@@ -283,6 +293,7 @@ export function ChapterExplorer({
 
       const versionsData = await offlineChapterVersionService.getAll();
       setAllVersions(versionsData ?? []);
+      notifyDataChanged('chapter-explorer');
       setCreatingVersionForChapterId(null);
       setNewVersionName('');
       setExpandedFolders((prev) => ({ ...prev, [`chapter-${chapterId}`]: true, [`chapter-${chapterId}-versions`]: true }));
