@@ -6,12 +6,15 @@ import { useNavigate } from 'react-router-dom';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetResponse } from '../../../types/sheet';
 import { offlineSheetService } from '../../../services/offlineSheetService';
+import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { useLatestGetter } from '../../../hooks/useLatestGetter';
 import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
 import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
 import { htmlToText } from '../../../utils/versions/htmlText';
-import { IconDelete, IconDown, IconEdit, IconUp } from '../../../components/icons';
+import { IconDelete, IconDown, IconEdit, IconUp, IconSave } from '../../../components/icons';
 import { ActionMenu } from './ActionMenu';
+import { toUpsert } from '../sheetLinks';
+import { useToast } from '../../../components/feedback/FeedbackProvider';
 
 interface SheetCardItemProps {
   card: IdeaResponse;
@@ -19,10 +22,10 @@ interface SheetCardItemProps {
   total: number;
   autoFocus?: boolean;
   onMove: (index: number, delta: -1 | 1) => void;
-  onEdit: (card: IdeaResponse) => void;
   onDelete: (card: IdeaResponse) => void;
   onSaveDescription: (card: IdeaResponse, description: string) => Promise<boolean>;
   onEditorChange?: (cardId: number, editor: Editor | null) => void;
+  onCardUpdated: () => void;
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -35,16 +38,21 @@ export function SheetCardItem({
   index,
   total,
   onMove,
-  onEdit,
   onDelete,
   onSaveDescription,
   onEditorChange,
+  onCardUpdated,
 }: SheetCardItemProps) {
   const navigate = useNavigate();
+  const toast = useToast();
   const incoming = card.description ?? '';
   const [state, setState] = useState<SaveState>('idle');
   const [isEmpty, setIsEmpty] = useState(() => htmlToText(incoming).trim() === '');
   const [sheets, setSheets] = useState<SheetResponse[]>([]);
+
+  // État pour renommer le titre de la caractéristique directement
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(card.name);
 
   const cardContainerRef = useRef<HTMLDivElement>(null);
   const getSheets = useLatestGetter(sheets);
@@ -58,6 +66,7 @@ export function SheetCardItem({
   useLayoutEffect(() => {
     cardRef.current = card;
     saveRef.current = onSaveDescription;
+    setDraftTitle(card.name);
   }, [card, onSaveDescription]);
 
   useEffect(() => {
@@ -124,11 +133,69 @@ export function SheetCardItem({
     return () => onEditorChange?.(card.id, null);
   }, [editor, card.id, onEditorChange]);
 
+  const saveTitle = async () => {
+    const newName = draftTitle.trim();
+    if (!newName || newName === card.name) {
+      setIsRenaming(false);
+      setDraftTitle(card.name);
+      return;
+    }
+
+    try {
+      await offlineIdeaService.update(card.id, {
+        ...toUpsert(card),
+        name: newName,
+      });
+      setIsRenaming(false);
+      toast.success('Caractéristique renommée');
+      onCardUpdated();
+      window.dispatchEvent(new CustomEvent('loomfiction-data-changed'));
+    } catch (err) {
+      console.error('Erreur renommage caractéristique :', err);
+      toast.error('Impossible de renommer la caractéristique.');
+    }
+  };
+
   return (
     <div ref={cardContainerRef} className="rounded-2xl border border-amber-900/25 bg-neutral-950/70 p-4 shadow-xl sm:p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="font-serif text-lg font-bold text-amber-100 wrap-break-word sm:text-xl">{card.name}</h3>
+        <div className="min-w-0 flex-1">
+          {isRenaming ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void saveTitle();
+              }}
+              className="flex items-center gap-2"
+            >
+              <input
+                type="text"
+                autoFocus
+                value={draftTitle}
+                onChange={(e) => setDraftTitle(e.target.value)}
+                className="w-full rounded-xl border border-amber-900/40 bg-neutral-900 px-3 py-1 font-serif text-lg font-bold text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+              <button
+                type="submit"
+                className="touch-target cursor-pointer rounded-xl border border-amber-600 bg-amber-700 px-3 py-1.5 text-xs font-medium text-amber-50 hover:bg-amber-600"
+              >
+                OK
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRenaming(false);
+                  setDraftTitle(card.name);
+                }}
+                className="touch-target cursor-pointer rounded-xl border border-amber-900/30 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-neutral-800"
+              >
+                Annuler
+              </button>
+            </form>
+          ) : (
+            <h3 className="font-serif text-lg font-bold text-amber-100 wrap-break-word sm:text-xl">{card.name}</h3>
+          )}
+
           <p role="status" className={`mt-0.5 h-4 font-sans text-[11px] ${state === 'error' ? 'text-red-400' : 'text-amber-200/50'}`}>
             {state === 'saving' && 'Enregistrement…'}
             {state === 'saved' && 'Enregistré'}
@@ -164,7 +231,7 @@ export function SheetCardItem({
           </button>
           <button
             type="button"
-            onClick={() => onEdit(card)}
+            onClick={() => setIsRenaming(true)}
             aria-label="Modifier le titre"
             className={`${iconBtn} border-amber-900/30 bg-neutral-900 text-amber-200 hover:bg-neutral-800`}
           >
@@ -186,7 +253,7 @@ export function SheetCardItem({
           items={[
             { key: 'up', label: 'Monter', icon: IconUp, disabled: index === 0, onSelect: () => onMove(index, -1) },
             { key: 'down', label: 'Descendre', icon: IconDown, disabled: index === total - 1, onSelect: () => onMove(index, 1) },
-            { key: 'edit', label: 'Modifier le titre', icon: IconEdit, onSelect: () => onEdit(card) },
+            { key: 'edit', label: 'Modifier le titre', icon: IconEdit, onSelect: () => setIsRenaming(true) },
             { key: 'delete', label: 'Supprimer la carte', icon: IconDelete, danger: true, separatorBefore: true, onSelect: () => onDelete(card) },
           ]}
         />
@@ -194,7 +261,6 @@ export function SheetCardItem({
 
       <div className="mt-3 border-t border-amber-900/20 pt-3">
         <div className="relative">
-          {/* Placeholder : visible tant que la carte est vide, ne gêne pas le toucher (l'éditeur reste cliquable dessous) */}
           {isEmpty && (
             <p
               aria-hidden="true"
