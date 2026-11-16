@@ -1,4 +1,6 @@
 import { mergeAttributes } from '@tiptap/core';
+import { Fragment } from '@tiptap/pm/model';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Mention } from '@tiptap/extension-mention';
 import { ReactRenderer } from '@tiptap/react';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
@@ -25,8 +27,55 @@ const positionMobilePopup = (instance: TippyInstance) => {
   });
 };
 
-export const createSheetMentionExtension = (getSheets: () => SheetResponse[]) => {
+export interface SheetMentionOptions {
+  isSheetMentionable?: (sheetId: number) => boolean;
+}
+
+const foreignMentionGuardKey = new PluginKey('foreignMentionGuard');
+
+export const createSheetMentionExtension = (
+  getSheets: () => SheetResponse[],
+  options: SheetMentionOptions = {},
+) => {
   return Mention.extend({
+    addProseMirrorPlugins() {
+      const { isSheetMentionable } = options;
+      const parentPlugins = this.parent?.() ?? [];
+      if (!isSheetMentionable) return parentPlugins;
+
+      const mentionName = this.name;
+      const guard = new Plugin({
+        key: foreignMentionGuardKey,
+        appendTransaction(transactions, _oldState, newState) {
+          const external = transactions.some(
+            (tr) =>
+              tr.docChanged &&
+              (tr.getMeta('paste') || tr.getMeta('uiEvent') === 'paste' || tr.getMeta('uiEvent') === 'drop'),
+          );
+          if (!external) return null;
+
+          const mentionType = newState.schema.nodes[mentionName];
+          if (!mentionType) return null;
+
+          const forbidden: Array<{ pos: number; size: number; label: string }> = [];
+          newState.doc.descendants((node, pos) => {
+            if (node.type !== mentionType) return;
+            if (!isSheetMentionable(Number(node.attrs.id))) {
+              forbidden.push({ pos, size: node.nodeSize, label: String(node.attrs.label ?? '') });
+            }
+          });
+          if (forbidden.length === 0) return null;
+
+          const tr = newState.tr;
+          for (const { pos, size, label } of forbidden.reverse()) {
+            tr.replaceWith(pos, pos + size, label ? Fragment.from(newState.schema.text(label)) : Fragment.empty);
+          }
+          return tr;
+        },
+      });
+
+      return [...parentPlugins, guard];
+    },
     renderHTML({ node, HTMLAttributes }) {
       const label = node.attrs.label ?? node.attrs.id;
       return [
