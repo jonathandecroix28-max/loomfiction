@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import {
   IconAdd,
@@ -6,11 +5,15 @@ import {
   IconExport,
   IconMore,
   IconSettings,
+  IconFile,
 } from '../../../components/icons';
 
 interface IdeasHeaderProps {
   onManageCategories: () => void;
   onNewIdea: () => void;
+  onNewSheet: () => void;
+  onOpenFreeIdeas: () => void;
+  freeIdeasCount: number;
   onImportSheets: () => void;
   onExportSheets: () => void;
   showImportExport: boolean;
@@ -20,6 +23,9 @@ interface IdeasHeaderProps {
 export function IdeasHeader({
   onManageCategories,
   onNewIdea,
+  onNewSheet,
+  onOpenFreeIdeas,
+  freeIdeasCount,
   onImportSheets,
   onExportSheets,
   showImportExport,
@@ -89,6 +95,29 @@ export function IdeasHeader({
             >
               <IconAdd className="size-4 shrink-0" aria-hidden="true" />
               <span>Nouvelle note</span>
+            </button>
+
+            {/* Mobile uniquement : ces actions ne sont pas affichées en clair dans la page */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => handleAction(onNewSheet)}
+              aria-label="Créer une nouvelle fiche"
+              className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-amber-200 transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 sm:hidden"
+            >
+              <IconAdd className="size-4 shrink-0" aria-hidden="true" />
+              <span>Nouvelle fiche</span>
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => handleAction(onOpenFreeIdeas)}
+              aria-label="Ouvrir les notes libres"
+              className="flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-amber-200 transition hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 sm:hidden"
+            >
+              <IconFile className="size-4 shrink-0" aria-hidden="true" />
+              <span>Notes libres ({freeIdeasCount})</span>
             </button>
 
             {/* Importation et exportation */}

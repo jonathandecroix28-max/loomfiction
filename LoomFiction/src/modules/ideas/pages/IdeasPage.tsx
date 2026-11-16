@@ -144,14 +144,12 @@ export function IdeasPage() {
     return matchesQuery && matchesBook && matchesStatus;
   };
 
-  // Synchronisation avec l'explorateur et les autres pages, sans rechargement.
   useDataChanged((source) => {
     if (source === 'ideas-page') return;
     void refreshIdeas();
     void refreshSheets();
   });
 
-  // Créer une fiche reste possible même quand il n'en existe encore aucune, depuis n'importe quel onglet.
   const startNewSheet = () => {
     if (categories.length === 0) {
       setIsAddingCategory(true);
@@ -237,6 +235,9 @@ export function IdeasPage() {
         <IdeasHeader
           onManageCategories={() => setIsManageCategoriesOpen(true)}
           onNewIdea={() => { setSelectedIdea(null); setIsModalOpen(true); }}
+          onNewSheet={startNewSheet}
+          onOpenFreeIdeas={() => navigate('/ideas/libres')}
+          freeIdeasCount={freeIdeasCount}
           onImportSheets={() => setIsImportOpen(true)}
           onExportSheets={() => setIsExportOpen(true)}
           showImportExport={categories.length > 0}
@@ -249,7 +250,8 @@ export function IdeasPage() {
           </div>
         )}
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        {/* Sur mobile, ces actions sont dans le menu « ⋯ » (IdeasHeader). */}
+        <div className="mb-4 hidden flex-wrap items-center gap-2 sm:flex">
           <button
             type="button"
             onClick={() => { setSelectedIdea(null); setIsModalOpen(true); }}

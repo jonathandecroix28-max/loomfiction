@@ -184,16 +184,16 @@ export function IsolatedIdeasPage() {
               title="Ouvrir l'explorateur"
               aria-label="Ouvrir l'explorateur"
               aria-expanded={isExplorerOpen}
-              className="touch-target flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-amber-900/40 bg-neutral-900 text-amber-200/70 shadow-md transition-colors hover:bg-amber-900/20 hover:text-amber-100"
+              className="touch-target flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-amber-900/40 bg-neutral-900 text-amber-200/70 shadow-md transition-colors hover:bg-amber-900/20 hover:text-amber-100 sm:size-9"
             >
               <IconMenu className="size-5" aria-hidden="true" />
             </button>
           )}
         </div>
 
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div>
-            <h1 className="font-serif text-3xl font-bold text-amber-100 sm:text-4xl">Notes libres</h1>
+            <h1 className="font-serif text-2xl font-bold text-amber-100 sm:text-4xl">Notes libres</h1>
             <p className="mt-1 text-sm text-amber-200/50">
               {plural(isolated.length, 'note')} non rattachée{isolated.length > 1 ? 's' : ''} à une fiche
               {filtered.length !== isolated.length && ` · ${plural(filtered.length, 'résultat')}`}
@@ -205,13 +205,13 @@ export function IsolatedIdeasPage() {
               setSelectedIdea(null);
               setIsModalOpen(true);
             }}
-            className="touch-target cursor-pointer rounded-xl border border-amber-600 bg-amber-700 px-4 py-2 text-sm font-medium text-amber-50 shadow-md transition hover:bg-amber-600"
+            className="touch-target w-full cursor-pointer rounded-xl border border-amber-600 bg-amber-700 px-4 py-2 text-sm font-medium text-amber-50 shadow-md transition hover:bg-amber-600 sm:w-auto"
           >
             + Nouvelle note
           </button>
         </div>
 
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:px-0">
           <button type="button" onClick={() => setCategoryFilter('all')} className={chip(categoryFilter === 'all')}>
             Toutes ({filtered.length})
           </button>
@@ -244,7 +244,7 @@ export function IsolatedIdeasPage() {
         />
       </div>
 
-      <div className="mx-auto w-full max-w-[1700px] flex-1 space-y-8 px-4 py-4 pb-32 sm:px-6 sm:pb-20 md:px-12">
+      <div className="mx-auto w-full max-w-[1700px] flex-1 space-y-6 px-4 py-4 pb-[calc(8rem+env(safe-area-inset-bottom))] sm:space-y-8 sm:px-6 sm:pb-20 md:px-12">
         {groups.length === 0 ? (
           <div className="mx-auto my-6 max-w-2xl rounded-3xl border border-amber-900/20 bg-neutral-950/40 px-6 py-12 text-center">
             <p className="mb-1 font-serif text-amber-200/60">
@@ -259,7 +259,7 @@ export function IsolatedIdeasPage() {
                 {group.label}
                 <span className="text-xs font-normal text-amber-200/40">({group.items.length})</span>
               </h2>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {group.items.map((idea) => (
                   <IdeaCard
                     key={idea.id}
