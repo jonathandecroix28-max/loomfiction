@@ -20,7 +20,6 @@ import type { IdeaResponse } from '../../../types/idea';
 import type { SheetVersionResponse } from '../../../types/sheetVersion';
 import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
-import { useLockDocumentScroll } from '../../../hooks/useLockDocumentScroll';
 import {
   IconAdd,
   IconAttach,
@@ -146,7 +145,6 @@ function htmlToMarkdown(html: string): string {
 
 export function SheetPage() {
   const { sheetId } = useParams<{ sheetId: string }>();
-  useLockDocumentScroll();
   const navigate = useNavigate();
   const location = useLocation();
   const confirm = useConfirm();
@@ -615,7 +613,7 @@ export function SheetPage() {
   };
 
   return (
-    <div className="flex flex-1 h-[calc(100dvh-4rem)] overflow-clip bg-[#1c1411] font-serif text-[#fcf9f2] print:bg-white print:h-auto relative">
+    <div className="relative flex min-h-[calc(100dvh-4rem)] flex-1 items-start bg-[#1c1411] font-serif text-[#fcf9f2] print:bg-white">
       <SheetExplorer
         isOpen={isExplorerOpen}
         onClose={() => setIsExplorerOpen(false)}
@@ -634,7 +632,7 @@ export function SheetPage() {
         }}
       />
 
-      <div className="flex min-h-0 flex-1 flex-col min-w-0 h-full overflow-clip print:overflow-visible">
+      <div className="flex min-h-[calc(100dvh-4rem)] min-w-0 flex-1 flex-col self-stretch">
         <header className="shrink-0 border-b border-amber-900/40 bg-neutral-950/80 px-4 py-4 sm:px-6 print:hidden">
           <div className="mx-auto flex max-w-4xl flex-col gap-3">
             <div className="flex items-center justify-between gap-3">

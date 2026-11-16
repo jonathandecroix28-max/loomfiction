@@ -902,7 +902,7 @@ export function SheetExplorer({
         aria-hidden={!isOpen}
         className={`fixed inset-y-0 left-0 z-40 flex h-[100dvh] flex-col w-[min(88vw,21rem)] shrink-0 border-r border-amber-900/40 bg-[var(--c-surface)] shadow-2xl transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none md:hidden'
-        } md:static md:h-full md:w-80 md:translate-x-0 md:shadow-xl`}
+        } md:sticky md:top-16 md:bottom-auto md:left-auto md:h-[calc(100dvh-4rem)] md:self-start md:w-80 md:translate-x-0 md:shadow-xl`}
       >
         <div className="flex flex-col shrink-0 border-b border-amber-900/40 bg-[var(--c-surface-2,#150e0c)]">
           <div className="flex items-center justify-between p-3">
