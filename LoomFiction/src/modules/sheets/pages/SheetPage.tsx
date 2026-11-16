@@ -20,6 +20,7 @@ import type { IdeaResponse } from '../../../types/idea';
 import type { SheetVersionResponse } from '../../../types/sheetVersion';
 import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
+import { useExplorerOpen } from '../../../hooks/useExplorerOpen';
 import {
   IconAdd,
   IconAttach,
@@ -38,7 +39,6 @@ import {
 
 type Mode = 'cards' | 'document';
 
-// Version transmise par l'explorateur via l'état de navigation quand elle appartient à une autre fiche.
 function versionFromNavigationState(state: unknown, sheetId: number | null): SheetVersionResponse | null {
   const version = (state as { version?: SheetVersionResponse } | null)?.version;
   return version && sheetId !== null && version.sheetId === sheetId ? version : null;
@@ -156,12 +156,11 @@ export function SheetPage() {
   const [mode, setMode] = useState<Mode>('cards');
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isAttachOpen, setIsAttachOpen] = useState(false);
-  const [isExplorerOpen, setIsExplorerOpen] = useState(false);
+  const [isExplorerOpen, setIsExplorerOpen] = useExplorerOpen();
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [feedback, setFeedback] = useState('');
 
-  // La version affichée n'est valable que pour sa propre fiche : elle est comparée à cette fiche, jamais à une autre.
   const [storedVersion, setActiveVersion] = useState<SheetVersionResponse | null>(() =>
     versionFromNavigationState(location.state, numSheetId),
   );
@@ -173,7 +172,6 @@ export function SheetPage() {
   const [reviewPreviewCards, setReviewPreviewCards] = useState<IdeaResponse[]>([]);
   const [isApplyingReview, setIsApplyingReview] = useState(false);
 
-  // À chaque navigation (changement de fiche, version ouverte depuis l'explorateur), on repart d'un état propre.
   const [appliedLocationKey, setAppliedLocationKey] = useState(location.key);
   if (location.key !== appliedLocationKey) {
     setAppliedLocationKey(location.key);
@@ -187,7 +185,6 @@ export function SheetPage() {
 
   const { sheets: allSheets, refreshSheets } = useSheets();
 
-  // Synchronisation avec l'explorateur (et les modales) sans rechargement de page.
   useDataChanged((source) => {
     if (source === 'sheet-page') return;
     void refreshSheets();
@@ -543,7 +540,6 @@ export function SheetPage() {
     setFeedback('');
     try {
       const currentById = new Map(cards.map((card) => [card.id, card]));
-      // Une version archivée peut contenir l'ancienne catégorie / l'ancien roman : les cartes suivent la fiche actuelle.
       const currentBookId = bookOfSheet(cards);
       const targetById = new Map(reviewPreviewCards.map((card) => [card.id, card]));
 
@@ -598,7 +594,6 @@ export function SheetPage() {
     { key: 'delete', label: 'Supprimer la fiche', icon: IconDelete, danger: true, separatorBefore: true, onSelect: () => void deleteSheet() },
   ];
 
-  // Sur grand écran, les actions les plus utilisées sortent du menu « ⋯ » et deviennent des boutons visibles.
   const primaryActionKeys = ['config', 'save-version', 'versions', 'attach'];
   const desktopMenuItems = menuItems
     .filter((item) => !primaryActionKeys.includes(item.key))
@@ -626,7 +621,6 @@ export function SheetPage() {
         currentSheetId={sheet.id}
         onSelectSheetVersion={(version) => {
           if (version.sheetId !== sheet.id) {
-            // La version appartient à une autre fiche : on ouvre cette fiche et on la compare avec ses propres cartes.
             navigate(`/ideas/fiches/${version.sheetId}`, { state: { version } });
             return;
           }

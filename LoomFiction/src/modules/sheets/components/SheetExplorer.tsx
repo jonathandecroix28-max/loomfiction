@@ -36,7 +36,8 @@ type ChapterEntry = { chapter: ChapterResponse; bookId: number };
 type SheetExplorerProps = {
   isOpen: boolean;
   onClose: () => void;
-  currentSheetId: number;
+  /** Fiche affichée par la page courante ; `null` sur les pages qui n'en ont pas (ex. notes libres). */
+  currentSheetId: number | null;
   onSelectSheetVersion?: (version: SheetVersionResponse) => void;
   onSelectIdeaVersion?: (version: IdeaVersionResponse) => void;
 };
@@ -123,7 +124,6 @@ export function SheetExplorer({
     }
   };
 
-  // Mise à jour en direct quand la page (ou une modale) modifie des données ; on ignore nos propres événements.
   useDataChanged((source) => {
     if (source === 'sheet-explorer') return;
     void refreshSheets();
@@ -210,7 +210,6 @@ export function SheetExplorer({
     return map;
   }, [ideaVersions]);
 
-  // Chapitres qui mentionnent chaque fiche (mentions @ présentes dans le contenu des chapitres).
   const chaptersBySheetId = useMemo(() => {
     const map = new Map<number, ChapterEntry[]>();
     if (sheets.length === 0 || chapterEntries.length === 0) return map;
@@ -271,7 +270,7 @@ export function SheetExplorer({
   };
 
   const navigateToIdea = () => {
-    navigate('/ideas');
+    navigate('/ideas/libres');
     closeAfterNavigation();
   };
 
@@ -410,9 +409,7 @@ export function SheetExplorer({
     }
   };
 
-  // Sur ordinateur, l'explorateur est collé en haut de l'écran et occupe toute la hauteur visible :
-  // on mesure sa position réelle (sous l'éventuel en-tête de l'application, puis 0 une fois collé)
-  // au lieu de supposer une hauteur d'en-tête.
+
   const asideRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -448,7 +445,6 @@ export function SheetExplorer({
     };
   }, [isOpen]);
 
-  // Dossiers à ouvrir automatiquement pour la fiche courante.
   const autoExpandKeys = useMemo(() => {
     if (!isOpen || !currentSheetId || sheets.length === 0) return [];
     const currentSheet = sheets.find((sheet) => sheet.id === currentSheetId);
@@ -460,7 +456,6 @@ export function SheetExplorer({
     return [bookKey, categoryKey, `${categoryKey}-sheets`];
   }, [isOpen, currentSheetId, sheets, cardsBySheet]);
 
-  // Ajustement d'état pendant le rendu (pas d'effet) quand les dossiers cibles changent.
   const autoExpandId = autoExpandKeys.join('|');
   const [appliedAutoExpandId, setAppliedAutoExpandId] = useState('');
   if (autoExpandId !== appliedAutoExpandId) {
