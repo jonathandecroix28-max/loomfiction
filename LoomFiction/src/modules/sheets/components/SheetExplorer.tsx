@@ -410,6 +410,44 @@ export function SheetExplorer({
     }
   };
 
+  // Sur ordinateur, l'explorateur est collé en haut de l'écran et occupe toute la hauteur visible :
+  // on mesure sa position réelle (sous l'éventuel en-tête de l'application, puis 0 une fois collé)
+  // au lieu de supposer une hauteur d'en-tête.
+  const asideRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const element = asideRef.current;
+    if (!element) return;
+    const desktop = window.matchMedia('(min-width: 768px)');
+    let frame = 0;
+
+    const update = () => {
+      frame = 0;
+      if (!desktop.matches) {
+        element.style.height = '';
+        return;
+      }
+      const top = Math.max(0, element.getBoundingClientRect().top);
+      element.style.height = `${Math.max(0, window.innerHeight - top)}px`;
+    };
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    desktop.addEventListener('change', schedule);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      desktop.removeEventListener('change', schedule);
+      element.style.height = '';
+    };
+  }, [isOpen]);
+
   // Dossiers à ouvrir automatiquement pour la fiche courante.
   const autoExpandKeys = useMemo(() => {
     if (!isOpen || !currentSheetId || sheets.length === 0) return [];
@@ -898,11 +936,12 @@ export function SheetExplorer({
       />
 
       <aside
+        ref={asideRef}
         aria-label="Explorateur des fiches et idées"
         aria-hidden={!isOpen}
         className={`fixed inset-y-0 left-0 z-40 flex h-[100dvh] flex-col w-[min(88vw,21rem)] shrink-0 border-r border-amber-900/40 bg-[var(--c-surface)] shadow-2xl transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none md:hidden'
-        } md:sticky md:top-16 md:bottom-auto md:left-auto md:h-[calc(100dvh-4rem)] md:self-start md:w-80 md:translate-x-0 md:shadow-xl`}
+        } md:sticky md:top-0 md:bottom-auto md:left-auto md:h-[100dvh] md:self-start md:w-80 md:translate-x-0 md:shadow-xl`}
       >
         <div className="flex flex-col shrink-0 border-b border-amber-900/40 bg-[var(--c-surface-2,#150e0c)]">
           <div className="flex items-center justify-between p-3">
