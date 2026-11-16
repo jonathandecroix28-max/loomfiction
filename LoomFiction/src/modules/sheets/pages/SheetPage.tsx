@@ -598,6 +598,12 @@ export function SheetPage() {
     { key: 'delete', label: 'Supprimer la fiche', icon: IconDelete, danger: true, separatorBefore: true, onSelect: () => void deleteSheet() },
   ];
 
+  // Sur grand écran, les actions les plus utilisées sortent du menu « ⋯ » et deviennent des boutons visibles.
+  const primaryActionKeys = ['config', 'save-version', 'versions', 'attach'];
+  const desktopMenuItems = menuItems
+    .filter((item) => !primaryActionKeys.includes(item.key))
+    .map((item, index) => (index === 0 ? { ...item, separatorBefore: false } : item));
+
   const copyMarkdown = async () => {
     const parts = [`# ${sheet.name}`, category ? `*${category.name}*` : ''];
     for (const card of cards) {
@@ -671,7 +677,40 @@ export function SheetPage() {
                   <IconSettings className="size-4" />
                   <span className="hidden sm:inline">Configuration</span>
                 </button>
-                <ActionMenu label="Actions de la fiche" items={menuItems} />
+                <div className="hidden items-center gap-2 lg:flex">
+                  <button
+                    type="button"
+                    onClick={() => void saveVersion()}
+                    title="Enregistrer une version"
+                    aria-label="Enregistrer une version"
+                    className="touch-target inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-600 bg-amber-700 px-3 py-2 font-sans text-xs text-amber-50 shadow-md transition hover:bg-amber-600"
+                  >
+                    <IconSave className="size-4" aria-hidden="true" />
+                    <span className="hidden xl:inline">Enregistrer une version</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(versionsPath)}
+                    title="Historique des versions"
+                    aria-label="Historique des versions"
+                    className="touch-target inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-800/50 bg-amber-950/40 px-3 py-2 font-sans text-xs text-amber-200 transition hover:bg-amber-900/50"
+                  >
+                    <IconHistory className="size-4" aria-hidden="true" />
+                    <span className="hidden xl:inline">Historique</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAttachOpen(true)}
+                    title="Ajouter des notes existantes"
+                    aria-label="Ajouter des notes existantes"
+                    className="touch-target inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-800/50 bg-amber-950/40 px-3 py-2 font-sans text-xs text-amber-200 transition hover:bg-amber-900/50"
+                  >
+                    <IconAttach className="size-4" aria-hidden="true" />
+                    <span className="hidden xl:inline">Notes</span>
+                  </button>
+                  <ActionMenu label="Autres actions de la fiche" items={desktopMenuItems} />
+                </div>
+                <ActionMenu className="lg:hidden" label="Actions de la fiche" items={menuItems} />
               </div>
             </div>
 
