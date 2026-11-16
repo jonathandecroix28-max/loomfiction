@@ -16,6 +16,7 @@ import { SheetPage } from './modules/sheets/pages/SheetPage';
 import ExportPage from './pages/ExportPage';
 import { SheetVersionsPage } from './modules/sheets/pages/SheetVersionPage';
 import { FeedbackProvider } from './components/feedback/FeedbackProvider';
+import { IsolatedIdeasPage } from './modules/ideas/pages/IsolatedIdeasPage';
 //import { TermsPage } from './pages/TermsPage';
 //import { PrivacyPage } from './pages/PrivacyPage';
 //import { SupportPage } from './pages/SupportPage';
@@ -27,14 +28,15 @@ function AppContent() {
   const hideNavbarWhenReading = location.pathname.includes('/read');
   const hideNavbarWhenEditing = location.pathname.includes('/chapters/') && !location.pathname.includes('/versions');
   const hideNavbarSheet = location.pathname.includes('/ideas/fiches/') && !location.pathname.includes('/versions');
+  const hideNavbarIdeas = location.pathname.includes('/ideas/libres') && !location.pathname.includes('/versions');
   
   return (
     <div className="min-h-dvh bg-[#fcf9f2] flex flex-col">
-      {!hideNavbar  && !hideNavbarWhenReading && !hideNavbarWhenEditing && !hideNavbarSheet && <Navbar />}
+      {!hideNavbar  && !hideNavbarWhenReading && !hideNavbarWhenEditing && !hideNavbarSheet && !hideNavbarIdeas && <Navbar />}
 
       <main
         className={`grow flex flex-col ${
-          !hideNavbar && !hideNavbarWhenReading && !hideNavbarWhenEditing && !hideNavbarSheet ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0' : ''
+          !hideNavbar && !hideNavbarWhenReading && !hideNavbarWhenEditing && !hideNavbarSheet && !hideNavbarIdeas ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0' : ''
         }`}
       >
         <Routes>
@@ -58,6 +60,7 @@ function AppContent() {
           {/* <Route path="/terms" element={<TermsPage />} /> */}
           {/* <Route path="/privacy" element={<PrivacyPage />} /> */}
           {/* <Route path="/support" element={<SupportPage />} /> */}
+          <Route path="/ideas/libres" element={<IsolatedIdeasPage />} />
           <Route path="/github" element={<a href="https://github.com/jonathandecroix28-max/loomfiction" target="_blank" rel="noopener noreferrer">GitHub</a>} />
 
           {/* Route 404 */}

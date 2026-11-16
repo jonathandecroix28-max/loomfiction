@@ -26,6 +26,7 @@ import { AttachToSheetModal } from '../../sheets/components/AttachToSheetModal';
 import { AttachNotesModal } from '../../sheets/components/AttachNotesModal';
 import { ImportSheetModal } from '../../sheets/components/ImportSheetModal';
 import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
+import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
 import { ExportSheetsModal } from '../../sheets/components/ExportSheetsModal';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n > 1 ? many : one}`;
@@ -52,6 +53,7 @@ export function IdeasPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [notice, setNotice] = useState('');
+  const [isPickingSheetCategory, setIsPickingSheetCategory] = useState(false);
 
   const [ideaToAttach, setIdeaToAttach] = useState<IdeaResponse | null>(null);
   const [sheetToAttach, setSheetToAttach] = useState<SheetResponse | null>(null);
@@ -142,6 +144,32 @@ export function IdeasPage() {
     return matchesQuery && matchesBook && matchesStatus;
   };
 
+  // Synchronisation avec l'explorateur et les autres pages, sans rechargement.
+  useDataChanged((source) => {
+    if (source === 'ideas-page') return;
+    void refreshIdeas();
+    void refreshSheets();
+  });
+
+  // Créer une fiche reste possible même quand il n'en existe encore aucune, depuis n'importe quel onglet.
+  const startNewSheet = () => {
+    if (categories.length === 0) {
+      setIsAddingCategory(true);
+      flash('Crée d’abord une catégorie pour pouvoir ajouter une fiche.');
+      return;
+    }
+    const activeCategory = activeTab !== 'all' ? categories.find((c) => String(c.id) === activeTab) : null;
+    if (activeCategory) {
+      setNewSheetCategory(activeCategory);
+    } else if (categories.length === 1) {
+      setNewSheetCategory(categories[0]);
+    } else {
+      setIsPickingSheetCategory((open) => !open);
+    }
+  };
+
+  const freeIdeasCount = ideas.filter((idea) => idea.sheetId == null).length;
+
   const handleCreateCategory = async (data: CategoryUpsertRequest) => {
     const known = new Set(categories.map((c) => c.id));
     const updated = await createCategory(data);
@@ -167,6 +195,7 @@ export function IdeasPage() {
     const success = await deleteIdea(ideaId);
     if (success) {
       setIdeas(ideas.filter((i) => i.id !== ideaId));
+      notifyDataChanged('ideas-page');
       toast.success('Note supprimée');
     } else {
       toast.error('Impossible de supprimer la note.');
@@ -180,6 +209,7 @@ export function IdeasPage() {
 
   const handleImported = async (imported: SheetResponse[], { failed }: { failed: number }) => {
     await Promise.all([refreshIdeas(), refreshSheets()]);
+    notifyDataChanged('ideas-page');
 
     if (imported.length === 1 && failed === 0) {
       navigate(`/ideas/fiches/${imported[0].id}`);
@@ -216,6 +246,60 @@ export function IdeasPage() {
         {notice && (
           <div role="status" className="mb-4 rounded-xl border border-emerald-900/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-300">
             {notice}
+          </div>
+        )}
+
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { setSelectedIdea(null); setIsModalOpen(true); }}
+            className="touch-target cursor-pointer rounded-xl border border-amber-600 bg-amber-700 px-4 py-2 text-sm font-medium text-amber-50 shadow-md transition hover:bg-amber-600"
+          >
+            + Nouvelle note
+          </button>
+          <button
+            type="button"
+            onClick={startNewSheet}
+            aria-expanded={isPickingSheetCategory}
+            className="touch-target cursor-pointer rounded-xl border border-amber-800/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-200 transition hover:bg-amber-900/50"
+          >
+            + Nouvelle fiche
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsManageCategoriesOpen(true)}
+            className="touch-target cursor-pointer rounded-xl border border-amber-800/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-200 transition hover:bg-amber-900/50"
+          >
+            Gérer les catégories
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/ideas/libres')}
+            className="touch-target cursor-pointer rounded-xl border border-amber-800/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-200 transition hover:bg-amber-900/50"
+          >
+            Notes libres ({freeIdeasCount})
+          </button>
+        </div>
+
+        {isPickingSheetCategory && (
+          <div className="mb-4 rounded-2xl border border-amber-900/30 bg-neutral-950/60 p-4">
+            <p className="mb-2 text-xs uppercase tracking-wider text-amber-200/50">Dans quelle catégorie créer la fiche ?</p>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => {
+                    setIsPickingSheetCategory(false);
+                    setNewSheetCategory(category);
+                  }}
+                  className="touch-target inline-flex cursor-pointer items-center gap-2 rounded-xl border border-amber-900/40 bg-neutral-900 px-3 py-2 text-sm text-amber-100 transition hover:bg-neutral-800"
+                >
+                  <span className="size-2.5 rounded-full" style={{ backgroundColor: category.color }} />
+                  {category.name}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -298,7 +382,7 @@ export function IdeasPage() {
                   {tab.label} &bull; {summary}
                 </div>
 
-                {(category || isAll) && (tabSheets.length > 0 || category) && (
+                {(category || isAll) && (
                   <section>
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <h2 className="text-sm font-serif font-bold text-amber-200 flex items-center gap-2">
@@ -306,14 +390,12 @@ export function IdeasPage() {
                         {!category && <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />}
                         Fiches {isAll && '(Toutes les catégories)'}
                       </h2>
-                      {category && (
-                        <button
-                          onClick={() => setNewSheetCategory(category)}
+                      <button
+                          onClick={() => (category ? setNewSheetCategory(category) : startNewSheet())}
                           className="bg-amber-700 hover:bg-amber-600 text-amber-50 font-medium px-4 py-2 rounded-xl transition text-xs cursor-pointer shadow-md touch-target"
                         >
                           + Nouvelle fiche
                         </button>
-                      )}
 
                       
                     </div>
@@ -391,7 +473,10 @@ export function IdeasPage() {
         bookId={null}
         ideaToEdit={selectedIdea}
         defaultCategoryId={activeTab !== 'all' ? Number(activeTab) : null}
-        onSuccess={() => refreshIdeas()}
+        onSuccess={async () => {
+          await refreshIdeas();
+          notifyDataChanged('ideas-page');
+        }}
       />
 
       <NewSheetModal
@@ -413,6 +498,7 @@ export function IdeasPage() {
         onDelete={handleDeleteCategory}
         onContentChanged={async () => {
           await Promise.all([refreshIdeas(), refreshSheets()]);
+          notifyDataChanged('ideas-page');
         }}
       />
 
@@ -426,6 +512,7 @@ export function IdeasPage() {
         onAttached={async () => {
           await refreshIdeas();
           await refreshSheets();
+          notifyDataChanged('ideas-page');
         }}
       />
 
@@ -462,6 +549,7 @@ export function IdeasPage() {
           onAttached={async () => {
             await refreshIdeas();
             await refreshSheets();
+            notifyDataChanged('ideas-page');
           }}
         />
       )}
