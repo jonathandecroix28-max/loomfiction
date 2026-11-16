@@ -10,6 +10,8 @@ import { AttachNotesModal } from '../components/AttachNotesModal';
 import { SheetConfigModal } from '../components/SheetConfigModal';
 import { MentionDetection, type DetectionTarget } from '../../editor/components/MentionDetection';
 import { SheetExplorer } from '../components/SheetExplorer';
+import { SheetNetwork } from '../components/SheetNetwork';
+import { filterMentionableSheets, useSheetBookMap } from '../../editor/utils/mentionScope';
 import type { Editor } from '@tiptap/core';
 import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { offlineSheetService } from '../../../services/offlineSheetService';
@@ -37,7 +39,7 @@ import {
   IconClose,
 } from '../../../components/icons';
 
-type Mode = 'cards' | 'document';
+type Mode = 'cards' | 'document' | 'network';
 
 function versionFromNavigationState(state: unknown, sheetId: number | null): SheetVersionResponse | null {
   const version = (state as { version?: SheetVersionResponse } | null)?.version;
@@ -157,6 +159,13 @@ export function SheetPage() {
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isAttachOpen, setIsAttachOpen] = useState(false);
   const [isExplorerOpen, setIsExplorerOpen] = useExplorerOpen();
+  const [isHeaderHidden, setIsHeaderHidden] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('sheet-network-header-hidden') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [feedback, setFeedback] = useState('');
@@ -185,6 +194,13 @@ export function SheetPage() {
 
   const { sheets: allSheets, refreshSheets } = useSheets();
 
+  const { bookBySheet, ready: bookMapReady } = useSheetBookMap(allSheets);
+  const mentionScope = useMemo(
+    () => ({ targetBookId: bookOfSheet(cards) ?? null, bookBySheet, ready: bookMapReady }),
+    [cards, bookBySheet, bookMapReady],
+  );
+  const mentionableSheets = useMemo(() => filterMentionableSheets(allSheets, mentionScope), [allSheets, mentionScope]);
+
   useDataChanged((source) => {
     if (source === 'sheet-page') return;
     void refreshSheets();
@@ -203,6 +219,16 @@ export function SheetPage() {
       navigate('/404', { replace: true });
     }
   }, [isLoading, error, sheet, navigate]);
+
+  const toggleHeader = () => {
+    const next = !isHeaderHidden;
+    setIsHeaderHidden(next);
+    try {
+      localStorage.setItem('sheet-network-header-hidden', next ? '1' : '0');
+    } catch {
+      /* préférence non mémorisée : sans conséquence */
+    }
+  };
 
   const filled = cards.filter((card) => card.description?.trim()).length;
 
@@ -511,6 +537,10 @@ export function SheetPage() {
     [diffGroups],
   );
 
+  // Immersion : l'en-tête ne peut être masqué que dans la vue Réseau.
+  const isNetworkView = mode === 'network' && !activeVersion;
+  const showHeader = !(isNetworkView && isHeaderHidden);
+
   if (isLoading) {
     return (
       <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center bg-[#1c1411] font-serif text-amber-200/60">
@@ -614,7 +644,7 @@ export function SheetPage() {
   };
 
   return (
-    <div className="relative flex min-h-[calc(100dvh-4rem)] flex-1 items-start bg-[#1c1411] font-serif text-[#fcf9f2] print:bg-white">
+    <div className={`relative flex min-h-[calc(100dvh-4rem)] flex-1 items-start bg-[#1c1411] font-serif text-[#fcf9f2] print:bg-white ${isNetworkView ? 'h-[calc(100dvh-4rem)] overflow-hidden' : ''}`}>
       <SheetExplorer
         isOpen={isExplorerOpen}
         onClose={() => setIsExplorerOpen(false)}
@@ -633,6 +663,7 @@ export function SheetPage() {
       />
 
       <div className="flex min-h-[calc(100dvh-4rem)] min-w-0 flex-1 flex-col self-stretch">
+        {showHeader && (
         <header className="shrink-0 border-b border-amber-900/40 bg-neutral-950/80 px-4 py-4 sm:px-6 print:hidden">
           <div className="mx-auto flex max-w-4xl flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
@@ -804,8 +835,8 @@ export function SheetPage() {
             )}
 
             {!activeVersion && (
-              <div className="grid grid-cols-2 gap-1 rounded-xl border border-amber-900/30 bg-neutral-950/50 p-1 font-sans sm:w-72">
-                {(['cards', 'document'] as const).map((value) => (
+              <div className="grid grid-cols-3 gap-1 rounded-xl border border-amber-900/30 bg-neutral-950/50 p-1 font-sans sm:w-96">
+                {(['cards', 'document', 'network'] as const).map((value) => (
                   <button
                     key={value}
                     onClick={() => setMode(value)}
@@ -814,15 +845,25 @@ export function SheetPage() {
                       mode === value ? 'bg-amber-700 text-amber-50 shadow-sm' : 'text-amber-200/70 hover:text-amber-100'
                     }`}
                   >
-                    {value === 'cards' ? 'Cartes' : 'Fiche'}
+                    {value === 'cards' ? 'Cartes' : value === 'document' ? 'Fiche' : 'Réseau'}
                   </button>
                 ))}
               </div>
             )}
           </div>
         </header>
+        )}
 
-        {activeVersion && viewMode === 'diff' && !isReviewPreview ? (
+        {!activeVersion && mode === 'network' ? (
+          <main className={`flex min-h-0 flex-1 flex-col ${showHeader ? 'border-t border-amber-900/20' : ''}`}>
+            <SheetNetwork
+              currentSheetId={sheet.id}
+              onOpenSheet={(targetId) => navigate(`/ideas/fiches/${targetId}`)}
+              isImmersive={isHeaderHidden}
+              onToggleImmersive={toggleHeader}
+            />
+          </main>
+        ) : activeVersion && viewMode === 'diff' && !isReviewPreview ? (
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#1e1e1e] font-mono text-xs sm:text-sm">
             <div className="flex shrink-0 flex-col gap-2 border-b border-amber-900/30 bg-[#252526] px-3 py-2 font-sans sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
@@ -975,6 +1016,7 @@ export function SheetPage() {
                     onSaveDescription={async () => false}
                     onEditorChange={() => {}}
                     onCardUpdated={async () => {}}
+                    mentionScope={mentionScope}
                   />
                 ))}
               </div>
@@ -992,7 +1034,7 @@ export function SheetPage() {
 
                     <button
                       onClick={openDetection}
-                      disabled={allSheets.length === 0}
+                      disabled={mentionableSheets.length === 0}
                       title="Repérer les noms de fiches dans toutes les cartes"
                       aria-label="Détecter les fiches dans toutes les cartes"
                       className={`${toolbarBtn} flex shrink-0 items-center justify-center gap-1.5 border-amber-800/50 bg-amber-950/40 font-sans text-amber-200 hover:bg-amber-900/50 disabled:cursor-not-allowed disabled:opacity-40`}
@@ -1028,6 +1070,7 @@ export function SheetPage() {
                         onSaveDescription={saveCardDescription}
                         onEditorChange={registerEditor}
                         onCardUpdated={reload}
+                        mentionScope={mentionScope}
                       />
                     ))}
                   </div>
@@ -1044,7 +1087,7 @@ export function SheetPage() {
       <AttachNotesModal isOpen={isAttachOpen} sheet={sheet} cards={cards} onClose={() => setIsAttachOpen(false)} onAttached={reload} />
 
       {detectTargets && (
-        <MentionDetection targets={detectTargets} sheets={allSheets} onClose={() => setDetectTargets(null)} />
+        <MentionDetection targets={detectTargets} sheets={mentionableSheets} onClose={() => setDetectTargets(null)} />
       )}
     </div>
   );

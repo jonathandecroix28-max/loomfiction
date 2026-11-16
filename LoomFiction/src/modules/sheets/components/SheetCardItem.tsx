@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import type { Editor } from '@tiptap/core';
@@ -10,6 +10,7 @@ import { offlineIdeaService } from '../../../services/offlineIdeaService';
 import { useLatestGetter } from '../../../hooks/useLatestGetter';
 import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
 import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
+import { filterMentionableSheets, isSheetMentionable, type MentionScope } from '../../editor/utils/mentionScope';
 import { htmlToText } from '../../../utils/versions/htmlText';
 import { IconDelete, IconDown, IconEdit, IconUp } from '../../../components/icons';
 import { ActionMenu } from './ActionMenu';
@@ -27,6 +28,8 @@ interface SheetCardItemProps {
   onSaveDescription: (card: IdeaResponse, description: string) => Promise<boolean>;
   onEditorChange?: (cardId: number, editor: Editor | null) => void;
   onCardUpdated: () => void;
+  /** Roman de la fiche + table fiche → roman : limite les mentions au même roman. */
+  mentionScope: MentionScope;
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -43,6 +46,7 @@ export function SheetCardItem({
   onSaveDescription,
   onEditorChange,
   onCardUpdated,
+  mentionScope,
 }: SheetCardItemProps) {
   const navigate = useNavigate();
   const toast = useToast();
@@ -55,7 +59,9 @@ export function SheetCardItem({
   const [draftTitle, setDraftTitle] = useState(card.name);
 
   const cardContainerRef = useRef<HTMLDivElement>(null);
-  const getSheets = useLatestGetter(sheets);
+  const mentionableSheets = useMemo(() => filterMentionableSheets(sheets, mentionScope), [sheets, mentionScope]);
+  const getSheets = useLatestGetter(mentionableSheets);
+  const getMentionScope = useLatestGetter(mentionScope);
 
   const valueRef = useRef(incoming);
   const savedRef = useRef(incoming);
@@ -96,7 +102,16 @@ export function SheetCardItem({
   }, []);
 
   const editor = useEditor({
-    extensions: [StarterKit, createSheetMentionExtension(getSheets)],
+    extensions: [
+      StarterKit,
+      createSheetMentionExtension(getSheets, {
+        // Tant que la table des romans n'est pas chargée, on ne touche à rien (collage inclus).
+        isSheetMentionable: (sheetId) => {
+          const scope = getMentionScope();
+          return !scope.ready || isSheetMentionable(sheetId, scope);
+        },
+      }),
+    ],
     content: incoming,
     editorProps: {
       attributes: {

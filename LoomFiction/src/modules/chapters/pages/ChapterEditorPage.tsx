@@ -19,6 +19,7 @@ import { imageFilesFrom, insertImageFiles } from '../../../utils/images/editorIm
 import { createSheetMentionExtension } from '../../editor/extensions/SheetMention';
 import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
 import { MentionDetection } from '../../editor/components/MentionDetection';
+import { filterMentionableSheets, isSheetMentionable, useSheetBookMap } from '../../editor/utils/mentionScope';
 import { ChapterExplorer } from '../components/ChapterExplorer';
 import { ChapterModal } from '../../chapters/components/ChapterModal';
 import type { ChapterResponse } from '../../../types/chapter';
@@ -70,7 +71,15 @@ export function ChapterEditorPage() {
 
   const rootRef = useRef<HTMLDivElement>(null);
   const chapterLoadRequestRef = useRef(0);
-  const getSheets = useLatestGetter(sheets);
+
+  const { bookBySheet, ready: bookMapReady } = useSheetBookMap(sheets);
+  const mentionScope = useMemo(
+    () => ({ targetBookId: bookIdNumber, bookBySheet, ready: bookMapReady }),
+    [bookIdNumber, bookBySheet, bookMapReady],
+  );
+  const mentionableSheets = useMemo(() => filterMentionableSheets(sheets, mentionScope), [sheets, mentionScope]);
+  const getSheets = useLatestGetter(mentionableSheets);
+  const getMentionScope = useLatestGetter(mentionScope);
 
   const { updateChapter, isUpdating, error: updateError } = useUpdateChapter();
   const { versions: chapterVersions, refetch: refetchChapterVersions } = useChapterVersions(chapterIdNumber);
@@ -91,7 +100,12 @@ export function ChapterEditorPage() {
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
-      createSheetMentionExtension(getSheets),
+      createSheetMentionExtension(getSheets, {
+        isSheetMentionable: (sheetId) => {
+          const scope = getMentionScope();
+          return !scope.ready || isSheetMentionable(sheetId, scope);
+        },
+      }),
     ],
     content: '',
     editorProps: {
@@ -729,7 +743,7 @@ export function ChapterEditorPage() {
 
               <button
                 onClick={() => setShowMentionDetection(true)}
-                disabled={!editor || isPreview || sheets.length === 0 || (!!activeVersion && viewMode === 'diff')}
+                disabled={!editor || isPreview || mentionableSheets.length === 0 || (!!activeVersion && viewMode === 'diff')}
                 title="Détecter les fiches"
                 className="flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl border border-amber-800/50 bg-amber-950/40 px-2.5 sm:px-3 font-sans text-xs font-medium text-amber-200 transition-colors hover:bg-amber-900/50 disabled:opacity-40 touch-target"
               >
@@ -780,7 +794,7 @@ export function ChapterEditorPage() {
       {showMentionDetection && editor && (
         <MentionDetection
           editor={editor}
-          sheets={sheets}
+          sheets={mentionableSheets}
           onClose={() => setShowMentionDetection(false)}
         />
       )}
