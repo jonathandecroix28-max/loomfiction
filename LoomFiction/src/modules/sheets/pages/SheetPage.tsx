@@ -20,6 +20,7 @@ import type { IdeaResponse } from '../../../types/idea';
 import type { SheetVersionResponse } from '../../../types/sheetVersion';
 import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
+import { useLockDocumentScroll } from '../../../hooks/useLockDocumentScroll';
 import {
   IconAdd,
   IconAttach,
@@ -145,6 +146,7 @@ function htmlToMarkdown(html: string): string {
 
 export function SheetPage() {
   const { sheetId } = useParams<{ sheetId: string }>();
+  useLockDocumentScroll();
   const navigate = useNavigate();
   const location = useLocation();
   const confirm = useConfirm();
