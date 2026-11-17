@@ -7,15 +7,6 @@ import { useCategories } from '../../categories/hooks/useCategories';
 import { useDataChanged } from '../../../hooks/useDataChanged';
 import { buildSheetGraph, normalizeName } from '../sheetGraph';
 
-/**
- * Réseau des fiches, pensé comme un métier à tisser :
- *  - chaque catégorie est un fil de chaîne vertical (une « branche » façon git) ;
- *  - chaque mention est un fil de trame qui passe d’une branche à l’autre (courbes de merge) ;
- *  - le temps s’écoule vers le bas (les fiches sont ordonnées par id, donc par création).
- *
- * Performance : la simulation et la caméra écrivent directement dans le DOM (transform / d).
- * React ne re-rend que lors d’un survol, d’une sélection ou d’un changement de données.
- */
 
 interface SheetNetworkProps {
   currentSheetId: number | null;
@@ -40,6 +31,7 @@ type SimNode = {
 type SimLink = { key: string; s: SimNode; t: SimNode };
 type Sim = { nodes: SimNode[]; links: SimLink[]; lanes: boolean };
 type View = { x: number; y: number; k: number };
+type Isolate = { id: number; depth: 1 | 2 };
 
 const NO_CATEGORY = 'none';
 const FALLBACK_COLOR = '#78716c';
@@ -51,9 +43,14 @@ const LANE_PULL = 0.1;
 const ROW_PULL = 0.05;
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3;
-const LABEL_ZOOM = 0.55;
+const ZOOM_FAR = 0.5; // en dessous : aucune étiquette (sauf fiches actives)
+const ZOOM_MID = 0.95; // en dessous : seulement les hubs
 const DOUBLE_TAP_MS = 350;
-const INK = '#0b0806';
+
+/* Couleurs d’interface : variables du thème actif (voir index.css). */
+const PAGE = 'var(--c-page)';
+const SURFACE = 'var(--c-surface)';
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const radiusOf = (degree: number) => 8 + Math.min(12, Math.sqrt(degree) * 3.5);
@@ -155,6 +152,9 @@ const chip = (active: boolean) =>
 const iconBtn =
   'touch-target flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-amber-900/40 bg-neutral-900/90 font-sans text-base text-amber-200/80 shadow-md transition hover:bg-neutral-800 hover:text-amber-100 active:scale-95';
 
+const stepBtn =
+  'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-sm text-amber-200/80 transition hover:bg-neutral-800 hover:text-amber-100 disabled:cursor-default disabled:opacity-40';
+
 /* Animations « one-shot » uniquement : rien ne tourne en boucle. */
 const CSS = `
 @keyframes sn-pop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:scale(1)}}
@@ -168,16 +168,18 @@ const CSS = `
 .sn-slide{animation:sn-slide .3s ease-out both}
 .sn-hint{animation:sn-hint 9s ease forwards}
 .wv-far .wv-label:not(.wv-keep){display:none}
+.wv-mid .wv-label:not(.wv-keep):not(.wv-hub){display:none}
 @media (prefers-reduced-motion: reduce){
   .sn-pop,.sn-ping,.sn-draw,.sn-slide,.sn-hint{animation:none!important}
 }
 `;
 
-/* Tissu : sergé diagonal très discret + fils de chaîne verticaux. Statique, donc quasi gratuit. */
+/* Tissu : sergé diagonal + fils de chaîne verticaux + lueur d’horizon, tout en variables du thème. */
 const LOOM_BACKGROUND = [
-  'repeating-linear-gradient(90deg, rgba(231,190,130,0.045) 0 1px, transparent 1px 12px)',
-  'repeating-linear-gradient(45deg, rgba(231,190,130,0.025) 0 2px, transparent 2px 7px)',
-  'radial-gradient(120% 90% at 50% 40%, #1d1510 0%, #110b08 55%, #080605 100%)',
+  'repeating-linear-gradient(90deg, color-mix(in srgb, var(--c-text-2) 7%, transparent) 0 1px, transparent 1px 12px)',
+  'repeating-linear-gradient(45deg, color-mix(in srgb, var(--c-text-2) 4%, transparent) 0 2px, transparent 2px 7px)',
+  'radial-gradient(ellipse 90% 420px at 50% 0%, rgb(var(--c-glow) / var(--c-glow-a)), transparent 75%)',
+  'var(--c-page)',
 ].join(', ');
 
 export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false, onToggleImmersive }: SheetNetworkProps) {
@@ -199,6 +201,9 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
   const [showFilters, setShowFilters] = useState(false);
   const [touring, setTouring] = useState(false);
   const [laneMode, setLaneMode] = useState(true);
+  const [minDegree, setMinDegree] = useState(0);
+  const [strongOnly, setStrongOnly] = useState(false);
+  const [isolate, setIsolate] = useState<Isolate | null>(null);
 
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
@@ -212,19 +217,20 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (touring) {
-        setTouring(false);
-        return;
-      }
-      if (isImmersive && onToggleImmersive) onToggleImmersive();
+      if (touring) setTouring(false);
+      else if (isolate) setIsolate(null);
+      else if (isImmersive && onToggleImmersive) onToggleImmersive();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [touring, isImmersive, onToggleImmersive]);
+  }, [touring, isolate, isImmersive, onToggleImmersive]);
 
   /* ───────────── Données du graphe ───────────── */
 
-  const links = useMemo(() => buildSheetGraph(sheets, ideas), [sheets, ideas]);
+  const allLinks = useMemo(() => buildSheetGraph(sheets, ideas), [sheets, ideas]);
+
+  /** « Liens répétés » : on ne garde que les mentions qui reviennent au moins deux fois. */
+  const links = useMemo(() => (strongOnly ? allLinks.filter((link) => link.count >= 2) : allLinks), [allLinks, strongOnly]);
 
   const degree = useMemo(() => {
     const neighbours = new Map<number, Set<number>>();
@@ -240,6 +246,9 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
     return new Map(Array.from(neighbours, ([id, set]) => [id, set.size]));
   }, [links]);
 
+  const maxDegree = useMemo(() => Math.max(0, ...degree.values()), [degree]);
+  const effectiveMinDegree = Math.min(minDegree, maxDegree);
+
   const categoryKeyOf = useCallback(
     (categoryId: number | null | undefined) =>
       categories.some((category) => category.id === categoryId) ? String(categoryId) : NO_CATEGORY,
@@ -254,15 +263,42 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
   const effectiveHideIsolated = hideIsolated && links.length > 0;
 
+  /** Voisinage (1 ou 2 niveaux) de la fiche isolée, dans les deux sens des mentions. */
+  const neighbourhood = useMemo(() => {
+    if (!isolate) return null;
+    const adj = new Map<number, number[]>();
+    for (const link of links) {
+      adj.set(link.source, [...(adj.get(link.source) ?? []), link.target]);
+      adj.set(link.target, [...(adj.get(link.target) ?? []), link.source]);
+    }
+    const seen = new Set<number>([isolate.id]);
+    let frontier = [isolate.id];
+    for (let level = 0; level < isolate.depth; level++) {
+      const next: number[] = [];
+      for (const id of frontier) {
+        for (const other of adj.get(id) ?? []) {
+          if (!seen.has(other)) {
+            seen.add(other);
+            next.push(other);
+          }
+        }
+      }
+      frontier = next;
+    }
+    return seen;
+  }, [isolate, links]);
+
   const visibleSheets = useMemo(
     () =>
       sheets.filter((sheet) => {
+        if (neighbourhood) return neighbourhood.has(sheet.id);
         if (sheet.id === currentSheetId) return true;
         if (hiddenCategories.has(categoryKeyOf(sheet.categoryId))) return false;
         if (effectiveHideIsolated && !degree.get(sheet.id)) return false;
+        if (effectiveMinDegree > 0 && (degree.get(sheet.id) ?? 0) < effectiveMinDegree) return false;
         return true;
       }),
-    [sheets, currentSheetId, hiddenCategories, categoryKeyOf, effectiveHideIsolated, degree],
+    [sheets, neighbourhood, currentSheetId, hiddenCategories, categoryKeyOf, effectiveHideIsolated, effectiveMinDegree, degree],
   );
 
   const visibleIds = useMemo(() => new Set(visibleSheets.map((sheet) => sheet.id)), [visibleSheets]);
@@ -273,6 +309,10 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
   );
 
   const sheetById = useMemo(() => new Map(sheets.map((sheet) => [sheet.id, sheet])), [sheets]);
+
+  useEffect(() => {
+    if (isolate && sheets.length > 0 && !sheetById.has(isolate.id)) setIsolate(null);
+  }, [isolate, sheets.length, sheetById]);
 
   const adjacency = useMemo(() => {
     const out = new Map<number, number[]>();
@@ -288,6 +328,16 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
     () => new Set(sheets.map((sheet) => categoryKeyOf(sheet.categoryId))),
     [sheets, categoryKeyOf],
   );
+
+  /** Seuil de « hub » : le quart supérieur des fiches les plus connectées (au moins 2 liens). */
+  const hubThreshold = useMemo(() => {
+    const values = visibleSheets.map((sheet) => adjacency.out.get(sheet.id)?.length ?? 0).map(
+      (outDeg, index) => outDeg + (adjacency.incoming.get(visibleSheets[index].id)?.length ?? 0),
+    );
+    if (values.length === 0) return 2;
+    values.sort((a, b) => a - b);
+    return Math.max(2, values[Math.floor(values.length * 0.75)]);
+  }, [visibleSheets, adjacency]);
 
   /** Les « fils de chaîne » : une colonne par catégorie présente. */
   const lanes = useMemo(() => {
@@ -312,7 +362,8 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
   const alphaRef = useRef(0);
   const rafRef = useRef(0);
   const runningRef = useRef(false);
-  const modeRef = useRef(laneMode);
+  const layoutKey = `${laneMode ? 1 : 0}|${isolate ? `${isolate.id}:${isolate.depth}` : ''}`;
+  const layoutKeyRef = useRef(layoutKey);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -383,7 +434,11 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
   const applyView = useCallback((v: View) => {
     viewRef.current = v;
     worldRef.current?.setAttribute('transform', `translate(${v.x.toFixed(2)} ${v.y.toFixed(2)}) scale(${v.k.toFixed(4)})`);
-    svgRef.current?.classList.toggle('wv-far', v.k <= LABEL_ZOOM);
+    const svg = svgRef.current;
+    if (svg) {
+      svg.classList.toggle('wv-far', v.k <= ZOOM_FAR);
+      svg.classList.toggle('wv-mid', v.k > ZOOM_FAR && v.k <= ZOOM_MID);
+    }
   }, []);
 
   const stopCamera = useCallback(() => cancelAnimationFrame(camRef.current), []);
@@ -498,16 +553,17 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
       }
     }
 
-    const modeChanged = modeRef.current !== laneMode;
-    modeRef.current = laneMode;
-    alphaRef.current = modeChanged ? 1 : 0.3;
+    // Changement de disposition (branches / libre, voisinage) : on réchauffe la simulation et on recadre.
+    const layoutChanged = layoutKeyRef.current !== layoutKey;
+    layoutKeyRef.current = layoutKey;
+    alphaRef.current = layoutChanged ? 1 : 0.3;
 
     paint();
     start();
 
     if (!fittedRef.current && fitView()) fittedRef.current = true;
-    else if (modeChanged) window.setTimeout(() => void fitView(true), 700);
-  }, [visibleSheets, visibleLinks, degree, laneMode, laneX, categoryKeyOf, paint, start, fitView]);
+    else if (layoutChanged) window.setTimeout(() => void fitView(true), 700);
+  }, [visibleSheets, visibleLinks, degree, laneMode, laneX, layoutKey, categoryKeyOf, paint, start, fitView]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -802,6 +858,13 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
         ? 'Aucune fiche à afficher avec ces filtres.'
         : null;
 
+  /* Densité : plus il y a de liens, plus les fils au repos s’effacent (ils se révèlent au survol). */
+  const linkCount = visibleLinks.length;
+  const dense = linkCount > 90;
+  const veryDense = linkCount > 220;
+  const restOpacity = veryDense ? 0.16 : dense ? 0.3 : 0.6;
+  const dimOpacity = dense ? 0.04 : 0.1;
+
   return (
     <div
       ref={containerRef}
@@ -822,7 +885,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
       >
         <defs>
           <marker id={`${uid}-arrow`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto">
-            <path d="M0,1 L9,5 L0,9 z" fill="#fcd34d" />
+            <path d="M0,1 L9,5 L0,9 z" style={{ fill: 'var(--c-a400)' }} />
           </marker>
         </defs>
 
@@ -844,7 +907,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
                     x2={lane.x}
                     stroke={lane.color}
                     strokeWidth={lit ? 2.5 : 1.5}
-                    strokeOpacity={lit ? 0.7 : 0.28}
+                    strokeOpacity={lit ? 0.7 : 0.3}
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
                   />
@@ -853,11 +916,11 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
                       if (el) laneHeadEls.current.set(lane.key, el);
                       else laneHeadEls.current.delete(lane.key);
                     }}
-                    opacity={lit ? 1 : 0.8}
+                    opacity={lit ? 1 : 0.85}
                   >
-                    <rect x={-width / 2} y={-11} width={width} height={22} rx={11} fill={INK} stroke={lane.color} strokeWidth={1.5} />
+                    <rect x={-width / 2} y={-11} width={width} height={22} rx={11} fill={SURFACE} stroke={lane.color} strokeWidth={1.5} />
                     <circle cx={-width / 2 + 11} cy={0} r={3} fill={lane.color} />
-                    <text x={-width / 2 + 20} y={3.5} fontSize={10.5} className="fill-amber-100" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                    <text x={-width / 2 + 20} y={3.5} fontSize={10.5} className="fill-amber-100" style={{ fontFamily: MONO }}>
                       {label}
                     </text>
                   </g>
@@ -873,7 +936,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
             const d = s && t ? threadPath(s, t) : undefined;
             const hot = activeId != null && (link.source === activeId || link.target === activeId);
             const dim = (activeId != null && !hot) || (matches !== null && !(matches.has(link.source) && matches.has(link.target)));
-            const width = 1.2 + Math.min(link.count, 5) * 0.5;
+            const width = (dense ? 1 : 1.2) + Math.min(link.count, 5) * 0.5;
             const color = colorOfCategory(sheetById.get(link.source)?.categoryId);
             return (
               <g
@@ -881,24 +944,26 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
                 fill="none"
                 strokeLinecap="round"
                 pointerEvents="none"
-                style={{ opacity: dim ? 0.1 : 1, transition: 'opacity .25s ease' }}
+                style={{ opacity: dim ? dimOpacity : 1, transition: 'opacity .25s ease' }}
                 ref={(el) => {
                   if (el) linkEls.current.set(key, el);
                   else linkEls.current.delete(key);
                 }}
               >
-                {/* Liseré sombre : donne l’effet « dessus / dessous » aux croisements */}
-                <path d={d} stroke={INK} strokeOpacity={0.85} strokeWidth={width + 3} vectorEffect="non-scaling-stroke" />
+                {/* Liseré à la couleur du fond : effet « dessus / dessous » aux croisements */}
+                {(!veryDense || hot) && (
+                  <path d={d} stroke={PAGE} strokeOpacity={0.85} strokeWidth={width + 3} vectorEffect="non-scaling-stroke" />
+                )}
                 <path
                   d={d}
                   stroke={color}
-                  strokeOpacity={hot ? 1 : 0.6}
+                  strokeOpacity={hot ? 1 : restOpacity}
                   strokeWidth={hot ? width + 1 : width}
                   vectorEffect="non-scaling-stroke"
                   markerEnd={hot ? `url(#${uid}-arrow)` : undefined}
                 />
                 {hot && (
-                  <path d={d} pathLength={1} className="sn-draw" stroke="#fef3c7" strokeOpacity={0.85} strokeWidth={Math.max(1, width - 0.6)} vectorEffect="non-scaling-stroke" />
+                  <path d={d} pathLength={1} className="sn-draw" stroke="var(--c-heading)" strokeOpacity={0.8} strokeWidth={Math.max(1, width - 0.6)} vectorEffect="non-scaling-stroke" />
                 )}
               </g>
             );
@@ -907,7 +972,8 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
           {/* Fiches : des « commits » */}
           {visibleSheets.map((sheet, index) => {
             const sim = nodesRef.current.get(sheet.id);
-            const radius = radiusOf(degree.get(sheet.id) ?? 0);
+            const nodeDegree = degree.get(sheet.id) ?? 0;
+            const radius = radiusOf(nodeDegree);
             const color = colorOfCategory(sheet.categoryId);
             const isCurrent = sheet.id === currentSheetId;
             const isSelected = sheet.id === selectedId;
@@ -916,6 +982,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
             const near = activeNeighbours.has(sheet.id);
             const dim = (activeId != null && !near) || (matches !== null && !isMatch);
             const keepLabel = near || isMatch || isCurrent;
+            const isHub = nodeDegree >= hubThreshold;
             const scale = isHover ? 1.2 : isSelected ? 1.1 : 1;
 
             return (
@@ -946,22 +1013,22 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
                 <circle r={radius + 12} fill="transparent" />
                 <g className="sn-pop" style={{ animationDelay: `${Math.min(index * 15, 500)}ms` }}>
                   <g style={{ transform: `scale(${scale})`, transformOrigin: '0px 0px', transition: 'transform .2s ease-out' }}>
-                    {(isHover || isSelected || isCurrent) && <circle r={radius + 8} fill={color} opacity={0.2} pointerEvents="none" />}
+                    {(isHover || isSelected || isCurrent) && <circle r={radius + 8} fill={color} opacity={0.22} pointerEvents="none" />}
                     {(isSelected || isMatch) && (
                       <circle r={radius + 6} fill="none" className="stroke-amber-300" strokeWidth={1.5} strokeDasharray="4 3" pointerEvents="none" />
                     )}
                     {isSelected && <circle key={`ping-${selectedId}`} r={radius + 3} fill="none" className="sn-ping stroke-amber-200" strokeWidth={2} pointerEvents="none" />}
 
-                    {/* Point de commit : anneau coloré, cœur sombre (plein si fiche courante) */}
-                    <circle r={radius} fill={isCurrent ? color : INK} stroke={color} strokeWidth={3} />
+                    {/* Point de commit : anneau coloré, cœur « surface » du thème (plein si fiche courante) */}
+                    <circle r={radius} fill={isCurrent ? color : SURFACE} stroke={color} strokeWidth={3} />
                     {!isCurrent && <circle r={radius * 0.42} fill={color} pointerEvents="none" />}
                   </g>
                 </g>
 
                 {isCurrent && (
                   <g pointerEvents="none" transform={`translate(0 ${-radius - 13})`}>
-                    <rect x={-17} y={-8} width={34} height={16} rx={8} className="fill-amber-300" />
-                    <text y={3.5} textAnchor="middle" fontSize={9} fontWeight={700} fill={INK} style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                    <rect x={-17} y={-8} width={34} height={16} rx={8} className="fill-amber-700" />
+                    <text y={3.5} textAnchor="middle" fontSize={9} fontWeight={700} className="fill-amber-50" style={{ fontFamily: MONO }}>
                       HEAD
                     </text>
                   </g>
@@ -972,9 +1039,9 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
                   textAnchor="middle"
                   fontSize={isHover ? 13 : 12}
                   fontWeight={isHover || isSelected ? 600 : 400}
-                  className={`wv-label fill-amber-100 ${keepLabel ? 'wv-keep' : ''}`}
+                  className={`wv-label fill-amber-100 ${keepLabel ? 'wv-keep' : ''} ${isHub ? 'wv-hub' : ''}`}
                   pointerEvents="none"
-                  style={{ stroke: INK, strokeWidth: 3.5, paintOrder: 'stroke', strokeLinejoin: 'round' }}
+                  style={{ stroke: PAGE, strokeWidth: 3.5, paintOrder: 'stroke', strokeLinejoin: 'round' }}
                 >
                   {sheet.name}
                 </text>
@@ -984,11 +1051,11 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
         </g>
       </svg>
 
-      {/* Vignette légère (dégradé statique) */}
+      {/* Vignette légère, teintée par le thème (--c-shadow) */}
       <div
         className="pointer-events-none absolute inset-0"
         aria-hidden="true"
-        style={{ background: 'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.5) 100%)' }}
+        style={{ background: 'radial-gradient(ellipse at center, transparent 55%, var(--c-shadow) 100%)' }}
       />
 
       {emptyMessage && (
@@ -999,17 +1066,19 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
       {!emptyMessage && links.length === 0 && (
         <p className="pointer-events-none absolute inset-x-4 bottom-16 mx-auto max-w-md rounded-xl border border-amber-900/30 bg-neutral-950/90 px-4 py-3 text-center text-xs text-amber-200/70">
-          Aucune mention entre fiches pour l’instant. Mentionne une fiche avec « @ » dans une carte, ou utilise « Détecter les fiches ».
+          {allLinks.length === 0
+            ? 'Aucune mention entre fiches pour l’instant. Mentionne une fiche avec « @ » dans une carte, ou utilise « Détecter les fiches ».'
+            : 'Aucun lien ne répond au filtre « liens répétés ».'}
         </p>
       )}
 
-      {!emptyMessage && (
+      {!emptyMessage && !isolate && (
         <p className="sn-hint pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] mx-auto hidden w-fit rounded-full border border-amber-900/30 bg-neutral-950/80 px-4 py-1.5 text-[11px] text-amber-200/70 sm:block">
           Glisser pour explorer · Molette pour zoomer · Double-clic sur une fiche pour l’ouvrir
         </p>
       )}
 
-      {/* Filtres : repliables sur mobile */}
+      {/* Recherche, voisinage et filtres */}
       <div className="absolute left-3 right-16 top-[max(0.75rem,env(safe-area-inset-top))] flex max-w-2xl flex-col gap-2">
         <div className="flex items-center gap-2">
           <input
@@ -1037,12 +1106,40 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
           </button>
         </div>
 
+        {isolate && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex max-w-[14rem] items-center truncate rounded-xl border border-amber-600 bg-amber-700 px-3 py-1.5 text-xs text-amber-50">
+              ◎ {sheetById.get(isolate.id)?.name ?? `Fiche ${isolate.id}`}
+            </span>
+            {([1, 2] as const).map((depth) => (
+              <button key={depth} type="button" onClick={() => setIsolate({ id: isolate.id, depth })} className={chip(isolate.depth === depth)} aria-pressed={isolate.depth === depth}>
+                Niveau {depth}
+              </button>
+            ))}
+            <button type="button" onClick={() => setIsolate(null)} className={chip(false)}>
+              ✕ Tout afficher
+            </button>
+          </div>
+        )}
+
         <div
-          className={`${showFilters ? 'flex' : 'hidden'} max-h-[40dvh] flex-wrap gap-2 overflow-y-auto rounded-xl border border-amber-900/40 bg-neutral-950/95 p-2 sm:flex sm:max-h-none sm:flex-nowrap sm:overflow-x-auto sm:overflow-y-visible sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:pb-1 sm:scrollbar-none`}
+          className={`${showFilters ? 'flex' : 'hidden'} max-h-[40dvh] flex-wrap items-center gap-2 overflow-y-auto rounded-xl border border-amber-900/40 bg-neutral-950/95 p-2 sm:flex sm:max-h-none sm:flex-nowrap sm:overflow-x-auto sm:overflow-y-visible sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:pb-1 sm:scrollbar-none`}
         >
           <button type="button" onClick={() => setHideIsolated((value) => !value)} className={chip(effectiveHideIsolated)} aria-pressed={effectiveHideIsolated}>
             Masquer les fiches isolées
           </button>
+          <button type="button" onClick={() => setStrongOnly((value) => !value)} className={chip(strongOnly)} aria-pressed={strongOnly} title="Ne garder que les mentions qui reviennent au moins deux fois">
+            Liens répétés
+          </button>
+          <div className="inline-flex shrink-0 items-center gap-0.5 rounded-xl border border-amber-900/40 bg-neutral-900/90 px-1.5 py-1 font-sans text-xs text-amber-200/80" title="Masquer les fiches ayant moins de connexions">
+            <span className="whitespace-nowrap px-1">Connexions ≥ {effectiveMinDegree}</span>
+            <button type="button" className={stepBtn} aria-label="Moins de connexions minimales" disabled={effectiveMinDegree <= 0} onClick={() => setMinDegree(Math.max(0, effectiveMinDegree - 1))}>
+              −
+            </button>
+            <button type="button" className={stepBtn} aria-label="Plus de connexions minimales" disabled={effectiveMinDegree >= maxDegree} onClick={() => setMinDegree(Math.min(maxDegree, effectiveMinDegree + 1))}>
+              +
+            </button>
+          </div>
           {categories
             .filter((category) => presentCategoryKeys.has(String(category.id)))
             .map((category) => {
@@ -1160,14 +1257,29 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
               );
             })}
 
-            <button
-              type="button"
-              onClick={() => onOpenSheet(selectedSheet.id)}
-              disabled={selectedSheet.id === currentSheetId}
-              className="touch-target w-full cursor-pointer rounded-xl border border-amber-600 bg-amber-700 px-4 py-2 text-sm font-medium text-amber-50 shadow-md transition hover:bg-amber-600 disabled:cursor-default disabled:opacity-50"
-            >
-              {selectedSheet.id === currentSheetId ? 'Fiche actuelle' : 'Ouvrir la fiche'}
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  isolate?.id === selectedSheet.id
+                    ? setIsolate(null)
+                    : setIsolate({ id: selectedSheet.id, depth: isolate?.depth ?? 1 })
+                }
+                className={`${chip(isolate?.id === selectedSheet.id)} w-full justify-center`}
+                aria-pressed={isolate?.id === selectedSheet.id}
+                title="N’afficher que cette fiche et ses voisines"
+              >
+                {isolate?.id === selectedSheet.id ? '✕ Quitter le voisinage' : '◎ Isoler le voisinage'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenSheet(selectedSheet.id)}
+                disabled={selectedSheet.id === currentSheetId}
+                className="touch-target w-full cursor-pointer rounded-xl border border-amber-600 bg-amber-700 px-4 py-2 text-sm font-medium text-amber-50 shadow-md transition hover:bg-amber-600 disabled:cursor-default disabled:opacity-50"
+              >
+                {selectedSheet.id === currentSheetId ? 'Fiche actuelle' : 'Ouvrir la fiche'}
+              </button>
+            </div>
           </div>
         </div>
       )}
