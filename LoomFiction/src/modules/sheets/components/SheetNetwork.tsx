@@ -8,8 +8,11 @@ import { useDataChanged } from '../../../hooks/useDataChanged';
 import { buildSheetGraph, normalizeName } from '../sheetGraph';
 
 
+
 interface SheetNetworkProps {
   currentSheetId: number | null;
+  bookId?: number | null;
+  books?: { id: number; title: string }[];
   onOpenSheet: (sheetId: number) => void;
   isImmersive?: boolean;
   onToggleImmersive?: () => void;
@@ -43,11 +46,10 @@ const LANE_PULL = 0.1;
 const ROW_PULL = 0.05;
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3;
-const ZOOM_FAR = 0.5; // en dessous : aucune étiquette (sauf fiches actives)
-const ZOOM_MID = 0.95; // en dessous : seulement les hubs
+const ZOOM_FAR = 0.5; 
+const ZOOM_MID = 0.95;
 const DOUBLE_TAP_MS = 350;
 
-/* Couleurs d’interface : variables du thème actif (voir index.css). */
 const PAGE = 'var(--c-page)';
 const SURFACE = 'var(--c-surface)';
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -55,7 +57,6 @@ const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const radiusOf = (degree: number) => 8 + Math.min(12, Math.sqrt(degree) * 3.5);
 
-/** Courbe de « merge » façon git : départ et arrivée verticaux, arrêtée au bord de la fiche cible. */
 function threadPath(s: SimNode, t: SimNode) {
   const dy = t.y - s.y;
   const c1y = s.y + dy * 0.55;
@@ -155,7 +156,6 @@ const iconBtn =
 const stepBtn =
   'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-sm text-amber-200/80 transition hover:bg-neutral-800 hover:text-amber-100 disabled:cursor-default disabled:opacity-40';
 
-/* Animations « one-shot » uniquement : rien ne tourne en boucle. */
 const CSS = `
 @keyframes sn-pop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:scale(1)}}
 @keyframes sn-ping{0%{transform:scale(.8);opacity:.8}100%{transform:scale(2.8);opacity:0}}
@@ -174,7 +174,6 @@ const CSS = `
 }
 `;
 
-/* Tissu : sergé diagonal + fils de chaîne verticaux + lueur d’horizon, tout en variables du thème. */
 const LOOM_BACKGROUND = [
   'repeating-linear-gradient(90deg, color-mix(in srgb, var(--c-text-2) 7%, transparent) 0 1px, transparent 1px 12px)',
   'repeating-linear-gradient(45deg, color-mix(in srgb, var(--c-text-2) 4%, transparent) 0 2px, transparent 2px 7px)',
@@ -182,7 +181,7 @@ const LOOM_BACKGROUND = [
   'var(--c-page)',
 ].join(', ');
 
-export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false, onToggleImmersive }: SheetNetworkProps) {
+export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpenSheet, isImmersive = false, onToggleImmersive }: SheetNetworkProps) {
   const { sheets, refreshSheets } = useSheets();
   const { ideas, isLoading, refreshIdeas } = useIdeas(null);
   const { categories } = useCategories();
@@ -204,6 +203,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
   const [minDegree, setMinDegree] = useState(0);
   const [strongOnly, setStrongOnly] = useState(false);
   const [isolate, setIsolate] = useState<Isolate | null>(null);
+  const [pickedBookId, setPickedBookId] = useState<number | null | undefined>(undefined);
 
   const reducedMotion = useMemo(
     () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
@@ -212,7 +212,8 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
   useEffect(() => {
     setSelectedId(currentSheetId);
-  }, [currentSheetId]);
+    setPickedBookId(undefined);
+  }, [currentSheetId, bookIdProp]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -227,9 +228,67 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
   /* ───────────── Données du graphe ───────────── */
 
-  const allLinks = useMemo(() => buildSheetGraph(sheets, ideas), [sheets, ideas]);
+  /* ───────────── Roman actif ───────────── */
 
-  /** « Liens répétés » : on ne garde que les mentions qui reviennent au moins deux fois. */
+  const bookOptions = useMemo(() => {
+    const ids = new Set<number | null>(ideas.map((idea) => idea.bookId ?? null));
+    if (bookIdProp !== undefined) ids.add(bookIdProp);
+    for (const book of books ?? []) ids.add(book.id);
+    return Array.from(ids).sort((a, b) => (a === null ? 1 : b === null ? -1 : a - b));
+  }, [ideas, bookIdProp, books]);
+
+  const activeBook = useMemo<number | null>(() => {
+    if (pickedBookId !== undefined && bookOptions.includes(pickedBookId)) return pickedBookId;
+    if (bookIdProp !== undefined) return bookIdProp;
+    if (currentSheetId != null) {
+      const tally = new Map<number | null, number>();
+      for (const idea of ideas) {
+        if (idea.sheetId !== currentSheetId) continue;
+        const book = idea.bookId ?? null;
+        tally.set(book, (tally.get(book) ?? 0) + 1);
+      }
+      let best: number | null | undefined;
+      let bestCount = 0;
+      for (const [book, count] of tally) {
+        if (count > bestCount) {
+          best = book;
+          bestCount = count;
+        }
+      }
+      if (best !== undefined) return best;
+    }
+    return bookOptions[0] ?? null;
+  }, [pickedBookId, bookIdProp, bookOptions, ideas, currentSheetId]);
+
+  const bookTitleOf = useCallback(
+    (id: number | null) => (id === null ? 'Sans roman' : (books?.find((book) => book.id === id)?.title ?? `Roman n° ${id}`)),
+    [books],
+  );
+
+  const changeBook = (next: number | null) => {
+    if (next === activeBook) return;
+    setPickedBookId(next);
+    setIsolate(null);
+    setSelectedId(null);
+    setHoverId(null);
+    setTouring(false);
+  };
+
+  const bookIdeas = useMemo(() => ideas.filter((idea) => (idea.bookId ?? null) === activeBook), [ideas, activeBook]);
+  const allLinks = useMemo(() => buildSheetGraph(sheets, bookIdeas), [sheets, bookIdeas]);
+
+  const scopedIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const idea of bookIdeas) if (idea.sheetId != null) ids.add(idea.sheetId);
+    for (const link of allLinks) {
+      ids.add(link.source);
+      ids.add(link.target);
+    }
+    return ids;
+  }, [bookIdeas, allLinks]);
+
+  const scopedSheets = useMemo(() => sheets.filter((sheet) => scopedIds.has(sheet.id)), [sheets, scopedIds]);
+
   const links = useMemo(() => (strongOnly ? allLinks.filter((link) => link.count >= 2) : allLinks), [allLinks, strongOnly]);
 
   const degree = useMemo(() => {
@@ -263,7 +322,6 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
   const effectiveHideIsolated = hideIsolated && links.length > 0;
 
-  /** Voisinage (1 ou 2 niveaux) de la fiche isolée, dans les deux sens des mentions. */
   const neighbourhood = useMemo(() => {
     if (!isolate) return null;
     const adj = new Map<number, number[]>();
@@ -290,7 +348,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
   const visibleSheets = useMemo(
     () =>
-      sheets.filter((sheet) => {
+      scopedSheets.filter((sheet) => {
         if (neighbourhood) return neighbourhood.has(sheet.id);
         if (sheet.id === currentSheetId) return true;
         if (hiddenCategories.has(categoryKeyOf(sheet.categoryId))) return false;
@@ -298,7 +356,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
         if (effectiveMinDegree > 0 && (degree.get(sheet.id) ?? 0) < effectiveMinDegree) return false;
         return true;
       }),
-    [sheets, neighbourhood, currentSheetId, hiddenCategories, categoryKeyOf, effectiveHideIsolated, effectiveMinDegree, degree],
+    [scopedSheets, neighbourhood, currentSheetId, hiddenCategories, categoryKeyOf, effectiveHideIsolated, effectiveMinDegree, degree],
   );
 
   const visibleIds = useMemo(() => new Set(visibleSheets.map((sheet) => sheet.id)), [visibleSheets]);
@@ -308,11 +366,11 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
     [visibleIds, links],
   );
 
-  const sheetById = useMemo(() => new Map(sheets.map((sheet) => [sheet.id, sheet])), [sheets]);
+  const sheetById = useMemo(() => new Map(scopedSheets.map((sheet) => [sheet.id, sheet])), [scopedSheets]);
 
   useEffect(() => {
-    if (isolate && sheets.length > 0 && !sheetById.has(isolate.id)) setIsolate(null);
-  }, [isolate, sheets.length, sheetById]);
+    if (isolate && !sheetById.has(isolate.id)) setIsolate(null);
+  }, [isolate, sheetById]);
 
   const adjacency = useMemo(() => {
     const out = new Map<number, number[]>();
@@ -325,11 +383,10 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
   }, [visibleLinks]);
 
   const presentCategoryKeys = useMemo(
-    () => new Set(sheets.map((sheet) => categoryKeyOf(sheet.categoryId))),
-    [sheets, categoryKeyOf],
+    () => new Set(scopedSheets.map((sheet) => categoryKeyOf(sheet.categoryId))),
+    [scopedSheets, categoryKeyOf],
   );
 
-  /** Seuil de « hub » : le quart supérieur des fiches les plus connectées (au moins 2 liens). */
   const hubThreshold = useMemo(() => {
     const values = visibleSheets.map((sheet) => adjacency.out.get(sheet.id)?.length ?? 0).map(
       (outDeg, index) => outDeg + (adjacency.incoming.get(visibleSheets[index].id)?.length ?? 0),
@@ -339,7 +396,6 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
     return Math.max(2, values[Math.floor(values.length * 0.75)]);
   }, [visibleSheets, adjacency]);
 
-  /** Les « fils de chaîne » : une colonne par catégorie présente. */
   const lanes = useMemo(() => {
     const present = new Set(visibleSheets.map((sheet) => categoryKeyOf(sheet.categoryId)));
     const list: { key: string; name: string; color: string }[] = [];
@@ -362,7 +418,8 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
   const alphaRef = useRef(0);
   const rafRef = useRef(0);
   const runningRef = useRef(false);
-  const layoutKey = `${laneMode ? 1 : 0}|${isolate ? `${isolate.id}:${isolate.depth}` : ''}`;
+  const layoutKey = `${laneMode ? 1 : 0}|${isolate ? `${isolate.id}:${isolate.depth}` : ''}|${activeBook ?? 'none'}`;
+  const bookRef = useRef(activeBook);
   const layoutKeyRef = useRef(layoutKey);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -377,7 +434,6 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
   const laneLineEls = useRef(new Map<string, SVGLineElement>());
   const laneHeadEls = useRef(new Map<string, SVGGElement>());
 
-  /** Écrit les positions directement dans le DOM, sans passer par React. */
   const paint = useCallback(() => {
     const { nodes, links: simLinks } = simRef.current;
 
@@ -443,7 +499,6 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
   const stopCamera = useCallback(() => cancelAnimationFrame(camRef.current), []);
 
-  /** Centre la caméra sur un point du monde ; le zoom est interpolé en échelle logarithmique. */
   const flyTo = useCallback(
     (cx: number, cy: number, k: number, duration = 700) => {
       const el = containerRef.current;
@@ -553,9 +608,12 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
       }
     }
 
-    // Changement de disposition (branches / libre, voisinage) : on réchauffe la simulation et on recadre.
     const layoutChanged = layoutKeyRef.current !== layoutKey;
     layoutKeyRef.current = layoutKey;
+    if (bookRef.current !== activeBook) {
+      bookRef.current = activeBook;
+      fittedRef.current = false;
+    }
     alphaRef.current = layoutChanged ? 1 : 0.3;
 
     paint();
@@ -563,7 +621,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
     if (!fittedRef.current && fitView()) fittedRef.current = true;
     else if (layoutChanged) window.setTimeout(() => void fitView(true), 700);
-  }, [visibleSheets, visibleLinks, degree, laneMode, laneX, layoutKey, categoryKeyOf, paint, start, fitView]);
+  }, [visibleSheets, visibleLinks, degree, laneMode, laneX, layoutKey, activeBook, categoryKeyOf, paint, start, fitView]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -672,7 +730,6 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
     if (touring) setTouring(false);
   };
 
-  /** Deux doigts : le zoom se fait autour du milieu des doigts, qui peut aussi déplacer la vue. */
   const beginPinch = () => {
     const el = containerRef.current;
     const [p1, p2] = Array.from(pointersRef.current.values());
@@ -826,7 +883,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
     );
   }, [normalizedQuery, visibleSheets]);
 
-  const activeId = hoverId ?? selectedId;
+  const activeId = hoverId ?? (selectedId != null && visibleIds.has(selectedId) ? selectedId : null);
   const activeNeighbours = useMemo(() => {
     const set = new Set<number>();
     if (activeId == null) return set;
@@ -852,13 +909,12 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
   const emptyMessage = isLoading
     ? 'Chargement du réseau…'
-    : sheets.length === 0
-      ? 'Aucune fiche pour le moment.'
+    : scopedSheets.length === 0
+      ? 'Aucune fiche dans ce roman pour le moment.'
       : visibleSheets.length === 0
         ? 'Aucune fiche à afficher avec ces filtres.'
         : null;
 
-  /* Densité : plus il y a de liens, plus les fils au repos s’effacent (ils se révèlent au survol). */
   const linkCount = visibleLinks.length;
   const dense = linkCount > 90;
   const veryDense = linkCount > 220;
@@ -1080,6 +1136,20 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
 
       {/* Recherche, voisinage et filtres */}
       <div className="absolute left-3 right-16 top-[max(0.75rem,env(safe-area-inset-top))] flex max-w-2xl flex-col gap-2">
+        {bookOptions.length > 1 && (
+          <select
+            value={activeBook === null ? 'none' : String(activeBook)}
+            onChange={(event) => changeBook(event.target.value === 'none' ? null : Number(event.target.value))}
+            aria-label="Roman affiché"
+            className="min-h-11 w-full cursor-pointer rounded-xl border border-amber-900/40 bg-neutral-900/90 px-3 py-2 text-base text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 sm:min-h-0 sm:max-w-xs sm:text-xs"
+          >
+            {bookOptions.map((id) => (
+              <option key={id ?? 'none'} value={id === null ? 'none' : String(id)}>
+                {bookTitleOf(id)}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="flex items-center gap-2">
           <input
             value={query}
@@ -1201,6 +1271,7 @@ export function SheetNetwork({ currentSheetId, onOpenSheet, isImmersive = false,
       </div>
 
       <p className={`pointer-events-none absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 rounded-lg bg-neutral-950/80 px-2.5 py-1 text-[11px] text-amber-200/60 ${selectedSheet && selectedVisible ? 'hidden sm:block' : ''}`}>
+        {books?.some((book) => book.id === activeBook) ? `${bookTitleOf(activeBook)} · ` : ''}
         {visibleSheets.length} fiche{visibleSheets.length > 1 ? 's' : ''} · {visibleLinks.length} lien{visibleLinks.length > 1 ? 's' : ''}
       </p>
 
