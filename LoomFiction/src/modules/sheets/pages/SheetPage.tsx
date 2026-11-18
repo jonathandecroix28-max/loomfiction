@@ -11,6 +11,7 @@ import { SheetConfigModal } from '../components/SheetConfigModal';
 import { MentionDetection, type DetectionTarget } from '../../editor/components/MentionDetection';
 import { SheetExplorer } from '../components/SheetExplorer';
 import { SheetNetwork } from '../components/SheetNetwork';
+import { DiffView } from '../../../components/diff/DiffView';
 import { filterMentionableSheets, useSheetBookMap } from '../../editor/utils/mentionScope';
 import type { Editor } from '@tiptap/core';
 import { offlineIdeaService } from '../../../services/offlineIdeaService';
@@ -527,11 +528,6 @@ export function SheetPage() {
     return { groups, rows };
   }, [activeVersion, viewMode, cards]);
 
-  const visibleDiffRows = useMemo(
-    () => hideIdenticalLines ? diffGroups.rows.filter((row) => row.type !== 'equal') : diffGroups.rows,
-    [diffGroups, hideIdenticalLines],
-  );
-
   const changeGroups = useMemo(
     () => diffGroups.groups.filter((group) => group.type === 'change'),
     [diffGroups],
@@ -858,138 +854,24 @@ export function SheetPage() {
           <main className={`flex min-h-0 flex-1 flex-col ${showHeader ? 'border-t border-amber-900/20' : ''}`}>
             <SheetNetwork
               currentSheetId={sheet.id}
+              bookId={bookOfSheet(cards) ?? undefined}
               onOpenSheet={(targetId) => navigate(`/ideas/fiches/${targetId}`)}
               isImmersive={isHeaderHidden}
               onToggleImmersive={toggleHeader}
             />
           </main>
         ) : activeVersion && viewMode === 'diff' && !isReviewPreview ? (
-          <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#1e1e1e] font-mono text-xs sm:text-sm">
-            <div className="flex shrink-0 flex-col gap-2 border-b border-amber-900/30 bg-[#252526] px-3 py-2 font-sans sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
-                <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs text-neutral-300">
-                  <input type="checkbox" checked={hideIdenticalLines} onChange={(event) => setHideIdenticalLines(event.target.checked)} className="size-4 accent-amber-600" />
-                  Masquer les lignes identiques
-                </label>
-                <span className="shrink-0 text-[11px] text-neutral-400">{changeGroups.length} changement(s)</span>
-              </div>
-              <button
-                type="button"
-                onClick={buildReviewPreview}
-                disabled={changeGroups.length === 0}
-                className="touch-target w-full cursor-pointer rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
-              >
-                Prévisualiser le résultat
-              </button>
-            </div>
-
-            {changeGroups.length > 0 && (
-              <div className="flex shrink-0 snap-x gap-2 overflow-x-auto border-b border-amber-900/30 bg-[#222] p-2">
-                {changeGroups.map((group, index) => {
-                  const decision = reviewDecisions[group.id];
-                  return (
-                    <div key={group.id} className="flex w-44 shrink-0 snap-start flex-col gap-2 rounded-lg border border-neutral-700 bg-[#292929] p-2 sm:w-auto sm:flex-row sm:items-center">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-sans text-xs font-medium text-neutral-200">Changement {index + 1}</span>
-                        <span className="font-sans text-[10px] text-neutral-500">{decision === undefined ? 'En attente' : decision ? 'Accepté' : 'Rejeté'}</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setReviewDecisions((current) => ({ ...current, [group.id]: true }))}
-                          className={`min-h-10 cursor-pointer rounded-md px-3 font-sans text-xs font-medium ${decision === true ? 'bg-emerald-700 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-emerald-900'}`}
-                        >
-                          Accepter
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setReviewDecisions((current) => ({ ...current, [group.id]: false }))}
-                          className={`min-h-10 cursor-pointer rounded-md px-3 font-sans text-xs font-medium ${decision === false ? 'bg-red-800 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-red-950'}`}
-                        >
-                          Rejeter
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Desktop : 2 colonnes synchronisées */}
-            <div className="hidden md:grid min-h-0 flex-1 grid-cols-2 divide-x divide-amber-900/30 overflow-y-auto">
-              <section className="min-w-0">
-                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-900/30 bg-[#252526] px-4 py-3 font-sans text-amber-200/70">
-                  <span>v{activeVersion.versionNumber} {activeVersion.name ? `- ${activeVersion.name}` : ''}</span>
-                  <span className="rounded bg-red-950/80 px-2 py-0.5 text-[10px] uppercase text-red-300">Ancienne version</span>
-                </div>
-                <div className="space-y-0.5 p-3">
-                  {visibleDiffRows.map((row, idx) => (
-                    <div key={`old-${idx}`} className={`flex min-h-7 rounded px-2 py-1 ${row.type === 'removed' ? 'bg-red-950/50 text-red-200' : row.type === 'equal' ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                      <span className="w-9 shrink-0 select-none pr-3 text-right text-neutral-500">{row.leftLine ?? ''}</span>
-                      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{row.left ?? ' '}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-              <section className="min-w-0">
-                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-900/30 bg-[#252526] px-4 py-3 font-sans text-amber-200/70">
-                  <span>Fiche actuelle</span>
-                  <span className="rounded bg-emerald-950/80 px-2 py-0.5 text-[10px] uppercase text-emerald-300">Actuel</span>
-                </div>
-                <div className="space-y-0.5 p-3">
-                  {visibleDiffRows.map((row, idx) => (
-                    <div key={`new-${idx}`} className={`flex min-h-7 rounded px-2 py-1 ${row.type === 'added' ? 'bg-emerald-950/50 text-emerald-200' : row.type === 'equal' ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                      <span className="w-9 shrink-0 select-none pr-3 text-right text-neutral-500">{row.rightLine ?? ''}</span>
-                      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{row.right ?? ' '}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            {/* Mobile : un seul flux avec les suppressions puis les ajouts en contexte. */}
-            <section className="md:hidden min-h-0 flex-1 overflow-y-auto">
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-900/30 bg-[#252526] px-3 py-3 font-sans text-amber-200/70">
-                <span>Comparaison avec v{activeVersion.versionNumber}</span>
-                <span className="text-[10px] text-neutral-400">− supprimé · + ajouté</span>
-              </div>
-              <div className="space-y-1 p-3">
-                {visibleDiffRows.map((row, idx) => {
-                  const isRemoved = row.type === 'removed';
-                  const isAdded = row.type === 'added';
-                  const lineNumber = isRemoved ? row.leftLine : row.rightLine;
-                  const marker = isRemoved ? '−' : isAdded ? '+' : ' ';
-                  const value = isRemoved ? row.left : row.right;
-
-                  return (
-                    <div
-                      key={`mobile-${idx}`}
-                      className={`flex min-h-8 rounded px-2 py-1.5 ${
-                        isRemoved
-                          ? 'border-l-2 border-red-500 bg-red-950/50 text-red-200'
-                          : isAdded
-                            ? 'border-l-2 border-emerald-500 bg-emerald-950/50 text-emerald-200'
-                            : 'border-l-2 border-transparent text-neutral-300'
-                      }`}
-                    >
-                      <span className="w-9 shrink-0 select-none pr-2 text-right tabular-nums text-neutral-500">
-                        {lineNumber ?? ''}
-                      </span>
-                      <span className={`w-5 shrink-0 select-none text-center font-bold ${
-                        isRemoved ? 'text-red-400' : isAdded ? 'text-emerald-400' : 'text-transparent'
-                      }`}>
-                        {marker}
-                      </span>
-                      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{value || ' '}</span>
-                    </div>
-                  );
-                })}
-                {diffGroups.rows.length === 0 && (
-                  <p className="py-8 text-center font-sans text-neutral-400">Aucune différence détectée.</p>
-                )}
-              </div>
-            </section>
-          </main>
+          <DiffView
+            rows={diffGroups.rows}
+            changeIds={changeGroups.map((group) => group.id)}
+            decisions={reviewDecisions}
+            onDecide={(id, accepted) => setReviewDecisions((current) => ({ ...current, [id]: accepted }))}
+            hideIdentical={hideIdenticalLines}
+            onHideIdenticalChange={setHideIdenticalLines}
+            onPreview={buildReviewPreview}
+            oldLabel={`v${activeVersion.versionNumber}${activeVersion.name ? ` - ${activeVersion.name}` : ''}`}
+            currentLabel="Fiche actuelle"
+          />
         ) : (
           <main className="mx-auto max-w-4xl space-y-4 px-4 py-6 sm:px-6 sm:py-8 print:max-w-none print:p-0 w-full">
             {feedback && (

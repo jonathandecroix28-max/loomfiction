@@ -21,6 +21,7 @@ import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
 import { MentionDetection } from '../../editor/components/MentionDetection';
 import { filterMentionableSheets, isSheetMentionable, useSheetBookMap } from '../../editor/utils/mentionScope';
 import { ChapterExplorer } from '../components/ChapterExplorer';
+import { DiffView } from '../../../components/diff/DiffView';
 import { ChapterModal } from '../../chapters/components/ChapterModal';
 import type { ChapterResponse } from '../../../types/chapter';
 import type { ChapterVersionResponse } from '../../../types/chapterVersion';
@@ -415,11 +416,6 @@ export function ChapterEditorPage() {
     return { groups, rows };
   }, [activeVersion, viewMode, chapter]);
 
-  const visibleDiffRows = useMemo(
-    () => hideIdenticalLines ? diffGroups.rows.filter((row) => row.type !== 'equal') : diffGroups.rows,
-    [diffGroups, hideIdenticalLines],
-  );
-
   const changeGroups = useMemo(
     () => diffGroups.groups.filter((group) => group.type === 'change'),
     [diffGroups],
@@ -556,102 +552,17 @@ export function ChapterEditorPage() {
         </header>
 
         {activeVersion && viewMode === 'diff' && !isReviewPreview ? (
-          <main className="flex flex-1 min-h-0 flex-col overflow-hidden bg-[#1e1e1e] font-mono text-xs sm:text-sm">
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-amber-900/30 bg-[#252526] px-3 py-2 font-sans">
-              <label className="flex items-center gap-2 text-xs text-neutral-300">
-                <input type="checkbox" checked={hideIdenticalLines} onChange={(event) => setHideIdenticalLines(event.target.checked)} className="accent-amber-600" />
-                Masquer les lignes identiques
-              </label>
-              <span className="text-[11px] text-neutral-400">{changeGroups.length} changement(s) à examiner</span>
-              <button onClick={buildReviewPreview} disabled={changeGroups.length === 0} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">Prévisualiser le résultat</button>
-            </div>
-            {changeGroups.length > 0 && (
-              <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-amber-900/30 bg-[#222] p-2">
-                {changeGroups.map((group, index) => (
-                  <div key={group.id} className="flex shrink-0 items-center gap-2 rounded-lg border border-neutral-700 bg-[#292929] px-2 py-1.5">
-                    <span className="font-sans text-[11px] text-neutral-300">Changement {index + 1}</span>
-                    <button onClick={() => setReviewDecisions((current) => ({ ...current, [group.id]: true }))} className={`rounded px-2 py-1 font-sans text-[11px] ${reviewDecisions[group.id] === true ? 'bg-emerald-700 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-emerald-900'}`}>Accepter</button>
-                    <button onClick={() => setReviewDecisions((current) => ({ ...current, [group.id]: false }))} className={`rounded px-2 py-1 font-sans text-[11px] ${reviewDecisions[group.id] === false ? 'bg-red-800 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-red-950'}`}>Rejeter</button>
-                    <span className="font-sans text-[10px] text-neutral-500">{reviewDecisions[group.id] === undefined ? 'En attente' : reviewDecisions[group.id] ? 'Accepté' : 'Rejeté'}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {/* Desktop : comparaison classique en deux colonnes synchronisées visuellement. */}
-            <div className="hidden md:grid min-h-0 flex-1 grid-cols-2 divide-x divide-amber-900/30 overflow-y-auto">
-              <section className="min-w-0">
-                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-900/30 bg-[#252526] px-4 py-3 font-sans text-amber-200/70">
-                  <span>v{activeVersion.versionNumber} {activeVersion.name ? `- ${activeVersion.name}` : ''}</span>
-                  <span className="rounded bg-red-950/80 px-2 py-0.5 text-[10px] uppercase text-red-300">Ancienne version</span>
-                </div>
-                <div className="space-y-0.5 p-3">
-                  {visibleDiffRows.map((row, idx) => (
-                    <div key={`old-${idx}`} className={`flex min-h-7 rounded px-2 py-1 ${row.type === 'removed' ? 'bg-red-950/50 text-red-200' : row.type === 'equal' ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                      <span className="w-9 shrink-0 select-none pr-3 text-right text-neutral-500">{row.leftLine ?? ''}</span>
-                      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{row.left ?? ' '}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-              <section className="min-w-0">
-                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-900/30 bg-[#252526] px-4 py-3 font-sans text-amber-200/70">
-                  <span>Manuscrit actuel</span>
-                  <span className="rounded bg-emerald-950/80 px-2 py-0.5 text-[10px] uppercase text-emerald-300">Actuel</span>
-                </div>
-                <div className="space-y-0.5 p-3">
-                  {visibleDiffRows.map((row, idx) => (
-                    <div key={`new-${idx}`} className={`flex min-h-7 rounded px-2 py-1 ${row.type === 'added' ? 'bg-emerald-950/50 text-emerald-200' : row.type === 'equal' ? 'text-neutral-300' : 'text-neutral-700'}`}>
-                      <span className="w-9 shrink-0 select-none pr-3 text-right text-neutral-500">{row.rightLine ?? ''}</span>
-                      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{row.right ?? ' '}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            {/* Mobile : un seul flux avec les suppressions puis les ajouts en contexte. */}
-            <section className="md:hidden min-h-0 flex-1 overflow-y-auto">
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-amber-900/30 bg-[#252526] px-3 py-3 font-sans text-amber-200/70">
-                <span>Comparaison avec v{activeVersion.versionNumber}</span>
-                <span className="text-[10px] text-neutral-400">− supprimé · + ajouté</span>
-              </div>
-              <div className="space-y-1 p-3">
-                {visibleDiffRows.map((row, idx) => {
-                  const isRemoved = row.type === 'removed';
-                  const isAdded = row.type === 'added';
-                  const lineNumber = isRemoved ? row.leftLine : row.rightLine;
-                  const marker = isRemoved ? '−' : isAdded ? '+' : ' ';
-                  const value = isRemoved ? row.left : row.right;
-
-                  return (
-                    <div
-                      key={`mobile-${idx}`}
-                      className={`flex min-h-8 rounded px-2 py-1.5 ${
-                        isRemoved
-                          ? 'border-l-2 border-red-500 bg-red-950/50 text-red-200'
-                          : isAdded
-                            ? 'border-l-2 border-emerald-500 bg-emerald-950/50 text-emerald-200'
-                            : 'border-l-2 border-transparent text-neutral-300'
-                      }`}
-                    >
-                      <span className="w-9 shrink-0 select-none pr-2 text-right tabular-nums text-neutral-500">
-                        {lineNumber ?? ''}
-                      </span>
-                      <span className={`w-5 shrink-0 select-none text-center font-bold ${
-                        isRemoved ? 'text-red-400' : isAdded ? 'text-emerald-400' : 'text-transparent'
-                      }`}>
-                        {marker}
-                      </span>
-                      <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{value || ' '}</span>
-                    </div>
-                  );
-                })}
-                {diffGroups.rows.length === 0 && (
-                  <p className="py-8 text-center font-sans text-neutral-400">Aucune différence détectée.</p>
-                )}
-              </div>
-            </section>
-          </main>
+          <DiffView
+            rows={diffGroups.rows}
+            changeIds={changeGroups.map((group) => group.id)}
+            decisions={reviewDecisions}
+            onDecide={(id, accepted) => setReviewDecisions((current) => ({ ...current, [id]: accepted }))}
+            hideIdentical={hideIdenticalLines}
+            onHideIdenticalChange={setHideIdenticalLines}
+            onPreview={buildReviewPreview}
+            oldLabel={`v${activeVersion.versionNumber}${activeVersion.name ? ` - ${activeVersion.name}` : ''}`}
+            currentLabel="Manuscrit actuel"
+          />
         ) : (
           <main className={`flex-1 overflow-y-auto w-full flex flex-col ${isReviewPreview || isPreview ? 'p-4' : 'px-3 sm:px-6 pt-4 sm:pt-6'}`}>
             {isReviewPreview ? (
