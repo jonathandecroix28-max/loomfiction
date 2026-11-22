@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import { useSheets } from '../hooks/useSheets';
@@ -6,8 +6,6 @@ import { useIdeas } from '../../ideas/hooks/useIdeas';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useDataChanged } from '../../../hooks/useDataChanged';
 import { buildSheetGraph, normalizeName } from '../sheetGraph';
-
-
 
 interface SheetNetworkProps {
   currentSheetId: number | null;
@@ -18,129 +16,77 @@ interface SheetNetworkProps {
   onToggleImmersive?: () => void;
 }
 
-type SimNode = {
-  id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  r: number;
-  deg: number;
-  lane: string;
-  lx: number;
-  ty: number;
-  fixed: boolean;
-};
-type SimLink = { key: string; s: SimNode; t: SimNode };
-type Sim = { nodes: SimNode[]; links: SimLink[]; lanes: boolean };
+/** Position d'une fiche sur le cercle. */
+type Pos = { x: number; y: number; r: number; lane: string };
+type Arc = { key: string; name: string; color: string; start: number; end: number; mid: number; count: number };
+type Layout = { radius: number; positions: Map<number, Pos>; arcs: Arc[] };
 type View = { x: number; y: number; k: number };
 type Isolate = { id: number; depth: 1 | 2 };
+type Drag = { id: number | null; sx: number; sy: number; ox: number; oy: number; moved: boolean; threshold: number };
 
 const NO_CATEGORY = 'none';
 const FALLBACK_COLOR = '#78716c';
-const REPULSION = 9000;
-const LINK_DISTANCE = 150;
-const GRAVITY = 0.02;
-const LANE_GAP = 230;
-const LANE_PULL = 0.1;
-const ROW_PULL = 0.05;
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3;
-const ZOOM_FAR = 0.5; 
+const ZOOM_FAR = 0.5;
 const ZOOM_MID = 0.95;
-const DOUBLE_TAP_MS = 350;
+const MIN_RING = 230;
+const GROUP_GAP = 84;
+const CENTER_R = 34;
+const ARC_OFFSET = 34;
 
 const PAGE = 'var(--c-page)';
 const SURFACE = 'var(--c-surface)';
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const radiusOf = (degree: number) => 8 + Math.min(12, Math.sqrt(degree) * 3.5);
+const nodeRadius = (degree: number) => 11 + Math.min(8, Math.sqrt(degree) * 2.2);
+const initialOf = (name: string) => (name.trim().match(/[\p{L}\p{N}]/u)?.[0] ?? '·').toUpperCase();
+const fmt = (value: number) => value.toFixed(1);
 
-function threadPath(s: SimNode, t: SimNode) {
-  const dy = t.y - s.y;
-  const c1y = s.y + dy * 0.55;
-  const c2y = t.y - dy * 0.55;
-  let tx = 0;
-  let ty = t.y - c2y;
-  if (Math.abs(ty) < 12) {
-    tx = t.x - s.x;
-    ty = t.y - s.y;
-  }
-  const len = Math.hypot(tx, ty) || 1;
-  const gap = t.r + 4;
-  const ex = t.x - (tx / len) * gap;
-  const ey = t.y - (ty / len) * gap;
-  return `M${s.x.toFixed(1)},${s.y.toFixed(1)} C${s.x.toFixed(1)},${c1y.toFixed(1)} ${t.x.toFixed(1)},${c2y.toFixed(1)} ${ex.toFixed(1)},${ey.toFixed(1)}`;
+const polar = (radius: number, angle: number) => ({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+
+/** Arc de cercle (sens horaire) entre deux angles. */
+function arcPath(radius: number, start: number, end: number) {
+  const a = polar(radius, start);
+  const b = polar(radius, end);
+  const large = end - start > Math.PI ? 1 : 0;
+  return `M${fmt(a.x)},${fmt(a.y)} A${fmt(radius)},${fmt(radius)} 0 ${large} 1 ${fmt(b.x)},${fmt(b.y)}`;
 }
 
-function tickSim(sim: Sim, alpha: number) {
-  const { nodes, links, lanes } = sim;
+/**
+ * Lien entre deux fiches du cercle : une courbe qui plonge vers le centre d'autant plus
+ * que les deux fiches sont éloignées l'une de l'autre (les voisines restent près du bord).
+ */
+function ringPath(a: Pos, b: Pos, ring: number) {
+  const inset = (p: Pos) => {
+    const scale = Math.max(0.2, (ring - p.r - 4) / ring);
+    return { x: p.x * scale, y: p.y * scale };
+  };
+  const p = inset(a);
+  const q = inset(b);
+  const cos = clamp((a.x * b.x + a.y * b.y) / (ring * ring), -1, 1);
+  const pull = Math.pow(1 - Math.acos(cos) / Math.PI, 1.25);
+  const cx = ((p.x + q.x) / 2) * pull;
+  const cy = ((p.y + q.y) / 2) * pull;
+  return `M${fmt(p.x)},${fmt(p.y)} Q${fmt(cx)},${fmt(cy)} ${fmt(q.x)},${fmt(q.y)}`;
+}
 
-  for (let i = 0; i < nodes.length; i++) {
-    const a = nodes[i];
-    for (let j = i + 1; j < nodes.length; j++) {
-      const b = nodes[j];
-      let dx = b.x - a.x;
-      let dy = b.y - a.y;
-      let d2 = dx * dx + dy * dy;
-      if (d2 < 1) {
-        dx = (i - j) * 0.5 || 0.5;
-        dy = 0.5;
-        d2 = dx * dx + dy * dy;
-      }
-      const dist = Math.sqrt(d2);
-      const force = (REPULSION / d2) * alpha;
-      const fx = (dx / dist) * force;
-      const fy = (dy / dist) * force;
-      a.vx -= fx;
-      a.vy -= fy;
-      b.vx += fx;
-      b.vy += fy;
-
-      const minDist = a.r + b.r + 18;
-      if (dist < minDist) {
-        const push = (minDist - dist) * 0.05;
-        a.vx -= (dx / dist) * push;
-        a.vy -= (dy / dist) * push;
-        b.vx += (dx / dist) * push;
-        b.vy += (dy / dist) * push;
-      }
-    }
-  }
-
-  for (const { s, t } of links) {
-    const dx = t.x - s.x;
-    const dy = t.y - s.y;
-    const dist = Math.max(1, Math.hypot(dx, dy));
-    const strength = 0.05 / Math.max(1, Math.sqrt((s.deg + t.deg) / 4));
-    const force = (dist - LINK_DISTANCE) * strength * alpha;
-    const fx = (dx / dist) * force;
-    const fy = (dy / dist) * force;
-    s.vx += fx;
-    s.vy += fy;
-    t.vx -= fx;
-    t.vy -= fy;
-  }
-
-  for (const node of nodes) {
-    if (node.fixed) {
-      node.vx = 0;
-      node.vy = 0;
-      continue;
-    }
-    if (lanes) {
-      node.vx += (node.lx - node.x) * LANE_PULL * alpha;
-      node.vy += (node.ty - node.y) * ROW_PULL * alpha;
-    } else {
-      node.vx -= node.x * GRAVITY * alpha;
-      node.vy -= node.y * GRAVITY * alpha;
-    }
-    node.vx *= 0.65;
-    node.vy *= 0.65;
-    node.x += node.vx;
-    node.y += node.vy;
-  }
+/** Lien en éventail entre la fiche centrale et une fiche du cercle, légèrement courbé. */
+function fanPath(from: { x: number; y: number; r: number }, to: { x: number; y: number; r: number }, sign: 1 | -1) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const sx = from.x + ux * (from.r + 3);
+  const sy = from.y + uy * (from.r + 3);
+  const ex = to.x - ux * (to.r + 5);
+  const ey = to.y - uy * (to.r + 5);
+  const offset = len * 0.14 * sign;
+  const cx = (sx + ex) / 2 - uy * offset;
+  const cy = (sy + ey) / 2 + ux * offset;
+  return `M${fmt(sx)},${fmt(sy)} Q${fmt(cx)},${fmt(cy)} ${fmt(ex)},${fmt(ey)}`;
 }
 
 const chip = (active: boolean) =>
@@ -158,13 +104,13 @@ const stepBtn =
 
 const CSS = `
 @keyframes sn-pop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:scale(1)}}
-@keyframes sn-ping{0%{transform:scale(.8);opacity:.8}100%{transform:scale(2.8);opacity:0}}
+@keyframes sn-ping{0%{transform:scale(.8);opacity:.8}100%{transform:scale(2.4);opacity:0}}
 @keyframes sn-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
 @keyframes sn-slide{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes sn-hint{0%,65%{opacity:1}100%{opacity:0}}
 .sn-pop{transform-origin:0 0;animation:sn-pop .45s ease-out backwards}
-.sn-ping{transform-origin:0 0;opacity:0;animation:sn-ping .9s ease-out forwards}
-.sn-draw{stroke-dasharray:1;animation:sn-draw .5s ease-out both}
+.sn-ping{transform-origin:0 0;opacity:0;animation:sn-ping 1.1s ease-out forwards}
+.sn-draw{stroke-dasharray:1;animation:sn-draw .6s ease-out both}
 .sn-slide{animation:sn-slide .3s ease-out both}
 .sn-hint{animation:sn-hint 9s ease forwards}
 .wv-far .wv-label:not(.wv-keep){display:none}
@@ -175,8 +121,7 @@ const CSS = `
 `;
 
 const LOOM_BACKGROUND = [
-  'repeating-linear-gradient(90deg, color-mix(in srgb, var(--c-text-2) 7%, transparent) 0 1px, transparent 1px 12px)',
-  'repeating-linear-gradient(45deg, color-mix(in srgb, var(--c-text-2) 4%, transparent) 0 2px, transparent 2px 7px)',
+  'radial-gradient(ellipse 70% 70% at 50% 50%, color-mix(in srgb, var(--c-text-2) 9%, transparent), transparent 75%)',
   'radial-gradient(ellipse 90% 420px at 50% 0%, rgb(var(--c-glow) / var(--c-glow-a)), transparent 75%)',
   'var(--c-page)',
 ].join(', ');
@@ -199,10 +144,9 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
   const [hoverId, setHoverId] = useState<number | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [touring, setTouring] = useState(false);
-  const [laneMode, setLaneMode] = useState(true);
   const [minDegree, setMinDegree] = useState(0);
   const [strongOnly, setStrongOnly] = useState(false);
-  const [isolate, setIsolate] = useState<Isolate | null>(null);
+  const [isolateRaw, setIsolate] = useState<Isolate | null>(null);
   const [pickedBookId, setPickedBookId] = useState<number | null | undefined>(undefined);
 
   const reducedMotion = useMemo(
@@ -210,21 +154,25 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
     [],
   );
 
-  useEffect(() => {
+  // Quand la page change de fiche / de roman, la sélection repart de la fiche courante (ajustement pendant le rendu).
+  const syncKey = `${currentSheetId ?? ''}|${bookIdProp ?? ''}`;
+  const [appliedSyncKey, setAppliedSyncKey] = useState(syncKey);
+  if (syncKey !== appliedSyncKey) {
+    setAppliedSyncKey(syncKey);
     setSelectedId(currentSheetId);
     setPickedBookId(undefined);
-  }, [currentSheetId, bookIdProp]);
+  }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       if (touring) setTouring(false);
-      else if (isolate) setIsolate(null);
+      else if (isolateRaw) setIsolate(null);
       else if (isImmersive && onToggleImmersive) onToggleImmersive();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [touring, isolate, isImmersive, onToggleImmersive]);
+  }, [touring, isolateRaw, isImmersive, onToggleImmersive]);
 
   /* ───────────── Données du graphe ───────────── */
 
@@ -288,6 +236,9 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
   }, [bookIdeas, allLinks]);
 
   const scopedSheets = useMemo(() => sheets.filter((sheet) => scopedIds.has(sheet.id)), [sheets, scopedIds]);
+
+  // Le voisinage isolé n'est valable que tant que sa fiche appartient au roman affiché.
+  const isolate = isolateRaw && scopedIds.has(isolateRaw.id) ? isolateRaw : null;
 
   const links = useMemo(() => (strongOnly ? allLinks.filter((link) => link.count >= 2) : allLinks), [allLinks, strongOnly]);
 
@@ -368,10 +319,6 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
 
   const sheetById = useMemo(() => new Map(scopedSheets.map((sheet) => [sheet.id, sheet])), [scopedSheets]);
 
-  useEffect(() => {
-    if (isolate && !sheetById.has(isolate.id)) setIsolate(null);
-  }, [isolate, sheetById]);
-
   const adjacency = useMemo(() => {
     const out = new Map<number, number[]>();
     const incoming = new Map<number, number[]>();
@@ -405,22 +352,49 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
       }
     }
     if (present.has(NO_CATEGORY)) list.push({ key: NO_CATEGORY, name: 'Sans catégorie', color: FALLBACK_COLOR });
-    return list.map((lane, index) => ({ ...lane, x: (index - (list.length - 1) / 2) * LANE_GAP }));
+    return list;
   }, [visibleSheets, categories, categoryKeyOf]);
 
-  const laneX = useMemo(() => new Map(lanes.map((lane) => [lane.key, lane.x])), [lanes]);
-  const laneXRef = useRef(laneX);
+  /* ───────────── Disposition : un grand cercle, un arc par catégorie ───────────── */
 
-  /* ───────────── Simulation + rendu impératif ───────────── */
+  const layout = useMemo<Layout>(() => {
+    const buckets = lanes
+      .map((lane) => {
+        const members = visibleSheets
+          .filter((sheet) => categoryKeyOf(sheet.categoryId) === lane.key)
+          .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+        const width = members.reduce((sum, sheet) => sum + 2 * nodeRadius(degree.get(sheet.id) ?? 0) + 16, 0);
+        return { lane, members, width };
+      })
+      .filter((bucket) => bucket.members.length > 0);
 
-  const nodesRef = useRef(new Map<number, SimNode>());
-  const simRef = useRef<Sim>({ nodes: [], links: [], lanes: true });
-  const alphaRef = useRef(0);
-  const rafRef = useRef(0);
-  const runningRef = useRef(false);
-  const layoutKey = `${laneMode ? 1 : 0}|${isolate ? `${isolate.id}:${isolate.depth}` : ''}|${activeBook ?? 'none'}`;
-  const bookRef = useRef(activeBook);
-  const layoutKeyRef = useRef(layoutKey);
+    if (buckets.length === 0) return { radius: MIN_RING, positions: new Map(), arcs: [] };
+
+    const totalWidth = buckets.reduce((sum, bucket) => sum + bucket.width, 0);
+    const radius = clamp((totalWidth + buckets.length * GROUP_GAP) / (2 * Math.PI), MIN_RING, 2400);
+    const gapAngle = GROUP_GAP / radius;
+    const available = Math.max(0.5, 2 * Math.PI - buckets.length * gapAngle);
+
+    const positions = new Map<number, Pos>();
+    const arcs: Arc[] = [];
+    let cursor = -Math.PI / 2 + gapAngle / 2;
+
+    for (const bucket of buckets) {
+      const span = (available * bucket.width) / totalWidth;
+      const start = cursor;
+      const end = cursor + span;
+      bucket.members.forEach((sheet, index) => {
+        const angle = start + ((index + 0.5) / bucket.members.length) * span;
+        const point = polar(radius, angle);
+        positions.set(sheet.id, { ...point, r: nodeRadius(degree.get(sheet.id) ?? 0), lane: bucket.lane.key });
+      });
+      arcs.push({ ...bucket.lane, start, end, mid: (start + end) / 2, count: bucket.members.length });
+      cursor = end + gapAngle;
+    }
+    return { radius, positions, arcs };
+  }, [lanes, visibleSheets, degree, categoryKeyOf]);
+
+  /* ───────────── Caméra ───────────── */
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -428,64 +402,11 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
   const fittedRef = useRef(false);
   const camRef = useRef(0);
   const viewRef = useRef<View>({ x: 0, y: 0, k: 1 });
+  const ringRef = useRef(layout.radius);
 
-  const nodeEls = useRef(new Map<number, SVGGElement>());
-  const linkEls = useRef(new Map<string, SVGGElement>());
-  const laneLineEls = useRef(new Map<string, SVGLineElement>());
-  const laneHeadEls = useRef(new Map<string, SVGGElement>());
-
-  const paint = useCallback(() => {
-    const { nodes, links: simLinks } = simRef.current;
-
-    for (const node of nodes) {
-      nodeEls.current.get(node.id)?.setAttribute('transform', `translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})`);
-    }
-    for (const link of simLinks) {
-      const group = linkEls.current.get(link.key);
-      if (!group) continue;
-      const d = threadPath(link.s, link.t);
-      for (const child of Array.from(group.children)) child.setAttribute('d', d);
-    }
-
-    if (laneLineEls.current.size > 0) {
-      const bounds = new Map<string, { min: number; max: number }>();
-      for (const node of nodes) {
-        const b = bounds.get(node.lane);
-        if (!b) bounds.set(node.lane, { min: node.y, max: node.y });
-        else {
-          b.min = Math.min(b.min, node.y);
-          b.max = Math.max(b.max, node.y);
-        }
-      }
-      for (const [key, line] of laneLineEls.current) {
-        const b = bounds.get(key);
-        if (!b) continue;
-        line.setAttribute('y1', String(b.min - 26));
-        line.setAttribute('y2', String(b.max + 40));
-        laneHeadEls.current
-          .get(key)
-          ?.setAttribute('transform', `translate(${laneXRef.current.get(key) ?? 0} ${b.min - 46})`);
-      }
-    }
-  }, []);
-
-  const start = useCallback(() => {
-    if (runningRef.current) return;
-    runningRef.current = true;
-    const frame = () => {
-      if (alphaRef.current < 0.01) {
-        runningRef.current = false;
-        return;
-      }
-      tickSim(simRef.current, alphaRef.current);
-      alphaRef.current *= 0.985;
-      paint();
-      rafRef.current = requestAnimationFrame(frame);
-    };
-    rafRef.current = requestAnimationFrame(frame);
-  }, [paint]);
-
-  /* ───────────── Caméra ───────────── */
+  useEffect(() => {
+    ringRef.current = layout.radius;
+  }, [layout.radius]);
 
   const applyView = useCallback((v: View) => {
     viewRef.current = v;
@@ -526,102 +447,26 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
     [reducedMotion, applyView],
   );
 
+  /** Cadre tout le cercle (arcs et titres de catégories compris) dans la zone visible. */
   const fitView = useCallback(
     (animate = false) => {
       const el = containerRef.current;
-      const nodes = simRef.current.nodes;
-      if (!el || el.clientWidth === 0 || nodes.length === 0) return false;
-
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-      for (const node of nodes) {
-        minX = Math.min(minX, node.x - node.r);
-        maxX = Math.max(maxX, node.x + node.r);
-        minY = Math.min(minY, node.y - node.r - 50);
-        maxY = Math.max(maxY, node.y + node.r + 40);
-      }
-      const width = Math.max(1, maxX - minX + 140);
-      const height = Math.max(1, maxY - minY + 120);
-      const k = clamp(Math.min(el.clientWidth / width, el.clientHeight / height), MIN_ZOOM, 1.2);
-      flyTo((minX + maxX) / 2, (minY + maxY) / 2, k, animate ? 800 : 0);
+      if (!el || el.clientWidth === 0 || el.clientHeight === 0) return false;
+      const bound = ringRef.current + ARC_OFFSET + 150;
+      const k = clamp(Math.min(el.clientWidth, el.clientHeight) / (2 * bound), MIN_ZOOM, 1.2);
+      flyTo(0, 0, k, animate ? 800 : 0);
       return true;
     },
     [flyTo],
   );
 
-  useLayoutEffect(() => {
-    laneXRef.current = laneX;
-    const count = visibleSheets.length;
-    const gap = clamp(1400 / Math.max(1, count), 34, 84);
-    const rank = new Map([...visibleSheets].sort((a, b) => a.id - b.id).map((sheet, index) => [sheet.id, index]));
+  const hasNodes = visibleSheets.length > 0;
+  const fitKey = `${activeBook ?? 'none'}|${isolate ? `${isolate.id}:${isolate.depth}` : ''}`;
 
-    let hasNew = false;
-    const nodes = visibleSheets.map((sheet, index) => {
-      const deg = degree.get(sheet.id) ?? 0;
-      const lane = categoryKeyOf(sheet.categoryId);
-      const lx = laneMode ? (laneX.get(lane) ?? 0) : 0;
-      const ty = laneMode ? ((rank.get(sheet.id) ?? 0) - (count - 1) / 2) * gap : 0;
-      let node = nodesRef.current.get(sheet.id);
-      if (!node) {
-        hasNew = true;
-        const angle = index * 2.399963;
-        const distance = 30 + 22 * Math.sqrt(index);
-        node = {
-          id: sheet.id,
-          x: laneMode ? lx + (((index * 37) % 41) - 20) : Math.cos(angle) * distance,
-          y: laneMode ? ty : Math.sin(angle) * distance,
-          vx: 0,
-          vy: 0,
-          r: radiusOf(deg),
-          deg,
-          lane,
-          lx,
-          ty,
-          fixed: false,
-        };
-        nodesRef.current.set(sheet.id, node);
-      } else {
-        node.r = radiusOf(deg);
-        node.deg = deg;
-        node.lane = lane;
-        node.lx = lx;
-        node.ty = ty;
-      }
-      return node;
-    });
-
-    const byId = new Map(nodes.map((node) => [node.id, node]));
-    const simLinks = visibleLinks.flatMap((link) => {
-      const s = byId.get(link.source);
-      const t = byId.get(link.target);
-      return s && t ? [{ key: `${link.source}-${link.target}`, s, t }] : [];
-    });
-    simRef.current = { nodes, links: simLinks, lanes: laneMode };
-
-    if (hasNew) {
-      let alpha = 1;
-      for (let i = 0; i < 200; i++) {
-        tickSim(simRef.current, alpha);
-        alpha *= 0.985;
-      }
-    }
-
-    const layoutChanged = layoutKeyRef.current !== layoutKey;
-    layoutKeyRef.current = layoutKey;
-    if (bookRef.current !== activeBook) {
-      bookRef.current = activeBook;
-      fittedRef.current = false;
-    }
-    alphaRef.current = layoutChanged ? 1 : 0.3;
-
-    paint();
-    start();
-
-    if (!fittedRef.current && fitView()) fittedRef.current = true;
-    else if (layoutChanged) window.setTimeout(() => void fitView(true), 700);
-  }, [visibleSheets, visibleLinks, degree, laneMode, laneX, layoutKey, activeBook, categoryKeyOf, paint, start, fitView]);
+  useEffect(() => {
+    if (!hasNodes) return;
+    if (fitView(fittedRef.current)) fittedRef.current = true;
+  }, [fitKey, layout.radius, hasNodes, fitView]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -635,14 +480,10 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
 
   useEffect(
     () => () => {
-      cancelAnimationFrame(rafRef.current);
       cancelAnimationFrame(camRef.current);
-      runningRef.current = false;
     },
     [],
   );
-
-  /* ───────────── Zoom / déplacement ───────────── */
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -670,20 +511,10 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
     flyTo((el.clientWidth / 2 - v.x) / v.k, (el.clientHeight / 2 - v.y) / v.k, k, 250);
   };
 
-  const focusNode = useCallback(
-    (id: number, zoom?: number) => {
-      const node = nodesRef.current.get(id);
-      if (!node) return;
-      flyTo(node.x, node.y, zoom ?? Math.max(viewRef.current.k, 0.9), 750);
-    },
-    [flyTo],
-  );
-
-  const resetLayout = () => {
-    for (const node of simRef.current.nodes) node.fixed = false;
-    alphaRef.current = 1;
-    start();
-    window.setTimeout(() => void fitView(true), 600);
+  const resetView = () => {
+    setSelectedId(null);
+    setHoverId(null);
+    void fitView(true);
   };
 
   /* ───────────── Visite guidée ───────────── */
@@ -698,27 +529,17 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
       const sheet = order[i % order.length];
       i += 1;
       setSelectedId(sheet.id);
-      focusNode(sheet.id, 1.1);
-      timer = window.setTimeout(go, 3400);
+      timer = window.setTimeout(go, 3600);
     };
     timer = window.setTimeout(go, 0);
     return () => window.clearTimeout(timer);
-  }, [touring, visibleSheets, degree, focusNode]);
+  }, [touring, visibleSheets, degree]);
 
-  type Drag = {
-    kind: 'pan' | 'node';
-    id: number | null;
-    sx: number;
-    sy: number;
-    ox: number;
-    oy: number;
-    moved: boolean;
-    threshold: number;
-  };
+  /* ───────────── Gestes : déplacement, pincement, clic ───────────── */
+
   const dragRef = useRef<Drag | null>(null);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef<{ dist: number; k: number; wx: number; wy: number } | null>(null);
-  const lastTapRef = useRef<{ id: number; t: number } | null>(null);
 
   const trackPointer = (event: { pointerId: number; clientX: number; clientY: number }) => {
     svgRef.current?.setPointerCapture(event.pointerId);
@@ -734,12 +555,6 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
     const el = containerRef.current;
     const [p1, p2] = Array.from(pointersRef.current.values());
     if (!el || !p1 || !p2) return;
-
-    const drag = dragRef.current;
-    if (drag?.kind === 'node' && drag.id !== null && !drag.moved) {
-      const node = nodesRef.current.get(drag.id);
-      if (node) node.fixed = false;
-    }
     dragRef.current = null;
 
     const rect = el.getBoundingClientRect();
@@ -754,7 +569,7 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
     };
   };
 
-  const onBackgroundDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+  const startPan = (event: ReactPointerEvent<SVGElement>, id: number | null) => {
     interrupt();
     trackPointer(event);
     if (pointersRef.current.size >= 2) {
@@ -762,8 +577,7 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
       return;
     }
     dragRef.current = {
-      kind: 'pan',
-      id: null,
+      id,
       sx: event.clientX,
       sy: event.clientY,
       ox: viewRef.current.x,
@@ -773,27 +587,11 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
     };
   };
 
+  const onBackgroundDown = (event: ReactPointerEvent<SVGSVGElement>) => startPan(event, null);
+
   const onNodeDown = (event: ReactPointerEvent<SVGGElement>, id: number) => {
     event.stopPropagation();
-    interrupt();
-    trackPointer(event);
-    if (pointersRef.current.size >= 2) {
-      beginPinch();
-      return;
-    }
-    const node = nodesRef.current.get(id);
-    if (!node) return;
-    node.fixed = true;
-    dragRef.current = {
-      kind: 'node',
-      id,
-      sx: event.clientX,
-      sy: event.clientY,
-      ox: node.x,
-      oy: node.y,
-      moved: false,
-      threshold: event.pointerType === 'mouse' ? 4 : 10,
-    };
+    startPan(event, id);
   };
 
   const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -820,20 +618,7 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
     const dx = event.clientX - drag.sx;
     const dy = event.clientY - drag.sy;
     if (!drag.moved && Math.hypot(dx, dy) > drag.threshold) drag.moved = true;
-    if (!drag.moved) return;
-
-    if (drag.kind === 'pan') {
-      applyView({ ...viewRef.current, x: drag.ox + dx, y: drag.oy + dy });
-      return;
-    }
-    const node = drag.id !== null ? nodesRef.current.get(drag.id) : undefined;
-    if (!node) return;
-    node.x = drag.ox + dx / viewRef.current.k;
-    node.y = drag.oy + dy / viewRef.current.k;
-    node.vx = 0;
-    node.vy = 0;
-    alphaRef.current = Math.max(alphaRef.current, 0.3);
-    start();
+    if (drag.moved) applyView({ ...viewRef.current, x: drag.ox + dx, y: drag.oy + dy });
   };
 
   const onPointerUp = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -844,36 +629,26 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
         pinchRef.current = null;
         const rest = Array.from(pointersRef.current.values())[0];
         const v = viewRef.current;
-        dragRef.current = rest
-          ? { kind: 'pan', id: null, sx: rest.x, sy: rest.y, ox: v.x, oy: v.y, moved: true, threshold: 0 }
-          : null;
+        dragRef.current = rest ? { id: null, sx: rest.x, sy: rest.y, ox: v.x, oy: v.y, moved: true, threshold: 0 } : null;
       }
       return;
     }
 
     const drag = dragRef.current;
     dragRef.current = null;
-    if (!drag) return;
-    if (drag.kind === 'node' && drag.id !== null) {
-      const node = nodesRef.current.get(drag.id);
-      if (node && !drag.moved) node.fixed = false;
-      if (!drag.moved) {
-        const now = performance.now();
-        const last = lastTapRef.current;
-        if (last && last.id === drag.id && now - last.t < DOUBLE_TAP_MS) {
-          lastTapRef.current = null;
-          onOpenSheet(drag.id);
-        } else {
-          lastTapRef.current = { id: drag.id, t: now };
-          setSelectedId(drag.id);
-        }
-      }
-    } else if (!drag.moved) {
+    if (!drag || drag.moved) return;
+
+    if (drag.id === null) {
       setSelectedId(null);
+    } else if (drag.id === selectedId && visibleIds.has(drag.id)) {
+      // Un second clic sur la fiche déjà placée au centre l'ouvre.
+      onOpenSheet(drag.id);
+    } else {
+      setSelectedId(drag.id);
     }
   };
 
-  /* ───────────── Recherche / surbrillance ───────────── */
+  /* ───────────── Recherche / mise en avant ───────────── */
 
   const normalizedQuery = normalizeName(query);
   const matches = useMemo(() => {
@@ -883,17 +658,27 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
     );
   }, [normalizedQuery, visibleSheets]);
 
-  const activeId = hoverId ?? (selectedId != null && visibleIds.has(selectedId) ? selectedId : null);
+  /** La fiche sélectionnée vient se placer au centre du cercle. */
+  const centerId = selectedId != null && visibleIds.has(selectedId) ? selectedId : null;
+  const focusId = hoverId ?? centerId;
+
   const activeNeighbours = useMemo(() => {
     const set = new Set<number>();
-    if (activeId == null) return set;
-    set.add(activeId);
-    for (const id of adjacency.out.get(activeId) ?? []) set.add(id);
-    for (const id of adjacency.incoming.get(activeId) ?? []) set.add(id);
+    if (focusId == null) return set;
+    set.add(focusId);
+    for (const id of adjacency.out.get(focusId) ?? []) set.add(id);
+    for (const id of adjacency.incoming.get(focusId) ?? []) set.add(id);
     return set;
-  }, [activeId, adjacency]);
+  }, [focusId, adjacency]);
 
-  const activeLane = activeId != null ? categoryKeyOf(sheetById.get(activeId)?.categoryId) : null;
+  const activeLanes = useMemo(() => {
+    const set = new Set<string>();
+    for (const id of activeNeighbours) {
+      const lane = layout.positions.get(id)?.lane ?? categoryKeyOf(sheetById.get(id)?.categoryId);
+      set.add(lane);
+    }
+    return set;
+  }, [activeNeighbours, layout, categoryKeyOf, sheetById]);
 
   const toggleCategory = (key: string) =>
     setHiddenCategories((current) => {
@@ -918,8 +703,14 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
   const linkCount = visibleLinks.length;
   const dense = linkCount > 90;
   const veryDense = linkCount > 220;
-  const restOpacity = veryDense ? 0.16 : dense ? 0.3 : 0.6;
-  const dimOpacity = dense ? 0.04 : 0.1;
+  const restOpacity = veryDense ? 0.16 : dense ? 0.3 : 0.55;
+  const dimOpacity = dense ? 0.03 : 0.07;
+  const ring = layout.radius;
+  const arcRadius = ring + ARC_OFFSET;
+  const moveTransition = reducedMotion ? 'none' : 'transform .75s cubic-bezier(.22,1,.36,1), opacity .25s ease';
+
+  const fanLinks = centerId === null ? [] : visibleLinks.filter((link) => link.source === centerId || link.target === centerId);
+  const restLinks = centerId === null ? visibleLinks : visibleLinks.filter((link) => link.source !== centerId && link.target !== centerId);
 
   return (
     <div
@@ -940,59 +731,64 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
         aria-label="Réseau des fiches liées par leurs mentions"
       >
         <defs>
-          <marker id={`${uid}-arrow`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto">
+          <marker id={`${uid}-arrow`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
             <path d="M0,1 L9,5 L0,9 z" style={{ fill: 'var(--c-a400)' }} />
           </marker>
         </defs>
 
         <g ref={worldRef}>
-          {/* Fils de chaîne : une branche par catégorie */}
-          {laneMode &&
-            lanes.map((lane) => {
-              const lit = activeLane === lane.key;
-              const label = lane.name.length > 22 ? `${lane.name.slice(0, 21)}…` : lane.name;
-              const width = Math.max(54, label.length * 6.4 + 26);
-              return (
-                <g key={lane.key} pointerEvents="none">
-                  <line
-                    ref={(el) => {
-                      if (el) laneLineEls.current.set(lane.key, el);
-                      else laneLineEls.current.delete(lane.key);
-                    }}
-                    x1={lane.x}
-                    x2={lane.x}
-                    stroke={lane.color}
-                    strokeWidth={lit ? 2.5 : 1.5}
-                    strokeOpacity={lit ? 0.7 : 0.3}
-                    strokeLinecap="round"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <g
-                    ref={(el) => {
-                      if (el) laneHeadEls.current.set(lane.key, el);
-                      else laneHeadEls.current.delete(lane.key);
-                    }}
-                    opacity={lit ? 1 : 0.85}
-                  >
-                    <rect x={-width / 2} y={-11} width={width} height={22} rx={11} fill={SURFACE} stroke={lane.color} strokeWidth={1.5} />
-                    <circle cx={-width / 2 + 11} cy={0} r={3} fill={lane.color} />
-                    <text x={-width / 2 + 20} y={3.5} fontSize={10.5} className="fill-amber-100" style={{ fontFamily: MONO }}>
-                      {label}
-                    </text>
-                  </g>
-                </g>
-              );
-            })}
+          {/* Anneaux discrets autour de la fiche centrale */}
+          {centerId !== null && (
+            <g pointerEvents="none" fill="none" stroke="var(--c-text-2)" strokeOpacity={0.12} vectorEffect="non-scaling-stroke">
+              <circle r={ring * 0.55} strokeDasharray="2 6" />
+              <circle r={ring - 46} />
+            </g>
+          )}
 
-          {/* Fils de trame : les mentions */}
-          {visibleLinks.map((link) => {
+          {/* Arcs de catégories, avec leur titre à l'extérieur du cercle */}
+          {layout.arcs.map((arc) => {
+            const lit = focusId === null || activeLanes.has(arc.key);
+            const cos = Math.cos(arc.mid);
+            const sin = Math.sin(arc.mid);
+            const label = arc.name.length > 24 ? `${arc.name.slice(0, 23)}…` : arc.name;
+            const anchor = cos > 0.25 ? 'start' : cos < -0.25 ? 'end' : 'middle';
+            const labelPos = polar(arcRadius + 18, arc.mid);
+            const startDot = polar(arcRadius, arc.start);
+            const endDot = polar(arcRadius, arc.end);
+            return (
+              <g key={arc.key} pointerEvents="none" style={{ opacity: lit ? 1 : 0.25, transition: 'opacity .3s ease' }}>
+                <path d={arcPath(arcRadius, arc.start, arc.end)} fill="none" stroke={arc.color} strokeOpacity={0.55} strokeWidth={1.5} strokeLinecap="round" />
+                <circle cx={startDot.x} cy={startDot.y} r={2.6} fill={arc.color} />
+                <circle cx={endDot.x} cy={endDot.y} r={2.6} fill={arc.color} />
+                <text
+                  x={labelPos.x}
+                  y={labelPos.y + (sin > 0.5 ? 12 : sin < -0.5 ? -4 : 4)}
+                  textAnchor={anchor}
+                  fontSize={14}
+                  fontWeight={600}
+                  className="fill-amber-100"
+                  style={{ stroke: PAGE, strokeWidth: 4, paintOrder: 'stroke', strokeLinejoin: 'round' }}
+                >
+                  {label}
+                  <tspan fontSize={10.5} fontWeight={400} className="fill-amber-200/60" dx={6} style={{ fontFamily: MONO }}>
+                    {arc.count}
+                  </tspan>
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Liens entre fiches du cercle : des courbes qui plongent vers le centre */}
+          {restLinks.map((link) => {
+            const a = layout.positions.get(link.source);
+            const b = layout.positions.get(link.target);
+            if (!a || !b) return null;
             const key = `${link.source}-${link.target}`;
-            const s = nodesRef.current.get(link.source);
-            const t = nodesRef.current.get(link.target);
-            const d = s && t ? threadPath(s, t) : undefined;
-            const hot = activeId != null && (link.source === activeId || link.target === activeId);
-            const dim = (activeId != null && !hot) || (matches !== null && !(matches.has(link.source) && matches.has(link.target)));
-            const width = (dense ? 1 : 1.2) + Math.min(link.count, 5) * 0.5;
+            const d = ringPath(a, b, ring);
+            const hot = centerId === null && hoverId !== null && (link.source === hoverId || link.target === hoverId);
+            const searchDim = matches !== null && !(matches.has(link.source) && matches.has(link.target));
+            const dim = centerId !== null || (hoverId !== null && !hot) || searchDim;
+            const width = (dense ? 0.9 : 1.1) + Math.min(link.count, 5) * 0.45;
             const color = colorOfCategory(sheetById.get(link.source)?.categoryId);
             return (
               <g
@@ -1000,60 +796,82 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
                 fill="none"
                 strokeLinecap="round"
                 pointerEvents="none"
-                style={{ opacity: dim ? dimOpacity : 1, transition: 'opacity .25s ease' }}
-                ref={(el) => {
-                  if (el) linkEls.current.set(key, el);
-                  else linkEls.current.delete(key);
-                }}
+                style={{ opacity: dim ? dimOpacity : 1, transition: 'opacity .3s ease' }}
               >
-                {/* Liseré à la couleur du fond : effet « dessus / dessous » aux croisements */}
-                {(!veryDense || hot) && (
-                  <path d={d} stroke={PAGE} strokeOpacity={0.85} strokeWidth={width + 3} vectorEffect="non-scaling-stroke" />
+                {(!veryDense || hot) && !dim && (
+                  <path d={d} stroke={PAGE} strokeOpacity={0.6} strokeWidth={width + 2.5} vectorEffect="non-scaling-stroke" />
                 )}
                 <path
                   d={d}
-                  stroke={color}
+                  stroke={hot ? 'var(--c-a400)' : color}
                   strokeOpacity={hot ? 1 : restOpacity}
                   strokeWidth={hot ? width + 1 : width}
                   vectorEffect="non-scaling-stroke"
-                  markerEnd={hot ? `url(#${uid}-arrow)` : undefined}
                 />
-                {hot && (
-                  <path d={d} pathLength={1} className="sn-draw" stroke="var(--c-heading)" strokeOpacity={0.8} strokeWidth={Math.max(1, width - 0.6)} vectorEffect="non-scaling-stroke" />
-                )}
               </g>
             );
           })}
 
-          {/* Fiches : des « commits » */}
+          {/* Liens de la fiche centrale : un éventail vers ses voisines */}
+          {centerId !== null &&
+            fanLinks.map((link) => {
+              const outgoing = link.source === centerId;
+              const other = layout.positions.get(outgoing ? link.target : link.source);
+              if (!other) return null;
+              const centre = { x: 0, y: 0, r: CENTER_R };
+              const rim = { x: other.x, y: other.y, r: other.r };
+              const d = fanPath(outgoing ? centre : rim, outgoing ? rim : centre, outgoing ? 1 : -1);
+              const width = 1.3 + Math.min(link.count, 5) * 0.5;
+              return (
+                <g key={`${centerId}:${link.source}-${link.target}`} fill="none" strokeLinecap="round" pointerEvents="none">
+                  <path d={d} stroke={PAGE} strokeOpacity={0.7} strokeWidth={width + 2.5} vectorEffect="non-scaling-stroke" />
+                  <path
+                    d={d}
+                    pathLength={1}
+                    className="sn-draw"
+                    stroke={outgoing ? selectedColor : 'var(--c-heading)'}
+                    strokeOpacity={outgoing ? 0.95 : 0.8}
+                    strokeWidth={width}
+                    vectorEffect="non-scaling-stroke"
+                    markerEnd={`url(#${uid}-arrow)`}
+                  />
+                </g>
+              );
+            })}
+
+          {/* Fiches */}
           {visibleSheets.map((sheet, index) => {
-            const sim = nodesRef.current.get(sheet.id);
+            const rim = layout.positions.get(sheet.id);
+            if (!rim) return null;
+            const isCenter = sheet.id === centerId;
+            const x = isCenter ? 0 : rim.x;
+            const y = isCenter ? 0 : rim.y;
             const nodeDegree = degree.get(sheet.id) ?? 0;
-            const radius = radiusOf(nodeDegree);
             const color = colorOfCategory(sheet.categoryId);
             const isCurrent = sheet.id === currentSheetId;
-            const isSelected = sheet.id === selectedId;
             const isHover = sheet.id === hoverId;
             const isMatch = matches?.has(sheet.id) ?? false;
             const near = activeNeighbours.has(sheet.id);
-            const dim = (activeId != null && !near) || (matches !== null && !isMatch);
+            const dim = (focusId !== null && !near) || (matches !== null && !isMatch);
             const keepLabel = near || isMatch || isCurrent;
             const isHub = nodeDegree >= hubThreshold;
-            const scale = isHover ? 1.2 : isSelected ? 1.1 : 1;
+            const shownRadius = isCenter ? CENTER_R : rim.r;
+            const scale = isCenter ? CENTER_R / rim.r : isHover ? 1.18 : 1;
 
             return (
               <g
                 key={sheet.id}
-                transform={sim ? `translate(${sim.x.toFixed(1)} ${sim.y.toFixed(1)})` : undefined}
-                ref={(el) => {
-                  if (el) nodeEls.current.set(sheet.id, el);
-                  else nodeEls.current.delete(sheet.id);
+                style={{
+                  transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`,
+                  transition: moveTransition,
+                  opacity: dim ? 0.22 : 1,
+                  filter: dim ? 'grayscale(0.8)' : undefined,
                 }}
-                style={{ opacity: dim ? 0.2 : 1, transition: 'opacity .25s ease' }}
                 className="cursor-pointer"
                 role="button"
                 tabIndex={0}
                 aria-label={sheet.name}
+                aria-pressed={isCenter}
                 onPointerDown={(event) => onNodeDown(event, sheet.id)}
                 onPointerEnter={(event) => {
                   if (event.pointerType === 'mouse') setHoverId(sheet.id);
@@ -1062,27 +880,36 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    setSelectedId(sheet.id);
+                    if (isCenter) onOpenSheet(sheet.id);
+                    else setSelectedId(sheet.id);
                   }
                 }}
               >
-                <circle r={radius + 12} fill="transparent" />
-                <g className="sn-pop" style={{ animationDelay: `${Math.min(index * 15, 500)}ms` }}>
-                  <g style={{ transform: `scale(${scale})`, transformOrigin: '0px 0px', transition: 'transform .2s ease-out' }}>
-                    {(isHover || isSelected || isCurrent) && <circle r={radius + 8} fill={color} opacity={0.22} pointerEvents="none" />}
-                    {(isSelected || isMatch) && (
-                      <circle r={radius + 6} fill="none" className="stroke-amber-300" strokeWidth={1.5} strokeDasharray="4 3" pointerEvents="none" />
+                <circle r={shownRadius + 10} fill="transparent" />
+                <g className="sn-pop" style={{ animationDelay: `${Math.min(index * 12, 500)}ms` }}>
+                  <g style={{ transform: `scale(${scale})`, transformOrigin: '0px 0px', transition: reducedMotion ? 'none' : 'transform .6s cubic-bezier(.22,1,.36,1)' }}>
+                    {(isCenter || isHover || (isCurrent && centerId === null)) && (
+                      <circle r={rim.r + 8} fill={color} opacity={isCenter ? 0.3 : 0.22} pointerEvents="none" />
                     )}
-                    {isSelected && <circle key={`ping-${selectedId}`} r={radius + 3} fill="none" className="sn-ping stroke-amber-200" strokeWidth={2} pointerEvents="none" />}
+                    {isMatch && <circle r={rim.r + 5} fill="none" className="stroke-amber-300" strokeWidth={1.5} strokeDasharray="4 3" pointerEvents="none" />}
+                    {isCenter && <circle key={`ping-${centerId}`} r={rim.r + 3} fill="none" className="sn-ping stroke-amber-200" strokeWidth={2} pointerEvents="none" />}
 
-                    {/* Point de commit : anneau coloré, cœur « surface » du thème (plein si fiche courante) */}
-                    <circle r={radius} fill={isCurrent ? color : SURFACE} stroke={color} strokeWidth={3} />
-                    {!isCurrent && <circle r={radius * 0.42} fill={color} pointerEvents="none" />}
+                    <circle r={rim.r} fill={isCurrent ? color : SURFACE} stroke={color} strokeWidth={3} />
+                    <text
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={rim.r * 0.95}
+                      fontWeight={700}
+                      pointerEvents="none"
+                      style={{ fontFamily: MONO, fill: isCurrent ? PAGE : color }}
+                    >
+                      {initialOf(sheet.name)}
+                    </text>
                   </g>
                 </g>
 
                 {isCurrent && (
-                  <g pointerEvents="none" transform={`translate(0 ${-radius - 13})`}>
+                  <g pointerEvents="none" transform={`translate(0 ${-shownRadius - 13})`}>
                     <rect x={-17} y={-8} width={34} height={16} rx={8} className="fill-amber-700" />
                     <text y={3.5} textAnchor="middle" fontSize={9} fontWeight={700} className="fill-amber-50" style={{ fontFamily: MONO }}>
                       HEAD
@@ -1091,13 +918,13 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
                 )}
 
                 <text
-                  y={radius + 16}
+                  y={shownRadius + (isCenter ? 26 : 16)}
                   textAnchor="middle"
-                  fontSize={isHover ? 13 : 12}
-                  fontWeight={isHover || isSelected ? 600 : 400}
-                  className={`wv-label fill-amber-100 ${keepLabel ? 'wv-keep' : ''} ${isHub ? 'wv-hub' : ''}`}
+                  fontSize={isCenter ? 20 : isHover ? 13 : 12}
+                  fontWeight={isCenter || isHover ? 700 : 400}
+                  className={`wv-label fill-amber-100 ${keepLabel || isCenter ? 'wv-keep' : ''} ${isHub ? 'wv-hub' : ''}`}
                   pointerEvents="none"
-                  style={{ stroke: PAGE, strokeWidth: 3.5, paintOrder: 'stroke', strokeLinejoin: 'round' }}
+                  style={{ stroke: PAGE, strokeWidth: 4, paintOrder: 'stroke', strokeLinejoin: 'round', transition: 'all .3s ease' }}
                 >
                   {sheet.name}
                 </text>
@@ -1130,7 +957,7 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
 
       {!emptyMessage && !isolate && (
         <p className="sn-hint pointer-events-none absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] mx-auto hidden w-fit rounded-full border border-amber-900/30 bg-neutral-950/80 px-4 py-1.5 text-[11px] text-amber-200/70 sm:block">
-          Glisser pour explorer · Molette pour zoomer · Double-clic sur une fiche pour l’ouvrir
+          Cliquer une fiche pour la placer au centre · La cliquer à nouveau pour l’ouvrir · Molette pour zoomer
         </p>
       )}
 
@@ -1157,10 +984,7 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
             onKeyDown={(event) => {
               if (event.key !== 'Enter' || !matches || matches.size === 0) return;
               const first = visibleSheets.find((sheet) => matches.has(sheet.id));
-              if (first) {
-                setSelectedId(first.id);
-                focusNode(first.id);
-              }
+              if (first) setSelectedId(first.id);
             }}
             placeholder="Rechercher une fiche…"
             aria-label="Rechercher une fiche dans le réseau"
@@ -1246,17 +1070,7 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
         <button type="button" onClick={() => zoomBy(1.4)} className={iconBtn} aria-label="Zoom avant" title="Zoom avant">+</button>
         <button type="button" onClick={() => zoomBy(1 / 1.4)} className={iconBtn} aria-label="Zoom arrière" title="Zoom arrière">−</button>
         <button type="button" onClick={() => void fitView(true)} className={iconBtn} aria-label="Tout afficher" title="Tout afficher">⤢</button>
-        <button type="button" onClick={resetLayout} className={iconBtn} aria-label="Réorganiser le réseau" title="Réorganiser (libère les fiches déplacées)">↻</button>
-        <button
-          type="button"
-          onClick={() => setLaneMode((value) => !value)}
-          className={`${iconBtn} ${laneMode ? '!border-amber-600 !bg-amber-700 !text-amber-50' : ''}`}
-          aria-pressed={laneMode}
-          aria-label="Disposition en branches"
-          title={laneMode ? 'Passer en disposition libre' : 'Ranger les fiches en branches par catégorie'}
-        >
-          ∥
-        </button>
+        <button type="button" onClick={resetView} className={iconBtn} aria-label="Revenir à la vue d’ensemble" title="Vue d’ensemble (désélectionne la fiche centrale)">↻</button>
         <button
           type="button"
           onClick={() => setTouring((value) => !value)}
@@ -1315,7 +1129,6 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
                           onClick={() => {
                             interrupt();
                             setSelectedId(id);
-                            focusNode(id);
                           }}
                           className="cursor-pointer rounded-lg border border-amber-900/40 bg-neutral-900 px-2 py-1 text-xs text-amber-200 transition hover:bg-neutral-800"
                         >
