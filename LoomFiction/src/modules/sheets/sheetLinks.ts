@@ -14,11 +14,7 @@ export const toUpsert = (card: IdeaResponse): IdeaUpsertRequest => ({
   sortOrder: card.sortOrder,
 });
 
-/**
- * Le roman d'une fiche = celui de ses cartes (une fiche n'a pas de champ « roman » propre).
- * En cas de désaccord entre cartes, le roman le plus fréquent l'emporte.
- * Accepte aussi les cartes d'une version enregistrée (même champ `bookId`).
- */
+
 export function bookOfSheet(cards: ReadonlyArray<{ bookId?: number | null }>): number | null {
   const counts = new Map<number, number>();
   for (const card of cards) {
@@ -44,10 +40,7 @@ export async function setSheetBook(cards: IdeaResponse[], bookId: number | null)
   }
 }
 
-/**
- * Transforme des notes libres en cartes d'une fiche :
- * elles prennent la catégorie de la fiche, son roman (s'il y en a un) et se placent à la suite.
- */
+
 export async function attachIdeasToSheet(
   sheet: SheetResponse,
   cards: IdeaResponse[],
