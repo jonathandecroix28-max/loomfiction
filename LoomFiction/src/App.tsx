@@ -16,29 +16,45 @@ import { SheetPage } from './modules/sheets/pages/SheetPage';
 import ExportPage from './pages/ExportPage';
 import { SheetVersionsPage } from './modules/sheets/pages/SheetVersionPage';
 import { FeedbackProvider } from './components/feedback/FeedbackProvider';
+import { AppExplorer } from './components/explorer/AppExplorer';
+import { useExplorerOpen } from './hooks/explorerOpenStore';
 import { IsolatedIdeasPage } from './modules/ideas/pages/IsolatedIdeasPage';
 //import { TermsPage } from './pages/TermsPage';
 //import { PrivacyPage } from './pages/PrivacyPage';
 //import { SupportPage } from './pages/SupportPage';
 
-function AppContent() {
-  const location = useLocation();
-  
-  const hideNavbar = ['/', '/terms', '/privacy', '/support'].includes(location.pathname);
-  const hideNavbarWhenReading = location.pathname.includes('/read');
-  const hideNavbarWhenEditing = location.pathname.includes('/chapters/') && !location.pathname.includes('/versions');
-  const hideNavbarSheet = location.pathname.includes('/ideas/fiches/') && !location.pathname.includes('/versions');
-  const hideNavbarIdeas = location.pathname.includes('/ideas/libres') && !location.pathname.includes('/versions');
-  
-  return (
-    <div className="min-h-dvh bg-[#fcf9f2] flex flex-col">
-      {!hideNavbar  && !hideNavbarWhenReading && !hideNavbarWhenEditing && !hideNavbarSheet && !hideNavbarIdeas && <Navbar />}
 
-      <main
-        className={`grow flex flex-col ${
-          !hideNavbar && !hideNavbarWhenReading && !hideNavbarWhenEditing && !hideNavbarSheet && !hideNavbarIdeas ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] sm:pb-0' : ''
-        }`}
-      >
+const WITH_NAVBAR =
+  '[--nav-top:3.5rem] sm:[--nav-top:4rem] [--nav-bottom:calc(4rem+env(safe-area-inset-bottom))] sm:[--nav-bottom:0px]';
+const NAVBAR_COLLAPSED =
+  '[--nav-top:3.5rem] sm:[--nav-top:0px] [--nav-bottom:calc(4rem+env(safe-area-inset-bottom))] sm:[--nav-bottom:0px]';
+const WITHOUT_NAVBAR = '[--nav-top:0px] [--nav-bottom:0px]';
+
+function AppContent() {
+  const { pathname } = useLocation();
+  const [isExplorerOpen] = useExplorerOpen();
+
+  const inVersions = pathname.includes('/versions');
+  const showNavbar = !(
+    ['/', '/terms', '/privacy', '/support'].includes(pathname) ||
+    pathname.includes('/read') ||
+    (pathname.includes('/chapters/') && !inVersions) ||
+    (pathname.includes('/ideas/fiches/') && !inVersions) ||
+    (pathname.includes('/ideas/libres') && !inVersions)
+  );
+
+  const collapseNavbar = showNavbar && isExplorerOpen;
+  const layoutVars = !showNavbar ? WITHOUT_NAVBAR : collapseNavbar ? NAVBAR_COLLAPSED : WITH_NAVBAR;
+
+  return (
+    <div className={`min-h-dvh bg-[var(--c-page)] flex flex-col ${layoutVars}`}>
+      {showNavbar && <Navbar collapsed={collapseNavbar} />}
+
+      <div className="flex grow items-start">
+        {/* Explorateur unique, monté une seule fois à gauche du contenu (il se masque tout seul sur l'accueil et en lecture) */}
+        <AppExplorer />
+
+        <main className={`grow min-w-0 self-stretch flex flex-col ${showNavbar ? 'pb-[var(--nav-bottom)]' : ''}`}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/books" element={<BooksPage />} />
@@ -67,7 +83,8 @@ function AppContent() {
           <Route path="/404" element={<NotFound />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

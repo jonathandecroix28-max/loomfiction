@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ExplorerNav } from '../../../components/explorer/ExplorerNav';
 import { useNavigate } from 'react-router-dom';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useSheets } from '../../sheets/hooks/useSheets';
@@ -40,6 +41,8 @@ type SheetExplorerProps = {
   currentSheetId: number | null;
   onSelectSheetVersion?: (version: SheetVersionResponse) => void;
   onSelectIdeaVersion?: (version: IdeaVersionResponse) => void;
+  /** Dans l'explorateur commun : pas d'enveloppe (voile, tiroir, mini barre), seulement le contenu. */
+  embedded?: boolean;
 };
 
 type IdeaExplorerMeta = IdeaResponse & {
@@ -53,6 +56,7 @@ export function SheetExplorer({
   currentSheetId,
   onSelectSheetVersion,
   onSelectIdeaVersion,
+  embedded = false,
 }: SheetExplorerProps) {
   const navigate = useNavigate();
   const toast = useToast();
@@ -135,6 +139,7 @@ export function SheetExplorer({
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (isCreatingBook || isCreatingCategory || creatingSheetInFolderKey || creatingIdeaInFolderKey) event.preventDefault();
         if (isCreatingBook) {
           setIsCreatingBook(false);
           setNewBookTitle('');
@@ -147,7 +152,7 @@ export function SheetExplorer({
         } else if (creatingIdeaInFolderKey) {
           setCreatingIdeaInFolderKey(null);
           setNewIdeaName('');
-        } else {
+        } else if (!embedded) {
           onClose();
         }
       }
@@ -155,7 +160,7 @@ export function SheetExplorer({
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose, isCreatingBook, isCreatingCategory, creatingSheetInFolderKey, creatingIdeaInFolderKey]);
+  }, [isOpen, onClose, embedded, isCreatingBook, isCreatingCategory, creatingSheetInFolderKey, creatingIdeaInFolderKey]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -920,24 +925,10 @@ export function SheetExplorer({
     return { bookId, categories: categoriesForBook };
   });
 
-  return (
+  const content = (
     <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        className={`fixed inset-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-      />
+        {!embedded && <ExplorerNav />}
 
-      <aside
-        ref={asideRef}
-        aria-label="Explorateur des fiches et idées"
-        aria-hidden={!isOpen}
-        className={`fixed inset-y-0 left-0 z-40 flex h-[100dvh] flex-col w-[min(88vw,21rem)] shrink-0 border-r border-amber-900/40 bg-[var(--c-surface)] shadow-2xl transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none md:hidden'
-        } md:sticky md:top-0 md:bottom-auto md:left-auto md:h-[100dvh] md:self-start md:w-80 md:translate-x-0 md:shadow-xl`}
-      >
         <div className="flex flex-col shrink-0 border-b border-amber-900/40 bg-[var(--c-surface-2,#150e0c)]">
           <div className="flex items-center justify-between p-3">
             <span className="text-[10px] uppercase tracking-widest text-amber-200/50 font-semibold select-none">
@@ -962,15 +953,17 @@ export function SheetExplorer({
               >
                 <IconAdd className="size-4" />
               </button>
-              <button
-                type="button"
-                onClick={onClose}
-                title="Fermer l'explorateur (Échap)"
-                aria-label="Fermer l'explorateur"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/35 transition-colors cursor-pointer"
-              >
-                <IconClose className="size-4" />
-              </button>
+              {!embedded && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  title="Fermer l'explorateur (Échap)"
+                  aria-label="Fermer l'explorateur"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/35 transition-colors cursor-pointer"
+                >
+                  <IconClose className="size-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1060,6 +1053,33 @@ export function SheetExplorer({
         <div className="shrink-0 border-t border-amber-900/20 bg-[var(--c-surface-2,#150e0c)] px-3 py-2.5 text-center text-[10px] uppercase tracking-widest text-amber-200/30 font-sans">
           {books.length} {books.length > 1 ? 'romans' : 'roman'} · {sheets.length} {sheets.length > 1 ? 'fiches' : 'fiche'}
         </div>
+    </>
+  );
+
+  // Intégré à l'explorateur commun : seulement le contenu, l'enveloppe est fournie par lui.
+  if (embedded) {
+    return <div className={`flex min-h-0 flex-1 flex-col ${isOpen ? '' : 'hidden'}`}>{content}</div>;
+  }
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        className={`fixed inset-0 z-[65] bg-black/60 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+      />
+
+      <aside
+        ref={asideRef}
+        aria-label="Explorateur des fiches et idées"
+        aria-hidden={!isOpen}
+        className={`fixed inset-y-0 left-0 z-[70] md:z-40 flex flex-col w-[min(88vw,21rem)] shrink-0 border-r border-amber-900/40 bg-[var(--c-surface)] shadow-2xl transform transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full pointer-events-none md:hidden'
+        } md:sticky md:top-[var(--nav-top,0px)] md:bottom-auto md:left-auto md:h-[calc(100dvh-var(--nav-top,0px))] md:self-start md:w-80 md:translate-x-0 md:shadow-xl`}
+      >
+                {content}
       </aside>
     </>
   );
