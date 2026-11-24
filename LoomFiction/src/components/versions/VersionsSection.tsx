@@ -338,10 +338,10 @@ export function VersionsSection({
                 }
               }}
               className={`text-[11px] sm:text-xs font-semibold px-4 py-2 sm:py-2.5 rounded-xl transition ${
-                selectedCompare.selected.length === 2
-                  ? 'bg-amber-600 hover:bg-amber-500 text-amber-50 shadow-md cursor-pointer'
-                  : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-              }`}
+  selectedCompare.selected.length === 2
+    ? 'bg-amber-600 hover:bg-amber-500 text-amber-50 shadow-md cursor-pointer'
+    : 'bg-neutral-800 text-amber-200/40 cursor-not-allowed'
+}`}
             >
               Lancer la comparaison
             </button>

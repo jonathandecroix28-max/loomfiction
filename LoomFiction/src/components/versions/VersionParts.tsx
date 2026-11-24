@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 import type { SortBy } from '../../hooks/versions/useVersionCompare';
-import { btnBase, ghostBtn } from '../../utils/versions/versionStyles';
-import { IconBack } from '../icons';
+import { btnBase } from '../../utils/versions/versionStyles';
+import { IconBack, IconMenu } from '../icons';
+import '../diff/diff.css';
 
 /* ───────────────────────── États de la page ───────────────────────── */
 
 export function VersionsLoading() {
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] flex items-center justify-center font-serif text-amber-200/60 py-24">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[var(--c-page)] flex items-center justify-center font-serif text-amber-200/60 py-24">
       Consultation de l’historique...
     </div>
   );
@@ -15,7 +16,7 @@ export function VersionsLoading() {
 
 export function VersionsError({ message }: { message: string }) {
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif px-4 py-20">
+    <div className="min-h-[calc(100dvh-4rem)] bg-[var(--c-page)] text-[var(--c-ink)] font-serif px-4 py-20">
       <div className="max-w-xl mx-auto rounded-2xl border border-red-900/30 bg-red-950/20 p-6 text-center text-red-200">
         {message}
       </div>
@@ -42,6 +43,8 @@ interface HeaderProps {
   onBack: () => void;
   versionsCount: number;
   selectedNumber: number | null;
+  onOpenExplorer?: () => void;
+  explorerOpen?: boolean;
 }
 
 export function VersionsHeader({
@@ -52,17 +55,31 @@ export function VersionsHeader({
   onBack,
   versionsCount,
   selectedNumber,
+  onOpenExplorer,
+  explorerOpen = false,
 }: HeaderProps) {
   return (
-    <header className="border-b border-amber-900/40 bg-neutral-950/90">
+    <header className="loom border-b border-amber-900/40 bg-neutral-950/90">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
+          <div className="mb-1 flex items-center gap-3 sm:mb-2">
+          {onOpenExplorer && !explorerOpen && (
+            <button
+              onClick={onOpenExplorer}
+              title="Ouvrir l’explorateur"
+              aria-expanded={explorerOpen}
+              className="touch-target flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-amber-900/40 bg-neutral-900 text-amber-200/70 shadow-md transition-colors hover:bg-amber-900/20 hover:text-amber-100"
+            >
+              <IconMenu className="size-5" aria-hidden="true" />
+            </button>
+          )}
           <button
             onClick={onBack}
-            className="text-amber-200/60 hover:text-amber-100 transition-colors text-sm cursor-pointer flex items-center gap-1 font-sans mb-1 sm:mb-2"
+            className="text-amber-200/60 hover:text-amber-100 transition-colors text-sm cursor-pointer flex items-center gap-1 font-sans"
           >
             <IconBack className="size-4" aria-hidden="true" /> {backLabel}
           </button>
+          </div>
           <h1 className="text-xl sm:text-3xl font-bold text-amber-100">{title}</h1>
           <p className="text-sm text-amber-200/50 mt-1 truncate">{subtitle}</p>
         </div>
@@ -78,6 +95,7 @@ export function VersionsHeader({
           </button>
         </div>
       </div>
+      <div className="ld-stitchline" aria-hidden="true" />
     </header>
   );
 }
@@ -164,7 +182,7 @@ export function VersionsFilterBar({
   );
 }
 
-/* ───────────────────────── Options de fusion ───────────────────────── */
+/* ───────────────────────── Appliquer une version ───────────────────────── */
 
 interface MergeOptionsProps<K extends string> {
   fields: readonly { key: K; label: string }[];
@@ -172,6 +190,9 @@ interface MergeOptionsProps<K extends string> {
   onChange: (next: Record<K, boolean>) => void;
   onMerge: () => void;
   isRestoring: boolean;
+  actionLabel?: string;
+  summary?: string;
+  disabled?: boolean;
 }
 
 export function MergeOptions<K extends string>({
@@ -180,41 +201,60 @@ export function MergeOptions<K extends string>({
   onChange,
   onMerge,
   isRestoring,
+  actionLabel = 'Appliquer',
+  summary,
+  disabled = false,
 }: MergeOptionsProps<K>) {
-  const setAll = (checked: boolean) =>
-    onChange(Object.fromEntries(fields.map((field) => [field.key, checked])) as Record<K, boolean>);
+  const nothingSelected = fields.every((field) => !value[field.key]);
+  const blocked = disabled || nothingSelected || isRestoring;
 
   return (
-    <div className="rounded-xl sm:rounded-2xl border border-amber-900/20 bg-neutral-950/60 p-3 sm:p-5 space-y-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="text-sm font-medium text-amber-100">Choix de fusion</span>
-        {fields.map((field) => (
-          <label key={field.key} className="flex items-center gap-2 text-sm text-amber-200/70">
-            <input
-              type="checkbox"
-              checked={value[field.key]}
-              onChange={(e) => onChange({ ...value, [field.key]: e.target.checked })}
-            />
-            {field.label}
-          </label>
-        ))}
+    <div className="loom space-y-3 rounded-xl border border-amber-900/20 bg-neutral-950/60 p-3 sm:rounded-2xl sm:p-5">
+      <div>
+        <p className="text-sm font-medium text-amber-100">Que veux-tu appliquer ?</p>
+        <p className="mt-0.5 font-sans text-xs text-amber-200/60">
+          Rien n’est modifié tant que tu n’as pas cliqué sur le bouton du bas.
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3">
-        <button
-          onClick={onMerge}
-          disabled={isRestoring}
-          className="col-span-2 sm:col-span-1 px-4 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 text-sm font-medium transition-colors shadow-md cursor-pointer disabled:opacity-50"
-        >
-          {isRestoring ? 'Restauration...' : 'Fusionner les champs cochés'}
-        </button>
-        <button onClick={() => setAll(true)} className={ghostBtn}>
-          Tout cocher
-        </button>
-        <button onClick={() => setAll(false)} className={ghostBtn}>
-          Tout décocher
-        </button>
+      <div className="flex flex-wrap gap-2 font-sans">
+        {fields.map((field) => {
+          const on = value[field.key];
+          return (
+            <button
+              key={field.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChange({ ...value, [field.key]: !on })}
+              className={`touch-target inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition sm:min-h-0 ${
+                on
+                  ? 'border-amber-600 bg-amber-700 text-amber-50'
+                  : 'border-amber-900/40 bg-neutral-900 text-amber-200/70 hover:bg-neutral-800'
+              }`}
+            >
+              <span aria-hidden="true" className="w-3 text-center">
+                {on ? '✓' : ''}
+              </span>
+              {field.label}
+            </button>
+          );
+        })}
       </div>
+
+      <p className="font-sans text-xs text-amber-200/70">
+        {nothingSelected
+          ? 'Sélectionne au moins un élément à appliquer.'
+          : (summary ?? 'Les éléments sélectionnés remplaceront ceux de l’élément actuel.')}
+      </p>
+
+      <button
+        type="button"
+        onClick={onMerge}
+        disabled={blocked}
+        className="touch-target w-full cursor-pointer rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-medium text-amber-50 shadow-md transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+      >
+        {isRestoring ? 'Application en cours...' : actionLabel}
+      </button>
     </div>
   );
 }
