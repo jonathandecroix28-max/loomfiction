@@ -5,6 +5,8 @@ import { useSheets } from '../hooks/useSheets';
 import { useIdeas } from '../../ideas/hooks/useIdeas';
 import { useCategories } from '../../categories/hooks/useCategories';
 import { useDataChanged } from '../../../hooks/useDataChanged';
+import { offlineBookService } from '../../../services/offlineBookService';
+import { fileToAvatar, useSheetImages } from '../hooks/useSheetImages';
 import { buildSheetGraph, normalizeName } from '../sheetGraph';
 
 interface SheetNetworkProps {
@@ -16,7 +18,6 @@ interface SheetNetworkProps {
   onToggleImmersive?: () => void;
 }
 
-/** Position d'une fiche sur le cercle. */
 type Pos = { x: number; y: number; r: number; lane: string };
 type Arc = { key: string; name: string; color: string; start: number; end: number; mid: number; count: number };
 type Layout = { radius: number; positions: Map<number, Pos>; arcs: Arc[] };
@@ -28,8 +29,8 @@ const NO_CATEGORY = 'none';
 const FALLBACK_COLOR = '#78716c';
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3;
-const ZOOM_FAR = 0.5;
-const ZOOM_MID = 0.95;
+const ZOOM_FAR = 0.45;
+const ZOOM_MID = 0.65;
 const MIN_RING = 230;
 const GROUP_GAP = 84;
 const CENTER_R = 34;
@@ -40,13 +41,11 @@ const SURFACE = 'var(--c-surface)';
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const nodeRadius = (degree: number) => 11 + Math.min(8, Math.sqrt(degree) * 2.2);
-const initialOf = (name: string) => (name.trim().match(/[\p{L}\p{N}]/u)?.[0] ?? '·').toUpperCase();
+const nodeRadius = (degree: number) => 12 + Math.min(9, Math.sqrt(degree) * 2.4);
 const fmt = (value: number) => value.toFixed(1);
 
 const polar = (radius: number, angle: number) => ({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
 
-/** Arc de cercle (sens horaire) entre deux angles. */
 function arcPath(radius: number, start: number, end: number) {
   const a = polar(radius, start);
   const b = polar(radius, end);
@@ -54,10 +53,7 @@ function arcPath(radius: number, start: number, end: number) {
   return `M${fmt(a.x)},${fmt(a.y)} A${fmt(radius)},${fmt(radius)} 0 ${large} 1 ${fmt(b.x)},${fmt(b.y)}`;
 }
 
-/**
- * Lien entre deux fiches du cercle : une courbe qui plonge vers le centre d'autant plus
- * que les deux fiches sont éloignées l'une de l'autre (les voisines restent près du bord).
- */
+
 function ringPath(a: Pos, b: Pos, ring: number) {
   const inset = (p: Pos) => {
     const scale = Math.max(0.2, (ring - p.r - 4) / ring);
@@ -87,6 +83,41 @@ function fanPath(from: { x: number; y: number; r: number }, to: { x: number; y: 
   const cx = (sx + ex) / 2 - uy * offset;
   const cy = (sy + ey) / 2 + ux * offset;
   return `M${fmt(sx)},${fmt(sy)} Q${fmt(cx)},${fmt(cy)} ${fmt(ex)},${fmt(ey)}`;
+}
+
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-xl border border-amber-900/30 bg-neutral-900/70 px-3 py-2 text-left transition active:bg-neutral-800"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm text-amber-100">{label}</span>
+        {hint && <span className="block text-[11px] text-amber-200/50">{hint}</span>}
+      </span>
+      <span
+        aria-hidden="true"
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? 'bg-amber-600' : 'bg-neutral-700'}`}
+      >
+        <span
+          className={`absolute top-0.5 size-5 rounded-full bg-amber-50 shadow transition-all ${checked ? 'left-[1.375rem]' : 'left-0.5'}`}
+        />
+      </span>
+    </button>
+  );
 }
 
 const chip = (active: boolean) =>
@@ -131,10 +162,32 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
   const { ideas, isLoading, refreshIdeas } = useIdeas(null);
   const { categories } = useCategories();
   const uid = useId().replace(/:/g, '');
+  const { images, setImage } = useSheetImages();
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [imageError, setImageError] = useState<{ id: number; message: string } | null>(null);
+
+
+  const [loadedBooks, setLoadedBooks] = useState<{ id: number; title: string }[]>([]);
+  const loadBooks = useCallback(() => {
+    offlineBookService
+      .getAll()
+      .then((list) => setLoadedBooks((list ?? []).map((book) => ({ id: book.id, title: book.title }))))
+      .catch((err) => console.error('Erreur de chargement des romans :', err));
+  }, []);
+  useEffect(() => {
+    loadBooks();
+  }, [loadBooks]);
+  const allBooks = useMemo(() => {
+    const merged = new Map<number, string>();
+    for (const book of loadedBooks) merged.set(book.id, book.title);
+    for (const book of books ?? []) if (book.title) merged.set(book.id, book.title);
+    return Array.from(merged, ([id, title]) => ({ id, title }));
+  }, [loadedBooks, books]);
 
   useDataChanged(() => {
     void refreshSheets();
     void refreshIdeas();
+    loadBooks();
   });
 
   const [query, setQuery] = useState('');
@@ -154,7 +207,6 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
     [],
   );
 
-  // Quand la page change de fiche / de roman, la sélection repart de la fiche courante (ajustement pendant le rendu).
   const syncKey = `${currentSheetId ?? ''}|${bookIdProp ?? ''}`;
   const [appliedSyncKey, setAppliedSyncKey] = useState(syncKey);
   if (syncKey !== appliedSyncKey) {
@@ -166,13 +218,14 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (touring) setTouring(false);
+      if (showFilters) setShowFilters(false);
+      else if (touring) setTouring(false);
       else if (isolateRaw) setIsolate(null);
       else if (isImmersive && onToggleImmersive) onToggleImmersive();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [touring, isolateRaw, isImmersive, onToggleImmersive]);
+  }, [showFilters, touring, isolateRaw, isImmersive, onToggleImmersive]);
 
   /* ───────────── Données du graphe ───────────── */
 
@@ -181,9 +234,9 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
   const bookOptions = useMemo(() => {
     const ids = new Set<number | null>(ideas.map((idea) => idea.bookId ?? null));
     if (bookIdProp !== undefined) ids.add(bookIdProp);
-    for (const book of books ?? []) ids.add(book.id);
+    for (const book of allBooks) ids.add(book.id);
     return Array.from(ids).sort((a, b) => (a === null ? 1 : b === null ? -1 : a - b));
-  }, [ideas, bookIdProp, books]);
+  }, [ideas, bookIdProp, allBooks]);
 
   const activeBook = useMemo<number | null>(() => {
     if (pickedBookId !== undefined && bookOptions.includes(pickedBookId)) return pickedBookId;
@@ -209,8 +262,9 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
   }, [pickedBookId, bookIdProp, bookOptions, ideas, currentSheetId]);
 
   const bookTitleOf = useCallback(
-    (id: number | null) => (id === null ? 'Sans roman' : (books?.find((book) => book.id === id)?.title ?? `Roman n° ${id}`)),
-    [books],
+    (id: number | null) =>
+      id === null ? 'Sans roman' : (allBooks.find((book) => book.id === id)?.title ?? 'Roman sans titre'),
+    [allBooks],
   );
 
   const changeBook = (next: number | null) => {
@@ -237,7 +291,6 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
 
   const scopedSheets = useMemo(() => sheets.filter((sheet) => scopedIds.has(sheet.id)), [sheets, scopedIds]);
 
-  // Le voisinage isolé n'est valable que tant que sa fiche appartient au roman affiché.
   const isolate = isolateRaw && scopedIds.has(isolateRaw.id) ? isolateRaw : null;
 
   const links = useMemo(() => (strongOnly ? allLinks.filter((link) => link.count >= 2) : allLinks), [allLinks, strongOnly]);
@@ -691,6 +744,9 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
   const selectedSheet = selectedId != null ? sheetById.get(selectedId) : undefined;
   const selectedVisible = selectedId != null && visibleIds.has(selectedId);
   const selectedColor = selectedSheet ? colorOfCategory(selectedSheet.categoryId) : FALLBACK_COLOR;
+  const selectedImage = selectedSheet
+    ? (images[String(selectedSheet.id)] ?? (selectedSheet as { imageUrl?: string }).imageUrl)
+    : undefined;
 
   const emptyMessage = isLoading
     ? 'Chargement du réseau…'
@@ -699,6 +755,31 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
       : visibleSheets.length === 0
         ? 'Aucune fiche à afficher avec ces filtres.'
         : null;
+
+  const activeFilterCount =
+    (hideIsolated ? 0 : 1) + (strongOnly ? 1 : 0) + (effectiveMinDegree > 0 ? 1 : 0) + hiddenCategories.size;
+  const resetFilters = () => {
+    setHideIsolated(true);
+    setStrongOnly(false);
+    setMinDegree(0);
+    setHiddenCategories(new Set());
+  };
+
+  const handleImageFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !selectedSheet) return;
+    try {
+      const avatar = await fileToAvatar(file);
+      if (setImage(selectedSheet.id, avatar)) setImageError(null);
+      else setImageError({ id: selectedSheet.id, message: 'Stockage du navigateur plein : impossible d’enregistrer cette image.' });
+    } catch (err) {
+      setImageError({
+        id: selectedSheet.id,
+        message: err instanceof Error ? err.message : 'Impossible de charger cette image.',
+      });
+    }
+  };
 
   const linkCount = visibleLinks.length;
   const dense = linkCount > 90;
@@ -731,6 +812,9 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
         aria-label="Réseau des fiches liées par leurs mentions"
       >
         <defs>
+          <clipPath id={`${uid}-avatar`} clipPathUnits="objectBoundingBox">
+            <circle cx="0.5" cy="0.5" r="0.5" />
+          </clipPath>
           <marker id={`${uid}-arrow`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
             <path d="M0,1 L9,5 L0,9 z" style={{ fill: 'var(--c-a400)' }} />
           </marker>
@@ -857,6 +941,15 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
             const isHub = nodeDegree >= hubThreshold;
             const shownRadius = isCenter ? CENTER_R : rim.r;
             const scale = isCenter ? CENTER_R / rim.r : isHover ? 1.18 : 1;
+            const image = images[String(sheet.id)] ?? (sheet as { imageUrl?: string }).imageUrl;
+
+            // Le nom se place vers l'extérieur du cercle pour ne pas recouvrir les fiches voisines.
+            const ux = ring > 0 ? rim.x / ring : 0;
+            const uy = ring > 0 ? rim.y / ring : 1;
+            const labelX = isCenter ? 0 : ux * (rim.r + 8);
+            const labelY = isCenter ? CENTER_R + 26 : uy * (rim.r + 8) + (uy > 0.5 ? 10 : uy < -0.5 ? -4 : 4);
+            const labelAnchor = isCenter ? 'middle' : ux > 0.3 ? 'start' : ux < -0.3 ? 'end' : 'middle';
+            const labelText = !isCenter && sheet.name.length > 24 ? `${sheet.name.slice(0, 23)}…` : sheet.name;
 
             return (
               <g
@@ -894,17 +987,22 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
                     {isMatch && <circle r={rim.r + 5} fill="none" className="stroke-amber-300" strokeWidth={1.5} strokeDasharray="4 3" pointerEvents="none" />}
                     {isCenter && <circle key={`ping-${centerId}`} r={rim.r + 3} fill="none" className="sn-ping stroke-amber-200" strokeWidth={2} pointerEvents="none" />}
 
-                    <circle r={rim.r} fill={isCurrent ? color : SURFACE} stroke={color} strokeWidth={3} />
-                    <text
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fontSize={rim.r * 0.95}
-                      fontWeight={700}
-                      pointerEvents="none"
-                      style={{ fontFamily: MONO, fill: isCurrent ? PAGE : color }}
-                    >
-                      {initialOf(sheet.name)}
-                    </text>
+                    <circle r={rim.r} fill={isCurrent && !image ? color : SURFACE} />
+                    {image ? (
+                      <image
+                        href={image}
+                        x={-rim.r}
+                        y={-rim.r}
+                        width={rim.r * 2}
+                        height={rim.r * 2}
+                        preserveAspectRatio="xMidYMid slice"
+                        clipPath={`url(#${uid}-avatar)`}
+                        pointerEvents="none"
+                      />
+                    ) : (
+                      <circle r={rim.r * 0.4} fill={isCurrent ? PAGE : color} pointerEvents="none" />
+                    )}
+                    <circle r={rim.r} fill="none" stroke={color} strokeWidth={3} />
                   </g>
                 </g>
 
@@ -918,15 +1016,16 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
                 )}
 
                 <text
-                  y={shownRadius + (isCenter ? 26 : 16)}
-                  textAnchor="middle"
+                  x={labelX}
+                  y={labelY}
+                  textAnchor={labelAnchor}
                   fontSize={isCenter ? 20 : isHover ? 13 : 12}
                   fontWeight={isCenter || isHover ? 700 : 400}
                   className={`wv-label fill-amber-100 ${keepLabel || isCenter ? 'wv-keep' : ''} ${isHub ? 'wv-hub' : ''}`}
                   pointerEvents="none"
                   style={{ stroke: PAGE, strokeWidth: 4, paintOrder: 'stroke', strokeLinejoin: 'round', transition: 'all .3s ease' }}
                 >
-                  {sheet.name}
+                  {labelText}
                 </text>
               </g>
             );
@@ -968,7 +1067,7 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
             value={activeBook === null ? 'none' : String(activeBook)}
             onChange={(event) => changeBook(event.target.value === 'none' ? null : Number(event.target.value))}
             aria-label="Roman affiché"
-            className="min-h-11 w-full cursor-pointer rounded-xl border border-amber-900/40 bg-neutral-900/90 px-3 py-2 text-base text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 sm:min-h-0 sm:max-w-xs sm:text-xs"
+            className="hidden w-full cursor-pointer rounded-xl border border-amber-900/40 bg-neutral-900/90 px-3 py-2 text-xs text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500 sm:block sm:max-w-xs"
           >
             {bookOptions.map((id) => (
               <option key={id ?? 'none'} value={id === null ? 'none' : String(id)}>
@@ -994,9 +1093,15 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
             type="button"
             onClick={() => setShowFilters((value) => !value)}
             aria-expanded={showFilters}
-            className={`${chip(showFilters)} sm:hidden`}
+            aria-haspopup="dialog"
+            className={`${chip(showFilters || activeFilterCount > 0)} min-h-11 sm:hidden`}
           >
             Filtres
+            {activeFilterCount > 0 && (
+              <span className="inline-flex size-5 items-center justify-center rounded-full bg-amber-50 text-[11px] font-bold text-amber-900">
+                {activeFilterCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -1017,7 +1122,7 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
         )}
 
         <div
-          className={`${showFilters ? 'flex' : 'hidden'} max-h-[40dvh] flex-wrap items-center gap-2 overflow-y-auto rounded-xl border border-amber-900/40 bg-neutral-950/95 p-2 sm:flex sm:max-h-none sm:flex-nowrap sm:overflow-x-auto sm:overflow-y-visible sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:pb-1 sm:scrollbar-none`}
+          className="hidden items-center gap-2 sm:flex sm:flex-nowrap sm:overflow-x-auto sm:pb-1 sm:scrollbar-none"
         >
           <button type="button" onClick={() => setHideIsolated((value) => !value)} className={chip(effectiveHideIsolated)} aria-pressed={effectiveHideIsolated}>
             Masquer les fiches isolées
@@ -1054,6 +1159,143 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
         </div>
       </div>
 
+      {/* Filtres (mobile) : panneau qui monte du bas de l'écran */}
+      {showFilters && (
+        <div className="absolute inset-0 z-30 sm:hidden" role="dialog" aria-modal="true" aria-label="Filtres du réseau">
+          <button
+            type="button"
+            aria-label="Fermer les filtres"
+            onClick={() => setShowFilters(false)}
+            className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-[2px]"
+          />
+          <div className="sn-slide absolute inset-x-0 bottom-0 flex max-h-[82dvh] flex-col rounded-t-3xl border-t border-amber-900/40 bg-neutral-950 shadow-2xl">
+            <div className="flex shrink-0 flex-col items-center pt-2" aria-hidden="true">
+              <span className="h-1 w-10 rounded-full bg-amber-200/20" />
+            </div>
+            <div className="flex shrink-0 items-center justify-between gap-3 px-4 pb-2 pt-3">
+              <h2 className="font-serif text-lg font-bold text-amber-100">Filtres</h2>
+              <button
+                type="button"
+                onClick={resetFilters}
+                disabled={activeFilterCount === 0}
+                className="touch-target cursor-pointer rounded-lg px-3 text-sm text-amber-200/80 transition hover:text-amber-100 disabled:cursor-default disabled:opacity-30"
+              >
+                Réinitialiser
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 pb-4">
+              {bookOptions.length > 1 && (
+                <section>
+                  <h3 className="mb-2 text-[11px] uppercase tracking-[0.15em] text-amber-200/50">Roman</h3>
+                  <select
+                    value={activeBook === null ? 'none' : String(activeBook)}
+                    onChange={(event) => changeBook(event.target.value === 'none' ? null : Number(event.target.value))}
+                    aria-label="Roman affiché"
+                    className="min-h-12 w-full cursor-pointer rounded-xl border border-amber-900/40 bg-neutral-900 px-3 text-base text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  >
+                    {bookOptions.map((id) => (
+                      <option key={id ?? 'none'} value={id === null ? 'none' : String(id)}>
+                        {bookTitleOf(id)}
+                      </option>
+                    ))}
+                  </select>
+                </section>
+              )}
+
+              <section className="space-y-2">
+                <h3 className="text-[11px] uppercase tracking-[0.15em] text-amber-200/50">Affichage</h3>
+                <ToggleRow
+                  label="Masquer les fiches isolées"
+                  hint="Cache les fiches sans aucun lien"
+                  checked={effectiveHideIsolated}
+                  onChange={() => setHideIsolated((value) => !value)}
+                />
+                <ToggleRow
+                  label="Liens répétés uniquement"
+                  hint="Garde les mentions qui reviennent au moins 2 fois"
+                  checked={strongOnly}
+                  onChange={() => setStrongOnly((value) => !value)}
+                />
+                <div className="flex min-h-14 items-center gap-3 rounded-xl border border-amber-900/30 bg-neutral-900/70 px-3 py-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm text-amber-100">Connexions minimales</span>
+                    <span className="block text-[11px] text-amber-200/50">Cache les fiches trop peu reliées</span>
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label="Moins de connexions minimales"
+                      disabled={effectiveMinDegree <= 0}
+                      onClick={() => setMinDegree(Math.max(0, effectiveMinDegree - 1))}
+                      className="flex size-11 cursor-pointer items-center justify-center rounded-lg border border-amber-900/40 bg-neutral-900 text-lg text-amber-100 active:bg-neutral-800 disabled:cursor-default disabled:opacity-30"
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center font-mono text-base text-amber-100">{effectiveMinDegree}</span>
+                    <button
+                      type="button"
+                      aria-label="Plus de connexions minimales"
+                      disabled={effectiveMinDegree >= maxDegree}
+                      onClick={() => setMinDegree(Math.min(maxDegree, effectiveMinDegree + 1))}
+                      className="flex size-11 cursor-pointer items-center justify-center rounded-lg border border-amber-900/40 bg-neutral-900 text-lg text-amber-100 active:bg-neutral-800 disabled:cursor-default disabled:opacity-30"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {(presentCategoryKeys.size > 0) && (
+                <section>
+                  <h3 className="mb-2 text-[11px] uppercase tracking-[0.15em] text-amber-200/50">Catégories</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {categories
+                      .filter((category) => presentCategoryKeys.has(String(category.id)))
+                      .map((category) => {
+                        const key = String(category.id);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => toggleCategory(key)}
+                            className={`${chip(!hiddenCategories.has(key))} min-h-11 px-4 text-sm`}
+                            aria-pressed={!hiddenCategories.has(key)}
+                          >
+                            <span className="size-2.5 rounded-full" style={{ backgroundColor: category.color }} />
+                            {category.name}
+                          </button>
+                        );
+                      })}
+                    {presentCategoryKeys.has(NO_CATEGORY) && (
+                      <button
+                        type="button"
+                        onClick={() => toggleCategory(NO_CATEGORY)}
+                        className={`${chip(!hiddenCategories.has(NO_CATEGORY))} min-h-11 px-4 text-sm`}
+                        aria-pressed={!hiddenCategories.has(NO_CATEGORY)}
+                      >
+                        <span className="size-2.5 rounded-full" style={{ backgroundColor: FALLBACK_COLOR }} />
+                        Sans catégorie
+                      </button>
+                    )}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            <div className="shrink-0 border-t border-amber-900/30 bg-neutral-950 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+              <button
+                type="button"
+                onClick={() => setShowFilters(false)}
+                className="touch-target min-h-12 w-full cursor-pointer rounded-xl border border-amber-600 bg-amber-700 px-4 text-sm font-medium text-amber-50 shadow-md transition active:bg-amber-600"
+              >
+                Voir {visibleSheets.length} fiche{visibleSheets.length > 1 ? 's' : ''} · {visibleLinks.length} lien{visibleLinks.length > 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Contrôles de vue */}
       <div className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] flex flex-col gap-2">
         {onToggleImmersive && (
@@ -1085,7 +1327,7 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
       </div>
 
       <p className={`pointer-events-none absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 rounded-lg bg-neutral-950/80 px-2.5 py-1 text-[11px] text-amber-200/60 ${selectedSheet && selectedVisible ? 'hidden sm:block' : ''}`}>
-        {books?.some((book) => book.id === activeBook) ? `${bookTitleOf(activeBook)} · ` : ''}
+        {allBooks.some((book) => book.id === activeBook) ? `${bookTitleOf(activeBook)} · ` : ''}
         {visibleSheets.length} fiche{visibleSheets.length > 1 ? 's' : ''} · {visibleLinks.length} lien{visibleLinks.length > 1 ? 's' : ''}
       </p>
 
@@ -1110,6 +1352,46 @@ export function SheetNetwork({ currentSheetId, bookId: bookIdProp, books, onOpen
               </div>
               <button type="button" onClick={() => setSelectedId(null)} aria-label="Fermer" className="touch-target min-w-9 cursor-pointer text-amber-200/60 hover:text-amber-100">✕</button>
             </div>
+
+            <div className="mb-3 flex items-center gap-3 rounded-xl border border-amber-900/30 bg-neutral-900/60 p-2">
+              <span
+                className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-900"
+                style={{ boxShadow: `0 0 0 3px ${selectedColor}` }}
+              >
+                {selectedImage ? (
+                  <img src={selectedImage} alt="" className="size-full object-cover" />
+                ) : (
+                  <span className="size-4 rounded-full" style={{ backgroundColor: selectedColor }} />
+                )}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  className="min-h-9 cursor-pointer rounded-lg border border-amber-900/40 bg-neutral-900 px-2.5 text-xs text-amber-200 transition hover:bg-neutral-800"
+                >
+                  {selectedImage ? 'Changer l’image' : 'Ajouter une image'}
+                </button>
+                {selectedImage && images[String(selectedSheet.id)] && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImage(selectedSheet.id, null);
+                      setImageError(null);
+                    }}
+                    className="min-h-9 cursor-pointer rounded-lg border border-amber-900/40 bg-neutral-900 px-2.5 text-xs text-amber-200/70 transition hover:bg-neutral-800"
+                  >
+                    Retirer
+                  </button>
+                )}
+              </div>
+              <input ref={imageInputRef} type="file" accept="image/*" onChange={handleImageFile} className="hidden" />
+            </div>
+            {imageError?.id === selectedSheet.id && (
+              <p role="alert" className="-mt-1 mb-3 text-xs text-red-300/80">
+                {imageError.message}
+              </p>
+            )}
 
             {(['out', 'incoming'] as const).map((direction) => {
               const ids = adjacency[direction].get(selectedSheet.id) ?? [];
