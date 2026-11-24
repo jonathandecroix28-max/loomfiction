@@ -1,62 +1,41 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { IconBooks, IconIdea, IconHistory, IconExport, type LucideIcon } from './icons';
-
-
+import { IconMenu } from './icons';
+import { useExplorerOpen } from '../hooks/explorerOpenStore';
+import { explorerRouteInfo } from './explorer/explorerRoutes';
+import { NAV_ITEMS, isNavActive, type NavKey } from './navItems';
 import { ThemeToggle } from "./themes/ThemeToggle";
 
-type NavKey = "books" | "ideas" | "versions" | "export";
+interface NavbarProps {
+  collapsed?: boolean;
+}
 
-const NAV_ITEMS: {
-  key: NavKey;
-  label: string;
-  short: string;
-  Icon: LucideIcon;
-  path: string;
-}[] = [
-  {
-    key: "books",
-    label: "Romans",
-    short: "Romans",
-    Icon: IconBooks,
-    path: "/books",
-  },
-  {
-    key: "ideas",
-    label: "Carnet d'idées",
-    short: "Idées",
-    Icon: IconIdea,
-    path: "/ideas",
-  },
-  {
-    key: "versions",
-    label: "Versions",
-    short: "Versions",
-    Icon: IconHistory,
-    path: "/versions",
-  },
-  {
-    key: "export",
-    label: "Exporter",
-    short: "Export",
-    Icon: IconExport,
-    path: "/export",
-  },
-];
-
-export function Navbar() {
+export function Navbar({ collapsed = false }: NavbarProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  const inVersions = pathname.includes("/versions");
+  const [isExplorerOpen, setIsExplorerOpen] = useExplorerOpen();
+  const hasExplorer = explorerRouteInfo(pathname).available;
 
-  const active: Record<NavKey, boolean> = {
-    versions: inVersions,
-    export: pathname.startsWith("/export"),
-    ideas: pathname.startsWith("/ideas") && !inVersions,
-    books:
-      (pathname.startsWith("/books") || pathname === "/") &&
-      !inVersions,
-  };
+  const active = Object.fromEntries(
+    NAV_ITEMS.map((item) => [item.key, isNavActive(item.key, pathname)]),
+  ) as Record<NavKey, boolean>;
+
+  const ExplorerToggle = hasExplorer ? (
+    <button
+      type="button"
+      onClick={() => setIsExplorerOpen(!isExplorerOpen)}
+      aria-pressed={isExplorerOpen}
+      aria-label={isExplorerOpen ? "Fermer l'explorateur" : "Ouvrir l'explorateur"}
+      title={isExplorerOpen ? "Fermer l'explorateur" : "Ouvrir l'explorateur"}
+      className={`flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition ${
+        isExplorerOpen
+          ? "border-amber-700 bg-amber-900/70 text-amber-100"
+          : "border-transparent text-amber-200/70 hover:bg-amber-950/60 hover:text-amber-100"
+      }`}
+    >
+      <IconMenu size={20} strokeWidth={1.8} aria-hidden="true" />
+    </button>
+  ) : null;
 
   const Logo = (
     <button
@@ -79,12 +58,15 @@ export function Navbar() {
     <>
       {/* DESKTOP / TABLETTE : NAVIGATION EN HAUT   */}
 
-      <header className="hidden sm:block bg-[#1c1411] border-b border-amber-900/40 sticky top-0 z-50 shadow-md">
+      <header className={`${collapsed ? "hidden" : "hidden sm:block"} bg-[#1c1411] border-b border-amber-900/40 sticky top-0 z-50 shadow-md`}>
         <nav
           aria-label="Navigation principale"
           className="max-w-7xl mx-auto px-6 h-16 flex items-center gap-8"
         >
-          {Logo}
+          <div className="flex min-w-0 items-center gap-2">
+            {ExplorerToggle}
+            {Logo}
+          </div>
 
           <ul className="flex items-center gap-1.5">
             {NAV_ITEMS.map((item) => {
@@ -128,7 +110,10 @@ export function Navbar() {
 
       <header className="sm:hidden bg-[#1c1411] border-b border-amber-900/40 sticky top-0 z-40 shadow-md">
         <div className="px-4 h-14 flex items-center justify-between gap-3">
-          {Logo}
+          <div className="flex min-w-0 items-center gap-2">
+            {ExplorerToggle}
+            {Logo}
+          </div>
 
           <div className="flex items-center gap-2 shrink-0">
             <ThemeToggle />
