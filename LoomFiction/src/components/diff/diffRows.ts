@@ -84,7 +84,6 @@ export function wordDiff(a: string, b: string): { left: Seg[]; right: Seg[]; rat
 
 type Src = DiffRowData;
 
-
 export function buildRows(rows: DiffRowData[]): DRow[] {
   const out: DRow[] = [];
   const cellL = (row: Src): Cell => ({ text: row.left ?? '', line: row.leftLine });
@@ -161,4 +160,83 @@ export function buildRows(rows: DiffRowData[]): DRow[] {
     flush(pendingRemoved, added.slice(pointer));
   }
   return out;
+}
+
+export function changeIdsOf(rows: DiffRowData[]): number[] {
+  const ids: number[] = [];
+  const seen = new Set<number>();
+  for (const row of rows) {
+    if (row.type === 'equal' || row.hunkId === null || seen.has(row.hunkId)) continue;
+    seen.add(row.hunkId);
+    ids.push(row.hunkId);
+  }
+  return ids;
+}
+
+const MAX_LCS_CELLS = 2_000_000;
+
+export function diffLines(oldLines: string[], newLines: string[]): DiffRowData[] {
+  let start = 0;
+  while (start < oldLines.length && start < newLines.length && oldLines[start] === newLines[start]) start++;
+  let endOld = oldLines.length;
+  let endNew = newLines.length;
+  while (endOld > start && endNew > start && oldLines[endOld - 1] === newLines[endNew - 1]) {
+    endOld--;
+    endNew--;
+  }
+
+  const a = oldLines.slice(start, endOld);
+  const b = newLines.slice(start, endNew);
+  const events: Array<{ type: 'equal' | 'removed' | 'added'; oldIndex?: number; newIndex?: number }> = [];
+
+  if (a.length * b.length > MAX_LCS_CELLS) {
+    a.forEach((_, oldIndex) => events.push({ type: 'removed', oldIndex }));
+    b.forEach((_, newIndex) => events.push({ type: 'added', newIndex }));
+  } else {
+    const width = b.length + 1;
+    const dp = new Uint32Array((a.length + 1) * width);
+    for (let i = a.length - 1; i >= 0; i--) {
+      for (let j = b.length - 1; j >= 0; j--) {
+        dp[i * width + j] =
+          a[i] === b[j] ? dp[(i + 1) * width + j + 1] + 1 : Math.max(dp[(i + 1) * width + j], dp[i * width + j + 1]);
+      }
+    }
+    let i = 0;
+    let j = 0;
+    while (i < a.length && j < b.length) {
+      if (a[i] === b[j]) events.push({ type: 'equal', oldIndex: i++, newIndex: j++ });
+      else if (dp[(i + 1) * width + j] >= dp[i * width + j + 1]) events.push({ type: 'removed', oldIndex: i++ });
+      else events.push({ type: 'added', newIndex: j++ });
+    }
+    while (i < a.length) events.push({ type: 'removed', oldIndex: i++ });
+    while (j < b.length) events.push({ type: 'added', newIndex: j++ });
+  }
+
+  const rows: DiffRowData[] = [];
+  let oldNumber = 1;
+  let newNumber = 1;
+  let hunk = -1;
+  let inChange = false;
+
+  const equal = (text: string) => {
+    rows.push({ left: text, right: text, type: 'equal', leftLine: oldNumber++, rightLine: newNumber++, hunkId: null });
+    inChange = false;
+  };
+  const change = (type: 'removed' | 'added', text: string) => {
+    if (!inChange) {
+      hunk++;
+      inChange = true;
+    }
+    if (type === 'removed') rows.push({ left: text, right: null, type, leftLine: oldNumber++, rightLine: null, hunkId: hunk });
+    else rows.push({ left: null, right: text, type, leftLine: null, rightLine: newNumber++, hunkId: hunk });
+  };
+
+  for (let k = 0; k < start; k++) equal(oldLines[k]);
+  for (const event of events) {
+    if (event.type === 'equal') equal(a[event.oldIndex!]);
+    else if (event.type === 'removed') change('removed', a[event.oldIndex!]);
+    else change('added', b[event.newIndex!]);
+  }
+  for (let k = endOld; k < oldLines.length; k++) equal(oldLines[k]);
+  return rows;
 }

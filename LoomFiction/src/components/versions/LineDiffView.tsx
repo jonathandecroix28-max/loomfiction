@@ -1,16 +1,21 @@
+import { Fragment, useMemo } from 'react';
+import type { ReactNode } from 'react';
+import type { CompareMode } from '../../hooks/versions/useVersionCompare';
 import {
   choiceLabels,
   choiceSummary,
   defaultChoice,
   isSideMissing,
   lineNumberOf,
-  sideBg,
   type LineChoice,
   type LineChoices,
   type LineDiffRow,
 } from '../../utils/versions/lineDiff';
 import { displayLine } from '../../utils/versions/sanitizeHtml';
-import { choiceBtn } from '../../utils/versions/versionStyles';
+import { wordDiff, type Seg } from '../diff/diffRows';
+import '../diff/diff.css';
+
+type Tone = 'add' | 'del';
 
 interface Props {
   rows: LineDiffRow[];
@@ -18,125 +23,156 @@ interface Props {
   onChoose: (rowId: string, choice: LineChoice) => void;
   help: string;
   emptyMessage: string;
+  mode?: CompareMode;
+  sideLabels?: Record<LineChoice, string>;
+  tones?: Record<LineChoice, Tone>;
 }
 
-function renderSide(row: LineDiffRow, side: LineChoice) {
-  if (isSideMissing(row, side)) return <span className="italic text-amber-200/30">absente</span>;
-  const line = side === 'current' ? row.currentLine : row.versionLine;
-  const text = displayLine(line);
-  if (text === '') return <span className="italic text-amber-200/30">(ligne vide)</span>;
-  return text;
+const DEFAULT_LABELS: Record<LineChoice, string> = { current: 'Actuel', version: 'Version' };
+const DEFAULT_TONES: Record<LineChoice, Tone> = { current: 'add', version: 'del' };
+const MIN_WORD_RATIO = 0.2;
+
+const textOf = (row: LineDiffRow, side: LineChoice) => displayLine(side === 'current' ? row.currentLine : row.versionLine);
+
+function renderSegs(segs: Seg[]): ReactNode {
+  return segs.map((seg, index) =>
+    seg.changed ? (
+      <span key={index} className="ld-w">
+        {seg.text}
+      </span>
+    ) : (
+      <Fragment key={index}>{seg.text}</Fragment>
+    ),
+  );
 }
 
-export function LineDiffView({ rows, choices, onChoose, help, emptyMessage }: Props) {
-  const renderChoice = (row: LineDiffRow) => {
-    if (row.kind === 'equal') return <span className="text-xs text-emerald-300">Identique</span>;
+export function LineDiffView({
+  rows,
+  choices,
+  onChoose,
+  help,
+  emptyMessage,
+  mode = 'current-left',
+  sideLabels = DEFAULT_LABELS,
+  tones = DEFAULT_TONES,
+}: Props) {
+  const sides: LineChoice[] = mode === 'current-left' ? ['current', 'version'] : ['version', 'current'];
 
-    const selected = choices[row.id] ?? defaultChoice(row);
+  const wordSegs = useMemo(() => {
+    const map = new Map<string, Record<LineChoice, Seg[]>>();
+    for (const row of rows) {
+      if (row.kind === 'equal' || isSideMissing(row, 'current') || isSideMissing(row, 'version')) continue;
+      const oldSide: LineChoice = tones.current === 'del' ? 'current' : 'version';
+      const newSide: LineChoice = oldSide === 'current' ? 'version' : 'current';
+      const diff = wordDiff(textOf(row, oldSide), textOf(row, newSide));
+      if (!diff || diff.ratio < MIN_WORD_RATIO) continue;
+      map.set(row.id, { [oldSide]: diff.left, [newSide]: diff.right } as Record<LineChoice, Seg[]>);
+    }
+    return map;
+  }, [rows, tones.current]);
+
+  const renderText = (row: LineDiffRow, side: LineChoice): ReactNode => {
+    if (isSideMissing(row, side)) return <span className="ld-italic">absente</span>;
+    const segs = wordSegs.get(row.id)?.[side];
+    if (segs) return renderSegs(segs);
+    const text = textOf(row, side);
+    return text === '' ? <span className="ld-italic">(ligne vide)</span> : text;
+  };
+
+  const renderCell = (row: LineDiffRow, side: LineChoice, position?: 'l' | 'r') => {
+    const sideClass = position === 'r' ? 'ld-r' : '';
+
+    if (row.kind === 'equal') {
+      return (
+        <div className={`ld-cell ld-eq ${sideClass}`}>
+          <span className="ld-num">{lineNumberOf(row)}</span>
+          <span className="ld-rail" aria-hidden="true" />
+          <span className="ld-mark" aria-hidden="true" />
+          <span className="ld-text">{renderText(row, side)}</span>
+        </div>
+      );
+    }
+
+    const tone = tones[side];
+    const missing = isSideMissing(row, side);
+    const selected = (choices[row.id] ?? defaultChoice(row)) === side;
     const labels = choiceLabels(row.kind);
-    const activeLine = selected === 'version' ? row.versionLine : row.currentLine;
 
     return (
-      <div className="flex flex-col gap-1.5">
-        <div className="text-[11px] sm:text-xs text-amber-200/50">Résultat : {choiceSummary(row.kind, selected)}</div>
-        <div className="grid grid-cols-2 gap-2 mt-1">
-          <button
-            onClick={() => onChoose(row.id, 'current')}
-            className={`${choiceBtn(selected === 'current')} flex-1 px-1 sm:px-2 py-2 text-[11px] sm:text-xs text-center justify-center`}
-          >
-            {labels.current}
-          </button>
-          <button
-            onClick={() => onChoose(row.id, 'version')}
-            className={`${choiceBtn(selected === 'version')} flex-1 px-1 sm:px-2 py-2 text-[11px] sm:text-xs text-center justify-center`}
-          >
-            {labels.version}
-          </button>
-        </div>
-        <div className="mt-1 p-2 sm:p-2.5 rounded-lg bg-neutral-900/40 border border-amber-900/10 text-[11px] sm:text-xs text-amber-100/90 whitespace-pre-wrap wrap-break-word">
-          {(activeLine && displayLine(activeLine)) || <span className="italic text-amber-200/30">— Ligne vide —</span>}
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={() => onChoose(row.id, side)}
+        aria-pressed={selected}
+        title={`${labels[side]} — ${choiceSummary(row.kind, side)}`}
+        data-pick={selected ? 'kept' : 'dropped'}
+        className={`ld-cell ld-pickcell ld-${tone} ${missing ? 'ld-empty' : ''} ${sideClass}`}
+      >
+        <span className="ld-num">{lineNumberOf(row)}</span>
+        <span className="ld-rail" aria-hidden="true" />
+        <span className="ld-mark" aria-hidden="true">
+          {missing ? '' : tone === 'del' ? '−' : '+'}
+        </span>
+        <span className="ld-text">
+          <span className="sr-only">{labels[side]} : </span>
+          {renderText(row, side)}
+          {selected && <span className="ld-kept">✓ gardé</span>}
+        </span>
+      </button>
     );
   };
 
   return (
-    <div className="rounded-xl sm:rounded-2xl border border-amber-900/20 bg-neutral-950/60 p-3 sm:p-5 space-y-3">
-      <div>
-        <div className="text-[11px] sm:text-xs uppercase tracking-[0.22em] text-amber-200/40 mb-1">Diff ligne par ligne</div>
-        <p className="text-xs sm:text-sm text-amber-200/60">{help}</p>
+    <section className="loom-diff overflow-hidden rounded-xl border border-amber-900/25 bg-neutral-950/60">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-900/20 px-4 py-3 font-sans">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.22em] text-amber-200/40">Diff ligne par ligne</div>
+          <p className="mt-0.5 text-xs text-amber-200/60">{help}</p>
+        </div>
+        <span className="text-[11px] text-amber-200/50">Cliquez sur un côté pour le garder</span>
       </div>
 
       {rows.length === 0 ? (
-        <div className="px-4 py-6 text-center text-amber-200/50 text-sm">{emptyMessage}</div>
+        <div className="px-4 py-8 text-center font-sans text-sm text-amber-200/50">{emptyMessage}</div>
       ) : (
-        <>
-          {/* Mobile : une carte par ligne */}
-          <ul className="md:hidden max-h-[50vh] overflow-y-auto space-y-3">
-            {rows.map((row) => (
-              <li
-                key={row.id}
-                className={`rounded-xl border border-amber-900/20 p-3 space-y-3 ${row.kind === 'equal' ? 'bg-neutral-950/35' : 'bg-neutral-950/70'}`}
-              >
-                <div className="flex items-center justify-between text-[11px] font-sans font-medium uppercase tracking-widest text-amber-200/40">
-                  <span>Ligne {lineNumberOf(row)}</span>
-                  {row.kind === 'equal' && <span className="text-emerald-300">Identique</span>}
+        <div className="ld-body max-h-[50vh] overflow-y-auto">
+          {/* Ordinateur : deux colonnes, une rangée = une ligne */}
+          <div className="hidden md:block">
+            <div className="ld-head ld-row">
+              {sides.map((side, index) => (
+                <div key={side} className={`ld-tab ld-tab-${tones[side]} ${index === 1 ? 'ld-r' : ''}`}>
+                  <span className="truncate">{sideLabels[side]}</span>
                 </div>
-                
-                {row.kind === 'equal' ? (
-                  <div className="text-sm text-amber-100/80 whitespace-pre-wrap wrap-break-word">{renderSide(row, 'current')}</div>
-                ) : (
-                  <>
-                    <div className="flex flex-col gap-2.5">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-amber-200/30 mb-1">Actuel</div>
-                        <div className={`rounded-md px-2.5 py-2 text-sm text-amber-100/80 whitespace-pre-wrap wrap-break-word ${sideBg(row, 'current')}`}>
-                          {renderSide(row, 'current')}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-amber-200/30 mb-1">Version</div>
-                        <div className={`rounded-md px-2.5 py-2 text-sm text-amber-100/80 whitespace-pre-wrap wrap-break-word ${sideBg(row, 'version')}`}>
-                          {renderSide(row, 'version')}
-                        </div>
-                      </div>
-                    </div>
-                    {renderChoice(row)}
-                  </>
-                )}
-              </li>
+              ))}
+            </div>
+            {rows.map((row) => (
+              <div key={row.id} className="ld-row">
+                {renderCell(row, sides[0], 'l')}
+                {renderCell(row, sides[1], 'r')}
+              </div>
             ))}
-          </ul>
-
-          {/* Desktop : tableau */}
-          <div className="hidden md:block max-h-[45vh] overflow-auto rounded-2xl border border-amber-900/20">
-            <table className="min-w-full divide-y divide-amber-900/10">
-              <thead className="bg-neutral-950/90 sticky top-0 z-10">
-                <tr className="text-left text-xs uppercase tracking-[0.22em] text-amber-200/40">
-                  <th className="px-4 py-3 font-medium">Ligne</th>
-                  <th className="px-4 py-3 font-medium">Actuel</th>
-                  <th className="px-4 py-3 font-medium">Version</th>
-                  <th className="px-4 py-3 font-medium w-64">Choix</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-amber-900/10">
-                {rows.map((row) => (
-                  <tr key={row.id} className={row.kind === 'equal' ? 'bg-neutral-950/35' : 'bg-neutral-950/55'}>
-                    <td className="px-4 py-3 align-top text-xs text-amber-200/40 whitespace-nowrap">{lineNumberOf(row)}</td>
-                    <td className={`px-4 py-3 align-top whitespace-pre-wrap wrap-break-word text-sm text-amber-100/80 ${sideBg(row, 'current')}`}>
-                      {renderSide(row, 'current')}
-                    </td>
-                    <td className={`px-4 py-3 align-top whitespace-pre-wrap wrap-break-word text-sm text-amber-100/80 ${sideBg(row, 'version')}`}>
-                      {renderSide(row, 'version')}
-                    </td>
-                    <td className="px-4 py-3 align-top">{renderChoice(row)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        </>
+
+          {/* Mobile : un côté sous l’autre */}
+          <div className="md:hidden">
+            {rows.map((row) => (
+              <div key={row.id} className="ld-mrow">
+                {row.kind === 'equal' ? (
+                  renderCell(row, 'current')
+                ) : (
+                  sides.map((side) => (
+                    <div key={side}>
+                      <span className={`ld-lbl ld-lbl-${tones[side]}`}>
+                        {sideLabels[side]} · ligne {lineNumberOf(row)}
+                      </span>
+                      {renderCell(row, side)}
+                    </div>
+                  ))
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
-    </div>
+    </section>
   );
 }

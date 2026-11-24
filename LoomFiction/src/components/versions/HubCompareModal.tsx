@@ -5,6 +5,7 @@ import { htmlToPlainText } from '../../utils/versions/sanitizeHtml';
 import { ComparePanel, CompareCards } from './ComparePanel';
 import { LineDiffView } from './LineDiffView';
 import type { VersionRow } from '../versionsHubTypes';
+import '../diff/diff.css';
 
 export function HubCompareModal({
   parentTitle,
@@ -51,8 +52,8 @@ export function HubCompareModal({
     htmlToPlainText(body) || 'Aucun contenu.';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
-      <div className="bg-[#1c1411] border border-amber-700/40 rounded-3xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--c-overlay)] p-3 sm:p-6">
+      <div className="loom bg-[var(--c-surface)] border border-amber-700/40 rounded-3xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-amber-900/30 flex flex-wrap items-center justify-between gap-4 bg-neutral-950/90">
           <div>
             <span className="text-xs font-sans uppercase tracking-widest text-amber-400 font-semibold">
@@ -87,16 +88,19 @@ export function HubCompareModal({
           <ComparePanel
             mode={compare.compareMode}
             onModeChange={compare.setCompareMode}
-            currentLeftLabel={`v${older.versionNumber} à gauche`}
+            currentLeftLabel={`v${older.versionNumber}`}
+            versionLeftLabel={`v${newer.versionNumber}`}
           >
             <CompareCards
               mode={compare.compareMode}
               current={{
+                tone: 'del',
                 label: `Version v${older.versionNumber}`,
                 name: older.versionName || `Version ${older.versionNumber}`,
                 body: older.rawTextContent,
               }}
               version={{
+                tone: 'add',
                 label: `Version v${newer.versionNumber}`,
                 name: newer.versionName || `Version ${newer.versionNumber}`,
                 body: newer.rawTextContent,
@@ -110,13 +114,14 @@ export function HubCompareModal({
                 <span className="text-xs uppercase tracking-widest text-amber-200/50 font-semibold">
                   Différences ligne par ligne
                 </span>
-                <label className="flex items-center gap-2 text-xs sm:text-sm text-amber-200/80 cursor-pointer hover:text-amber-100">
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-amber-200/80 hover:text-amber-100 sm:text-sm">
                   <input
                     type="checkbox"
+                    className="sr-only"
                     checked={hideEqualLines}
                     onChange={(e) => setHideEqualLines(e.target.checked)}
-                    className="rounded border-amber-900/50 bg-neutral-900 text-amber-600 w-4 h-4 cursor-pointer"
                   />
+                  <span className="ld-switch" aria-hidden="true" />
                   Masquer les lignes identiques
                 </label>
               </div>
@@ -125,6 +130,9 @@ export function HubCompareModal({
                 rows={displayRows}
                 choices={compare.choices}
                 onChoose={compare.choose}
+                mode={compare.compareMode}
+                tones={{ current: 'del', version: 'add' }}
+                sideLabels={{ current: `v${older.versionNumber}`, version: `v${newer.versionNumber}` }}
                 help="Aperçu des ajouts et suppressions entre les deux versions."
                 emptyMessage={
                   hideEqualLines
