@@ -22,6 +22,10 @@ import { toUpsert } from '../sheetLinks';
 import type { IdeaResponse } from '../../../types/idea';
 import type { SheetSnapshotCard, SheetVersion } from '../../../types/sheetVersion';
 import { IconClose } from '../../../components/icons';
+import { wordDiff, type Seg } from '../../../components/diff/diffRows';
+import '../../../components/diff/diff.css';
+
+import { ExplorerBridge } from '../../../hooks/explorerBridge';
 
 const MERGE_FIELDS = [
   { key: 'name', label: 'Nom de la fiche' },
@@ -45,12 +49,32 @@ const STATUS_LABEL: Record<CardStatus, string> = {
   removed: 'Ajoutée depuis',
 };
 
-const STATUS_STYLE: Record<CardStatus, string> = {
-  same: 'border-emerald-900/30 bg-emerald-950/30 text-emerald-300',
-  changed: 'border-amber-800/40 bg-amber-950 text-amber-300',
-  added: 'border-blue-800/40 bg-blue-950/60 text-blue-300',
-  removed: 'border-red-900/40 bg-red-950/40 text-red-300',
+const STATUS_PILL: Record<CardStatus, string> = {
+  same: 'ld-pill-eq',
+  changed: 'ld-pill-mod',
+  added: 'ld-pill-del',
+  removed: 'ld-pill-add',
 };
+
+const SHEET_TONE: Record<CardStatus, string> = {
+  same: 'ld-sheet-eq',
+  changed: 'ld-sheet-neutral',
+  added: 'ld-sheet-del',
+  removed: 'ld-sheet-add',
+};
+
+function renderSegs(segs: Seg[] | undefined, fallback: string) {
+  if (!segs) return fallback;
+  return segs.map((seg, index) =>
+    seg.changed ? (
+      <span key={index} className="ld-w">
+        {seg.text}
+      </span>
+    ) : (
+      seg.text
+    ),
+  );
+}
 
 const CHOICE_LABELS: Record<Exclude<CardStatus, 'same'>, { current: string; version: string }> = {
   changed: { current: 'Garder l’actuelle', version: 'Prendre la version' },
@@ -149,6 +173,30 @@ export function SheetVersionsPage() {
 
   const differences = counts.changed + counts.added + counts.removed;
   const visibleRows = hideSame ? rows.filter((row) => row.status !== 'same') : rows;
+
+  const wordDiffs = useMemo(() => {
+    const map = new Map<string, { name: Seg[] | undefined; description: Seg[] | undefined; nameNew: Seg[] | undefined; descriptionNew: Seg[] | undefined }>();
+    for (const row of rows) {
+      if (row.status !== 'changed' || !row.snap || !row.current) continue;
+      const name = wordDiff(row.snap.name, row.current.name);
+      const description = wordDiff(plain(row.snap.description), plain(row.current.description));
+      map.set(row.key, {
+        name: name?.left,
+        nameNew: name?.right,
+        description: description && description.ratio >= 0.2 ? description.left : undefined,
+        descriptionNew: description && description.ratio >= 0.2 ? description.right : undefined,
+      });
+    }
+    return map;
+  }, [rows]);
+
+  const taken = useMemo(() => {
+    const total = { changed: 0, added: 0, removed: 0 };
+    rows.forEach((row) => {
+      if (row.status !== 'same' && (choices[row.key] ?? 'current') === 'version') total[row.status] += 1;
+    });
+    return total;
+  }, [rows, choices]);
 
   const applyAll = (choice: Choice) => {
     const next: Record<string, Choice> = {};
@@ -261,11 +309,24 @@ export function SheetVersionsPage() {
   if (isLoading || sheetLoading) return <VersionsLoading />;
   if (error || sheetError || !sheet) return <VersionsError message={error ?? 'Cette fiche n’existe plus ou est introuvable.'} />;
 
-  const bulkBtn =
-    'flex-1 sm:flex-none cursor-pointer rounded-lg border border-amber-900/30 bg-neutral-900 px-3 py-2 sm:py-1.5 text-xs font-medium text-amber-200 transition-colors hover:bg-neutral-800 text-center';
+  const renamed = mergeFields.name && !!versionToCompare && versionToCompare.name !== sheet.name;
+  const cardsTouched = mergeFields.cards ? taken.changed + taken.added + taken.removed : 0;
+  const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+  const summaryParts: string[] = [];
+  if (renamed && versionToCompare) summaryParts.push(`la fiche sera renommée « ${versionToCompare.name} »`);
+  if (mergeFields.cards && taken.changed) summaryParts.push(`${plural(taken.changed, 'carte remplacée', 'cartes remplacées')} par la version`);
+  if (mergeFields.cards && taken.added) summaryParts.push(`${plural(taken.added, 'carte restaurée', 'cartes restaurées')}`);
+  if (mergeFields.cards && taken.removed) summaryParts.push(`${plural(taken.removed, 'carte retirée', 'cartes retirées')}`);
+  const mergeSummary = summaryParts.length
+    ? `Ce qui va se passer : ${summaryParts.join(' · ')}.`
+    : 'Rien ne sera modifié : tout l’actuel est conservé. Choisis « Prendre la version » sur une carte pour la changer.';
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif">
+    <div className="loom relative flex min-h-[calc(100dvh-var(--nav-top,0px)-var(--nav-bottom,0px))] items-start bg-[var(--c-page)] font-serif text-[var(--c-ink)]">
+      {/* Dit à l'explorateur commun quelle version est affichée (sinon il ne retient que l'adresse). */}
+      <ExplorerBridge section="versions" value={{ selectedVersionId: versionToCompare?.id ?? null }} />
+
+      <div className="min-w-0 flex-1 self-stretch">
       <VersionsHeader
         title="Versions de la fiche"
         subtitle={sheet.name}
@@ -295,9 +356,7 @@ export function SheetVersionsPage() {
           <VersionList
             versions={compare.visibleVersions}
             selectedId={versionToCompare?.id ?? null}
-            isRestoring={isRestoring}
             onView={(version) => navigate(`${versionsPath}/${version.id}`)}
-            onMerge={(version) => navigate(`${versionsPath}/${version.id}`)}
             onDelete={handleDelete}
           />
 
@@ -326,22 +385,23 @@ export function SheetVersionsPage() {
                     : `${counts.changed} modifiée(s) · ${counts.added} supprimée(s) depuis · ${counts.removed} ajoutée(s) depuis · ${counts.same} identique(s)`}
                 </p>
                 <div className="flex flex-wrap items-center gap-4">
-                  <label className="flex items-center gap-2 text-xs text-neutral-300">
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-amber-200/80">
                     <input
                       type="checkbox"
+                      className="sr-only"
                       checked={hideSame}
                       onChange={(e) => setHideSame(e.target.checked)}
-                      className="accent-amber-600"
                     />
+                    <span className="ld-switch" aria-hidden="true" />
                     Masquer les identiques
                   </label>
                   {differences > 0 && (
-                    <div className="flex w-full sm:w-auto gap-2">
-                      <button onClick={() => applyAll('current')} className={bulkBtn}>
-                        Tout l’actuel
+                    <div className="ld-seg w-full sm:w-auto">
+                      <button type="button" onClick={() => applyAll('current')} className="flex-1">
+                        Tout garder l’actuel
                       </button>
-                      <button onClick={() => applyAll('version')} className={bulkBtn}>
-                        Toute la version
+                      <button type="button" onClick={() => applyAll('version')} className="flex-1">
+                        Tout prendre de la version
                       </button>
                     </div>
                   )}
@@ -349,72 +409,78 @@ export function SheetVersionsPage() {
               </div>
 
               {visibleRows.length === 0 ? (
-                <div className="px-4 py-6 text-center text-amber-200/50 text-sm border border-amber-900/20 rounded-xl bg-[#1e1e1e]">
+                <div className="px-4 py-6 text-center text-amber-200/50 text-sm border border-amber-900/20 rounded-xl bg-neutral-950/60">
                   {rows.length === 0 ? 'Aucune carte à comparer.' : 'Aucune différence : toutes les cartes sont identiques.'}
                 </div>
               ) : (
-                <ul className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+                <ul className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
                   {visibleRows.map((row) => {
                     const title = (row.current ?? row.snap)?.name ?? '';
                     const choice = choiceOf(row);
+                    const words = wordDiffs.get(row.key);
+                    const pick = (value: Choice) => (row.status === 'same' ? undefined : choice === value ? 'kept' : 'dropped');
                     return (
-                      <li key={row.key} className="rounded-xl border border-amber-900/30 bg-[#1e1e1e] p-4 space-y-3 font-mono text-xs sm:text-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-2 font-sans border-b border-amber-900/20 pb-2">
-                          <span className="min-w-0 truncate font-serif font-semibold text-amber-100 text-base">{title}</span>
-                          <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${STATUS_STYLE[row.status]}`}>
-                            {STATUS_LABEL[row.status]}
-                          </span>
+                      <li key={row.key} className={`ld-sheet overflow-hidden ${SHEET_TONE[row.status]}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-900/20 px-4 py-2.5 font-sans">
+                          <span className="min-w-0 truncate font-serif text-base font-semibold text-amber-100">{title}</span>
+                          <span className={`ld-pill ${STATUS_PILL[row.status]}`}>{STATUS_LABEL[row.status]}</span>
                         </div>
 
                         {row.status === 'same' ? (
-                          <p className="whitespace-pre-wrap text-sm text-amber-100/70 font-serif">
+                          <p className="whitespace-pre-wrap px-4 py-3 font-serif text-sm text-amber-100/70">
                             {plain(row.current?.description) || <span className="italic text-amber-200/30">(vide)</span>}
                           </p>
                         ) : (
                           <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-amber-900/30 rounded-lg overflow-hidden border border-amber-900/30">
-                              
-                              <div className="flex flex-col bg-red-950/20 p-3">
-                                <span className="text-[10px] uppercase text-red-300 mb-1 font-sans">Version v{versionToCompare.versionNumber}</span>
-                                <div className="text-red-200 font-serif whitespace-pre-wrap">
+                            <div className="grid grid-cols-1 divide-y divide-amber-900/20 md:grid-cols-2 md:divide-x md:divide-y-0">
+                              <div className="ld-side ld-side-del" data-pick={pick('version')}>
+                                <div className="ld-side-label">Version v{versionToCompare.versionNumber}</div>
+                                <div className="whitespace-pre-wrap font-serif text-sm text-amber-100/90">
                                   {row.snap ? (
                                     <>
-                                      <div className="font-bold">{row.snap.name}</div>
-                                      <div className="mt-1">{plain(row.snap.description) || '(vide)'}</div>
+                                      <div className="font-bold">{renderSegs(words?.name, row.snap.name)}</div>
+                                      <div className="mt-1">
+                                        {renderSegs(words?.description, plain(row.snap.description)) || '(vide)'}
+                                      </div>
                                     </>
-                                  ) : <span className="italic text-amber-200/30">absente</span>}
+                                  ) : (
+                                    <span className="italic text-amber-200/40">absente</span>
+                                  )}
                                 </div>
                               </div>
 
-                              <div className="flex flex-col bg-emerald-950/20 p-3">
-                                <span className="text-[10px] uppercase text-emerald-300 mb-1 font-sans">Fiche Actuelle</span>
-                                <div className="text-emerald-200 font-serif whitespace-pre-wrap">
+                              <div className="ld-side ld-side-add" data-pick={pick('current')}>
+                                <div className="ld-side-label">Fiche actuelle</div>
+                                <div className="whitespace-pre-wrap font-serif text-sm text-amber-100/90">
                                   {row.current ? (
                                     <>
-                                      <div className="font-bold">{row.current.name}</div>
-                                      <div className="mt-1">{plain(row.current.description) || '(vide)'}</div>
+                                      <div className="font-bold">{renderSegs(words?.nameNew, row.current.name)}</div>
+                                      <div className="mt-1">
+                                        {renderSegs(words?.descriptionNew, plain(row.current.description)) || '(vide)'}
+                                      </div>
                                     </>
-                                  ) : <span className="italic text-amber-200/30">absente</span>}
+                                  ) : (
+                                    <span className="italic text-amber-200/40">absente</span>
+                                  )}
                                 </div>
                               </div>
-
                             </div>
 
-                            <div className="flex flex-wrap gap-2 font-sans pt-1">
-                              {(['current', 'version'] as const).map((value) => (
-                                <button
-                                  key={value}
-                                  onClick={() => setChoices((current) => ({ ...current, [row.key]: value }))}
-                                  aria-pressed={choice === value}
-                                  className={`px-3 py-2 rounded-md text-xs border cursor-pointer touch-target flex-1 sm:flex-none text-center ${
-                                    choice === value
-                                      ? 'bg-amber-700 text-amber-50 border-amber-600'
-                                      : 'bg-neutral-900 text-amber-200 border-amber-900/30'
-                                  }`}
-                                >
-                                  {CHOICE_LABELS[row.status as Exclude<CardStatus, 'same'>][value]}
-                                </button>
-                              ))}
+                            <div className="flex flex-wrap items-center gap-3 border-t border-amber-900/20 px-4 py-3 font-sans">
+                              <span className="text-xs text-amber-200/60">Que garder pour cette carte ?</span>
+                              <div className="ld-seg w-full sm:w-auto" role="group" aria-label={`Choix pour ${title}`}>
+                                {(['current', 'version'] as const).map((value) => (
+                                  <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => setChoices((current) => ({ ...current, [row.key]: value }))}
+                                    aria-pressed={choice === value}
+                                    className="flex-1 sm:flex-none"
+                                  >
+                                    {CHOICE_LABELS[row.status as Exclude<CardStatus, 'same'>][value]}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           </>
                         )}
@@ -430,11 +496,15 @@ export function SheetVersionsPage() {
                 onChange={setMergeFields}
                 onMerge={() => void handleMerge()}
                 isRestoring={isRestoring}
+                actionLabel="Appliquer mes choix à la fiche"
+                summary={mergeSummary}
+                disabled={!renamed && cardsTouched === 0}
               />
             </section>
           )}
         </div>
       </main>
+      </div>
     </div>
   );
 }

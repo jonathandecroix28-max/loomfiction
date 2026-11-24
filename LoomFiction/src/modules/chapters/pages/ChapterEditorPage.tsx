@@ -20,7 +20,8 @@ import { createSheetMentionExtension } from '../../editor/extensions/SheetMentio
 import { setupMentionPopovers } from '../../editor/utils/setupMentionPopovers';
 import { MentionDetection } from '../../editor/components/MentionDetection';
 import { filterMentionableSheets, isSheetMentionable, useSheetBookMap } from '../../editor/utils/mentionScope';
-import { ChapterExplorer } from '../components/ChapterExplorer';
+import { ExplorerBridge } from '../../../hooks/explorerBridge';
+import { useExplorerOpen } from '../../../hooks/explorerOpenStore';
 import { DiffView } from '../../../components/diff/DiffView';
 import { ChapterModal } from '../../chapters/components/ChapterModal';
 import type { ChapterResponse } from '../../../types/chapter';
@@ -59,7 +60,7 @@ export function ChapterEditorPage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [showMentionDetection, setShowMentionDetection] = useState(false);
 
-  const [isExplorerOpen, setIsExplorerOpen] = useState(false);
+  const [isExplorerOpen, setIsExplorerOpen] = useExplorerOpen();
   const [isChapterModalOpen, setIsChapterModalOpen] = useState(false);
 
   const [activeVersion, setActiveVersion] = useState<ChapterVersionResponse | null>(null);
@@ -86,7 +87,6 @@ export function ChapterEditorPage() {
   const { versions: chapterVersions, refetch: refetchChapterVersions } = useChapterVersions(chapterIdNumber);
   const { chapters, setChapters, refetch: refetchChapters } = useChapters(bookIdNumber);
 
-  // Mise à jour en direct quand l'explorateur crée un roman, un chapitre ou une version.
   useDataChanged((source) => {
     if (source === 'chapter-page') return;
     void refetchChapters();
@@ -137,7 +137,6 @@ export function ChapterEditorPage() {
     editorRef.current = editor;
   }, [editor]);
 
-  // Le titre suit le chapitre / la version affichée (ajustement d'état pendant le rendu).
   const titleSource =
     activeVersion && viewMode === 'edit'
       ? activeVersion.name || `Version ${activeVersion.versionNumber}`
@@ -473,19 +472,21 @@ export function ChapterEditorPage() {
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-[var(--c-page)] font-serif text-[var(--c-ink)]">
       
-      <ChapterExplorer
-        isOpen={isExplorerOpen}
-        onClose={() => setIsExplorerOpen(false)}
-        bookId={Number(bookId)}
-        currentChapterId={Number(chapterId)}
-        onNavigate={handleNavigate}
-        onSelectVersion={(version) => {
-          setActiveVersion(version);
-          setViewMode('diff');
-          setHideIdenticalLines(false);
-          setReviewDecisions({});
-          setIsReviewPreview(false);
-          setReviewPreviewHtml('');
+      {/* L'explorateur est commun à toute l'application : l'éditeur lui dit seulement quoi faire sur place. */}
+      <ExplorerBridge
+        section="chapters"
+        value={{
+          bookId: Number(bookId),
+          currentChapterId: Number(chapterId),
+          onNavigate: handleNavigate,
+          onSelectVersion: (version) => {
+            setActiveVersion(version);
+            setViewMode('diff');
+            setHideIdenticalLines(false);
+            setReviewDecisions({});
+            setIsReviewPreview(false);
+            setReviewPreviewHtml('');
+          },
         }}
       />
 

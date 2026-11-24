@@ -9,7 +9,7 @@ import { ActionMenu, type ActionMenuItem } from '../components/ActionMenu';
 import { AttachNotesModal } from '../components/AttachNotesModal';
 import { SheetConfigModal } from '../components/SheetConfigModal';
 import { MentionDetection, type DetectionTarget } from '../../editor/components/MentionDetection';
-import { SheetExplorer } from '../components/SheetExplorer';
+import { ExplorerBridge } from '../../../hooks/explorerBridge';
 import { SheetNetwork } from '../components/SheetNetwork';
 import { DiffView } from '../../../components/diff/DiffView';
 import { filterMentionableSheets, useSheetBookMap } from '../../editor/utils/mentionScope';
@@ -23,7 +23,7 @@ import type { IdeaResponse } from '../../../types/idea';
 import type { SheetVersionResponse } from '../../../types/sheetVersion';
 import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
-import { useExplorerOpen } from '../../../hooks/useExplorerOpen';
+import { useExplorerOpen } from '../../../hooks/explorerOpenStore';
 import {
   IconAdd,
   IconAttach,
@@ -539,7 +539,7 @@ export function SheetPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center bg-[#1c1411] font-serif text-amber-200/60">
+      <div className="flex min-h-[calc(100dvh-var(--nav-top,0px))] items-center justify-center bg-[#1c1411] font-serif text-amber-200/60">
         Ouverture de la fiche...
       </div>
     );
@@ -640,25 +640,27 @@ export function SheetPage() {
   };
 
   return (
-    <div className={`relative flex min-h-[calc(100dvh-4rem)] flex-1 items-start bg-[#1c1411] font-serif text-[#fcf9f2] print:bg-white ${isNetworkView ? 'h-[calc(100dvh-4rem)] overflow-hidden' : ''}`}>
-      <SheetExplorer
-        isOpen={isExplorerOpen}
-        onClose={() => setIsExplorerOpen(false)}
-        currentSheetId={sheet.id}
-        onSelectSheetVersion={(version) => {
-          if (version.sheetId !== sheet.id) {
-            navigate(`/ideas/fiches/${version.sheetId}`, { state: { version } });
-            return;
-          }
-          setActiveVersion(version);
-          setViewMode('diff');
-          setHideIdenticalLines(false);
-          setReviewDecisions({});
-          setIsReviewPreview(false);
+    <div className={`relative flex min-h-[calc(100dvh-var(--nav-top,0px))] flex-1 items-start bg-[#1c1411] font-serif text-[#fcf9f2] print:bg-white ${isNetworkView ? 'h-[calc(100dvh-var(--nav-top,0px))] overflow-hidden' : ''}`}>
+      {/* L'explorateur est commun à toute l'application : la fiche lui dit seulement quoi faire sur place. */}
+      <ExplorerBridge
+        section="sheets"
+        value={{
+          currentSheetId: sheet.id,
+          onSelectSheetVersion: (version) => {
+            if (version.sheetId !== sheet.id) {
+              navigate(`/ideas/fiches/${version.sheetId}`, { state: { version } });
+              return;
+            }
+            setActiveVersion(version);
+            setViewMode('diff');
+            setHideIdenticalLines(false);
+            setReviewDecisions({});
+            setIsReviewPreview(false);
+          },
         }}
       />
 
-      <div className="flex min-h-[calc(100dvh-4rem)] min-w-0 flex-1 flex-col self-stretch">
+      <div className="flex min-h-[calc(100dvh-var(--nav-top,0px))] min-w-0 flex-1 flex-col self-stretch">
         {showHeader && (
         <header className="shrink-0 border-b border-amber-900/40 bg-neutral-950/80 px-4 py-4 sm:px-6 print:hidden">
           <div className="mx-auto flex max-w-4xl flex-col gap-3">

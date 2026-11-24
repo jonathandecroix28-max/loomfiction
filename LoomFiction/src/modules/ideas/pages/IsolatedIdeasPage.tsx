@@ -7,7 +7,7 @@ import { useCategories } from '../../categories/hooks/useCategories';
 import { useSheets } from '../../sheets/hooks/useSheets';
 import { offlineBookService } from '../../../services/offlineBookService';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
-import { useExplorerOpen } from '../../../hooks/useExplorerOpen';
+import { useExplorerOpen } from '../../../hooks/explorerOpenStore';
 
 import type { IdeaResponse, IdeaStatus } from '../../../types/idea';
 import type { BookResponse } from '../../../types/book';
@@ -16,7 +16,6 @@ import { IdeasFilters } from '../components/IdeasFilters';
 import { IdeaModal } from '../components/IdeaModal';
 import { IdeaCard } from '../components/IdeaCard';
 import { AttachToSheetModal } from '../../sheets/components/AttachToSheetModal';
-import { SheetExplorer } from '../../sheets/components/SheetExplorer';
 import { IconBack, IconMenu } from '../../../components/icons';
 import { useConfirm, useToast } from '../../../components/feedback/FeedbackProvider';
 
@@ -163,9 +162,6 @@ export function IsolatedIdeasPage() {
 
   return (
     <div className="relative flex flex-1 grow items-start bg-[#1c1411] font-sans text-[#fcf9f2]">
-      {/* Même explorateur que la page d'une fiche ; ici aucune fiche n'est « courante ». */}
-      <SheetExplorer isOpen={isExplorerOpen} onClose={() => setIsExplorerOpen(false)} currentSheetId={null} />
-
       <div className="flex min-w-0 flex-1 flex-col self-stretch overflow-x-hidden">
       <div className="mx-auto w-full max-w-[1700px] shrink-0 px-4 pt-6 sm:px-6 sm:pt-8 md:px-12">
         <div className="mb-3 flex items-center justify-between gap-3">

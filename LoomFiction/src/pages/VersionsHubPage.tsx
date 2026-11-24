@@ -376,7 +376,9 @@ export function VersionsHubPage() {
     'w-full rounded-xl border border-amber-900/30 bg-neutral-900 px-3 sm:px-4 py-2.5 sm:py-3 text-amber-100 placeholder:text-amber-200/30 focus:outline-none focus:ring-1 focus:ring-amber-500 text-sm sm:text-base';
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif overflow-x-hidden">
+    <div className="loom relative flex min-h-[calc(100dvh-var(--nav-top,0px)-var(--nav-bottom,0px))] items-start bg-[var(--c-page)] font-serif text-[var(--c-ink)]">
+      {/* overflow-x masqué sur le contenu seulement : sur le parent, il casserait le « sticky » de l’explorateur */}
+      <div className="min-w-0 flex-1 self-stretch overflow-x-hidden">
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-5 sm:py-10 space-y-5 sm:space-y-8">
         <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -505,6 +507,7 @@ export function VersionsHubPage() {
           </>
         )}
       </main>
+      </div>
 
       {activeCompare && (
         <HubCompareModal

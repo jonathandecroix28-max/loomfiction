@@ -19,6 +19,10 @@ import { VersionList } from '../../../components/versions/VersionList';
 import { useConfirm } from '../../../components/feedback/FeedbackProvider';
 import { IconClose } from '../../../components/icons';
 
+import { ExplorerBridge } from '../../../hooks/explorerBridge';
+import { DiffView } from '../../../components/diff/DiffView';
+import { changeIdsOf, diffLines } from '../../../components/diff/diffRows';
+
 const MERGE_FIELDS = [
   { key: 'name', label: 'Nom' },
   { key: 'description', label: 'Description' },
@@ -113,15 +117,12 @@ export function IdeaVersionsPage() {
     setFeedback('Impossible de supprimer cette version.');
   };
 
-  const diffLines = useMemo(() => {
-    if (!compare.versionToCompare || !idea) return { leftLines: [], rightLines: [] };
-    
-    const stripHtml = (html: string) => htmlToText(html).split('\n');
-    const leftLines = stripHtml(compare.versionToCompare.description || '');
-    const rightLines = stripHtml(idea.description || '');
-
-    return { leftLines, rightLines };
+  const diffRows = useMemo(() => {
+    if (!compare.versionToCompare || !idea) return [];
+    const toLines = (html: string) => htmlToText(html).split('\n');
+    return diffLines(toLines(compare.versionToCompare.description || ''), toLines(idea.description || ''));
   }, [compare.versionToCompare, idea]);
+  const changeIds = useMemo(() => changeIdsOf(diffRows), [diffRows]);
 
   if (isLoading || ideaLoading) return <VersionsLoading />;
   if (error || !idea) return <VersionsError message={error ?? 'Cette idée n’existe plus ou est introuvable.'} />;
@@ -129,7 +130,11 @@ export function IdeaVersionsPage() {
   const { versionToCompare } = compare;
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-[#1c1411] text-[#fcf9f2] font-serif">
+    <div className="loom relative flex min-h-[calc(100dvh-var(--nav-top,0px)-var(--nav-bottom,0px))] items-start bg-[var(--c-page)] font-serif text-[var(--c-ink)]">
+      {/* Dit à l'explorateur commun quelle version est affichée (sinon il ne retient que l'adresse). */}
+      <ExplorerBridge section="versions" value={{ selectedVersionId: versionToCompare?.id ?? null }} />
+
+      <div className="min-w-0 flex-1 self-stretch">
       <VersionsHeader
         title="Versions de l’idée"
         subtitle={idea.name}
@@ -157,9 +162,7 @@ export function IdeaVersionsPage() {
           <VersionList
             versions={compare.visibleVersions}
             selectedId={selectedVersion?.id ?? null}
-            isRestoring={isRestoring}
             onView={(version) => navigate(`/ideas/${numIdeaId}/versions/${version.id}`)}
-            onMerge={handleMerge}
             onDelete={handleDelete}
           />
 
@@ -181,42 +184,15 @@ export function IdeaVersionsPage() {
                 </button>
               </div>
 
-              {/* Vue Split / Diff côte à côte façon VS Code */}
-              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-amber-900/30 bg-[#1e1e1e] rounded-xl overflow-hidden border border-amber-900/30 font-mono text-xs sm:text-sm">
-                
-                {/* Colonne Gauche : Ancienne Version (Rouge) */}
-                <div className="flex flex-col h-80 overflow-y-auto">
-                  <div className="sticky top-0 bg-[#252526] px-4 py-2 border-b border-amber-900/30 text-amber-200/60 font-sans flex justify-between items-center z-10">
-                    <span>v{versionToCompare.versionNumber}</span>
-                    <span className="text-[10px] uppercase bg-red-950/80 text-red-300 px-2 py-0.5 rounded">Ancienne version</span>
-                  </div>
-                  <div className="p-4 space-y-1">
-                    {diffLines.leftLines.map((line, idx) => (
-                      <div key={idx} className="flex bg-red-950/30 text-red-200 px-2 py-0.5 rounded">
-                        <span className="w-8 select-none text-red-500/50 text-right pr-3">{idx + 1}</span>
-                        <span className="flex-1 whitespace-pre-wrap">{line || ' '}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Colonne Droite : Idée Actuelle (Vert) */}
-                <div className="flex flex-col h-80 overflow-y-auto">
-                  <div className="sticky top-0 bg-[#252526] px-4 py-2 border-b border-amber-900/30 text-amber-200/60 font-sans flex justify-between items-center z-10">
-                    <span>Actuelle</span>
-                    <span className="text-[10px] uppercase bg-emerald-950/80 text-emerald-300 px-2 py-0.5 rounded">Actuelle</span>
-                  </div>
-                  <div className="p-4 space-y-1">
-                    {diffLines.rightLines.map((line, idx) => (
-                      <div key={idx} className="flex bg-emerald-950/30 text-emerald-200 px-2 py-0.5 rounded">
-                        <span className="w-8 select-none text-emerald-500/50 text-right pr-3">{idx + 1}</span>
-                        <span className="flex-1 whitespace-pre-wrap">{line || ' '}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
+              {/* Comparaison en lecture seule : l’ancienne version à gauche, l’idée actuelle à droite */}
+              <DiffView
+                embedded
+                className="h-[22rem] sm:h-[26rem]"
+                rows={diffRows}
+                changeIds={changeIds}
+                oldLabel={`v${versionToCompare.versionNumber}${versionToCompare.name ? ` - ${versionToCompare.name}` : ''}`}
+                currentLabel="Idée actuelle"
+              />
 
               <MergeOptions
                 fields={MERGE_FIELDS}
@@ -224,11 +200,13 @@ export function IdeaVersionsPage() {
                 onChange={setMergeFields}
                 onMerge={() => handleMerge(versionToCompare)}
                 isRestoring={isRestoring}
+                actionLabel={`Appliquer la v${versionToCompare.versionNumber} à l’idée`}
               />
             </section>
           )}
         </div>
       </main>
+      </div>
     </div>
   );
 }
