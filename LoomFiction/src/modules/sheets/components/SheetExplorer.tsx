@@ -27,21 +27,19 @@ import {
   IconUp,
   IconDown,
 } from '../../../components/icons';
-import { formatDate } from '../../../utils/date/dateFormatter';
 import { bookOfSheet } from '../sheetLinks';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
+import { ExplorerFooter, ExplorerToolbar, INPUT, ROW_ACTION, SCROLL, ToolbarButton, TREE_BRANCH, TREE_COUNT, TREE_EMPTY, VersionLeaf, row, rowMain, rowShell } from '../../../components/explorer/ExplorerParts';
 
 type ChapterEntry = { chapter: ChapterResponse; bookId: number };
 
 type SheetExplorerProps = {
   isOpen: boolean;
   onClose: () => void;
-  /** Fiche affichée par la page courante ; `null` sur les pages qui n'en ont pas (ex. notes libres). */
   currentSheetId: number | null;
   onSelectSheetVersion?: (version: SheetVersionResponse) => void;
   onSelectIdeaVersion?: (version: IdeaVersionResponse) => void;
-  /** Dans l'explorateur commun : pas d'enveloppe (voile, tiroir, mini barre), seulement le contenu. */
   embedded?: boolean;
 };
 
@@ -139,6 +137,7 @@ export function SheetExplorer({
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // Une création en cours est annulée ici : on le signale pour que l'explorateur ne se ferme pas aussi.
         if (isCreatingBook || isCreatingCategory || creatingSheetInFolderKey || creatingIdeaInFolderKey) event.preventDefault();
         if (isCreatingBook) {
           setIsCreatingBook(false);
@@ -474,9 +473,9 @@ export function SheetExplorer({
   }
 
   const renderSheetVersions = (groupSheets: SheetResponse[]) => (
-    <div className="ml-4 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-2">
+    <div className={TREE_BRANCH}>
       {groupSheets.length === 0 || groupSheets.every((sheet) => !(versionsBySheetId.get(sheet.id)?.length)) ? (
-        <div className="py-1 text-[10px] text-amber-200/30 italic">Aucune version de fiche</div>
+        <div className={TREE_EMPTY}>Aucune version de fiche</div>
       ) : (
         groupSheets.map((sheet) => {
           const versions = versionsBySheetId.get(sheet.id) ?? [];
@@ -489,37 +488,28 @@ export function SheetExplorer({
                 type="button"
                 onClick={(event) => toggleFolder(key, event)}
                 aria-expanded={expanded}
-                className="flex min-h-8 items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11px] text-amber-200/60 hover:bg-amber-900/20 cursor-pointer"
+                className={row('l3')}
               >
                 <IconChevronRight className={`size-3 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
                 <IconSheet className="size-3 shrink-0 opacity-60" />
                 <span className="truncate">{sheet.name}</span>
-                <span className="ml-auto text-[10px] opacity-40">({versions.length})</span>
+                <span className={TREE_COUNT}>{versions.length}</span>
               </button>
               {expanded && (
-                <div className="ml-4 flex flex-col border-l border-amber-900/20 pl-2">
+                <div className={TREE_BRANCH}>
                   {versions.map((version) => (
-                    <button
-                      type="button"
+                    <VersionLeaf
                       key={version.id}
-                      onClick={() => {
+                      number={version.versionNumber}
+                      name={version.name}
+                      date={version.updatedAt || version.createdAt}
+                      onSelect={() => {
                         if (onSelectSheetVersion) {
                           onSelectSheetVersion(version);
                         }
                         if (window.innerWidth < 768) onClose();
                       }}
-                      className="flex min-h-9 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-amber-200/50 hover:bg-amber-900/20 hover:text-amber-200 cursor-pointer"
-                    >
-                      <IconHistory className="size-3.5 shrink-0 opacity-60" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[11px] font-medium leading-tight">
-                          v{version.versionNumber}{version.name ? ` - ${version.name}` : ''}
-                        </div>
-                        <div className="text-[9px] font-sans tracking-wide opacity-60">
-                          {formatDate(version.updatedAt || version.createdAt)}
-                        </div>
-                      </div>
-                    </button>
+                    />
                   ))}
                 </div>
               )}
@@ -539,9 +529,9 @@ export function SheetExplorer({
   };
 
   const renderMentionedChapters = (groupSheets: SheetResponse[]) => (
-    <div className="ml-4 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-2">
+    <div className={TREE_BRANCH}>
       {groupSheets.every((sheet) => !(chaptersBySheetId.get(sheet.id)?.length)) ? (
-        <div className="py-1 text-[10px] text-amber-200/30 italic">Aucun chapitre ne mentionne ces fiches</div>
+        <div className={TREE_EMPTY}>Aucun chapitre ne mentionne ces fiches</div>
       ) : (
         groupSheets.map((sheet) => {
           const entries = chaptersBySheetId.get(sheet.id) ?? [];
@@ -554,15 +544,15 @@ export function SheetExplorer({
                 type="button"
                 onClick={(event) => toggleFolder(key, event)}
                 aria-expanded={expanded}
-                className="flex min-h-8 items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11px] text-amber-200/60 hover:bg-amber-900/20 cursor-pointer"
+                className={row('l3')}
               >
                 <IconChevronRight className={`size-3 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
                 <IconSheet className="size-3 shrink-0 opacity-60" />
                 <span className="truncate">{sheet.name}</span>
-                <span className="ml-auto text-[10px] opacity-40">({entries.length})</span>
+                <span className={TREE_COUNT}>{entries.length}</span>
               </button>
               {expanded && (
-                <div className="ml-4 flex flex-col border-l border-amber-900/20 pl-2">
+                <div className={TREE_BRANCH}>
                   {entries.map(({ chapter, bookId }) => (
                     <button
                       type="button"
@@ -571,7 +561,7 @@ export function SheetExplorer({
                         navigate(`/books/${bookId}/chapters/${chapter.id}`);
                         closeAfterNavigation();
                       }}
-                      className="flex min-h-9 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-amber-200/60 hover:bg-amber-900/20 hover:text-amber-200 cursor-pointer"
+                      className={row('leaf')}
                     >
                       <IconFile className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
                       <div className="min-w-0 flex-1">
@@ -594,9 +584,9 @@ export function SheetExplorer({
   );
 
   const renderIdeaVersions = (groupIdeas: IdeaResponse[]) => (
-    <div className="ml-4 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-2">
+    <div className={TREE_BRANCH}>
       {groupIdeas.length === 0 || groupIdeas.every((idea) => !(versionsByIdeaId.get(idea.id)?.length)) ? (
-        <div className="py-1 text-[10px] text-amber-200/30 italic">Aucune version d’idée</div>
+        <div className={TREE_EMPTY}>Aucune version d’idée</div>
       ) : (
         groupIdeas.map((idea) => {
           const versions = versionsByIdeaId.get(idea.id) ?? [];
@@ -609,37 +599,28 @@ export function SheetExplorer({
                 type="button"
                 onClick={(event) => toggleFolder(key, event)}
                 aria-expanded={expanded}
-                className="flex min-h-8 items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11px] text-amber-200/60 hover:bg-amber-900/20 cursor-pointer"
+                className={row('l3')}
               >
                 <IconChevronRight className={`size-3 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} />
                 <IconIdea className="size-3 shrink-0 text-amber-400/70" />
                 <span className="truncate">{idea.name}</span>
-                <span className="ml-auto text-[10px] opacity-40">({versions.length})</span>
+                <span className={TREE_COUNT}>{versions.length}</span>
               </button>
               {expanded && (
-                <div className="ml-4 flex flex-col border-l border-amber-900/20 pl-2">
+                <div className={TREE_BRANCH}>
                   {versions.map((version) => (
-                    <button
-                      type="button"
+                    <VersionLeaf
                       key={version.id}
-                      onClick={() => {
+                      number={version.versionNumber}
+                      name={version.name}
+                      date={version.updatedAt || version.createdAt}
+                      onSelect={() => {
                         if (onSelectIdeaVersion) {
                           onSelectIdeaVersion(version);
                         }
                         if (window.innerWidth < 768) onClose();
                       }}
-                      className="flex min-h-9 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-amber-200/50 hover:bg-amber-900/20 hover:text-amber-200 cursor-pointer"
-                    >
-                      <IconHistory className="size-3.5 shrink-0 opacity-60" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[11px] font-medium leading-tight">
-                          v{version.versionNumber}{version.name ? ` - ${version.name}` : ''}
-                        </div>
-                        <div className="text-[9px] font-sans tracking-wide opacity-60">
-                          {formatDate(version.updatedAt || version.createdAt)}
-                        </div>
-                      </div>
-                    </button>
+                    />
                   ))}
                 </div>
               )}
@@ -677,7 +658,7 @@ export function SheetExplorer({
         count: groupSheets.length,
         icon: IconSheet,
         content: (
-          <div className="ml-4 my-1 flex flex-col space-y-0.5 border-l border-amber-900/20 pl-2">
+          <div className={TREE_BRANCH}>
             {isCreatingSheetHere && (
               <div className="px-2 py-1">
                 <input
@@ -691,40 +672,36 @@ export function SheetExplorer({
                   }}
                   onBlur={() => void handleCreateSheetSubmit(categoryId, bookId)}
                   placeholder="Nom de la fiche..."
-                  className="w-full rounded border border-amber-800 bg-neutral-900 px-2 py-1 text-xs text-amber-100 focus:outline-none font-serif"
+                  className={INPUT}
                 />
               </div>
             )}
             {groupSheets.length === 0 && !isCreatingSheetHere ? (
-              <div className="py-1 text-[10px] text-amber-200/30 italic">Aucune fiche</div>
+              <div className={TREE_EMPTY}>Aucune fiche</div>
             ) : (
               groupSheets.map((sheet, idx) => {
                 const isCurrent = sheet.id === currentSheetId;
                 return (
                   <div
                     key={sheet.id}
-                    className={`group/item flex items-center justify-between rounded-md px-2 py-1 text-xs transition-colors ${
-                      isCurrent
-                        ? 'bg-amber-900/40 text-amber-100 font-bold'
-                        : 'text-amber-200/70 hover:bg-amber-900/20 hover:text-amber-200'
-                    }`}
+                    className={rowShell('leaf', isCurrent)}
                   >
                     <button
                       type="button"
                       onClick={() => navigateToSheet(sheet.id)}
                       aria-current={isCurrent ? 'page' : undefined}
-                      className="flex items-center gap-2 text-left truncate flex-1 cursor-pointer min-w-0"
+                      className={rowMain('leaf')}
                     >
                       <IconSheet className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
                       <span className="truncate">{sheet.name}</span>
                     </button>
 
-                    <div className="hidden group-hover/item:flex items-center gap-0.5 shrink-0 ml-1">
+                    <div className="hidden shrink-0 items-center group-hover/row:flex [@media(hover:none)]:flex">
                       <button
                         type="button"
                         disabled={idx === 0}
                         onClick={(e) => { e.stopPropagation(); void handleMoveSheet(groupSheets, idx, -1); }}
-                        className="p-1 rounded text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/40 disabled:opacity-30 cursor-pointer"
+                        className={ROW_ACTION}
                         title="Monter"
                       >
                         <IconUp className="size-3" />
@@ -733,7 +710,7 @@ export function SheetExplorer({
                         type="button"
                         disabled={idx === groupSheets.length - 1}
                         onClick={(e) => { e.stopPropagation(); void handleMoveSheet(groupSheets, idx, 1); }}
-                        className="p-1 rounded text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/40 disabled:opacity-30 cursor-pointer"
+                        className={ROW_ACTION}
                         title="Descendre"
                       >
                         <IconDown className="size-3" />
@@ -752,7 +729,7 @@ export function SheetExplorer({
         count: groupIdeas.length,
         icon: IconIdea,
         content: (
-          <div className="ml-4 my-1 flex flex-col space-y-0.5 border-l border-amber-900/20 pl-2">
+          <div className={TREE_BRANCH}>
             {isCreatingIdeaHere && (
               <div className="px-2 py-1">
                 <input
@@ -766,19 +743,19 @@ export function SheetExplorer({
                   }}
                   onBlur={() => void handleCreateIdeaSubmit(categoryId, bookId)}
                   placeholder="Nom de l'idée..."
-                  className="w-full rounded border border-amber-800 bg-neutral-900 px-2 py-1 text-xs text-amber-100 focus:outline-none font-serif"
+                  className={INPUT}
                 />
               </div>
             )}
             {groupIdeas.length === 0 && !isCreatingIdeaHere ? (
-              <div className="py-1 text-[10px] text-amber-200/30 italic">Aucune idée libre</div>
+              <div className={TREE_EMPTY}>Aucune idée libre</div>
             ) : (
               groupIdeas.map((idea) => (
                 <button
                   type="button"
                   key={idea.id}
                   onClick={navigateToIdea}
-                  className="flex min-h-9 items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-amber-200/70 transition-colors hover:bg-amber-900/20 hover:text-amber-200 cursor-pointer"
+                  className={row('leaf')}
                 >
                   <IconIdea className="size-3.5 shrink-0 text-amber-400/70" aria-hidden="true" />
                   <span className="truncate">{idea.name}</span>
@@ -800,17 +777,17 @@ export function SheetExplorer({
             type="button"
             onClick={(event) => toggleFolder(categoryKey, event)}
             aria-expanded={expanded}
-            className="flex flex-1 min-h-9 items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-xs text-amber-200/70 hover:bg-amber-900/20 cursor-pointer min-w-0"
+            className={row('l2')}
           >
             <IconChevronRight className={`size-3.5 shrink-0 text-amber-400/50 transition-transform ${expanded ? 'rotate-90' : ''}`} />
             <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: category.color }} />
-            <span className="truncate font-medium">{category.name}</span>
-            <span className="ml-auto text-[10px] opacity-40">{groupSheets.length + groupIdeas.length}</span>
+            <span className="truncate">{category.name}</span>
+            <span className={TREE_COUNT}>{groupSheets.length + groupIdeas.length}</span>
           </button>
         </div>
 
         {expanded && (
-          <div className="ml-4 my-1 flex flex-col space-y-0.5 border-l border-amber-900/20 pl-2">
+          <div className={TREE_BRANCH}>
             {subfolders.map((folder) => {
               const FolderIcon = folder.icon;
               const folderExpanded = !!expandedFolders[folder.key];
@@ -824,12 +801,12 @@ export function SheetExplorer({
                       type="button"
                       onClick={(event) => toggleFolder(folder.key, event)}
                       aria-expanded={folderExpanded}
-                      className="flex flex-1 min-h-8 items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11px] text-amber-200/60 hover:bg-amber-900/20 cursor-pointer min-w-0"
+                      className={row('l3')}
                     >
                       <IconChevronRight className={`size-3 shrink-0 text-amber-400/50 transition-transform ${folderExpanded ? 'rotate-90' : ''}`} />
                       <FolderIcon className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
                       <span className="truncate">{folder.label}</span>
-                      <span className="ml-auto text-[10px] opacity-40">({folder.count})</span>
+                      <span className={TREE_COUNT}>{folder.count}</span>
                     </button>
 
                     {isSheetFolder && (
@@ -841,9 +818,9 @@ export function SheetExplorer({
                           setCreatingSheetInFolderKey(sheetsKey);
                         }}
                         title="Créer une fiche dans cette catégorie"
-                        className="opacity-0 group-hover/sub:opacity-100 p-1 text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/40 rounded transition-opacity cursor-pointer mr-1"
+                        className={ROW_ACTION}
                       >
-                        <IconAdd className="size-3" />
+                        <IconAdd className="size-3.5" />
                       </button>
                     )}
 
@@ -856,9 +833,9 @@ export function SheetExplorer({
                           setCreatingIdeaInFolderKey(ideasKey);
                         }}
                         title="Créer une idée libre"
-                        className="opacity-0 group-hover/sub:opacity-100 p-1 text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/40 rounded transition-opacity cursor-pointer mr-1"
+                        className={ROW_ACTION}
                       >
-                        <IconAdd className="size-3" />
+                        <IconAdd className="size-3.5" />
                       </button>
                     )}
                   </div>
@@ -929,86 +906,57 @@ export function SheetExplorer({
     <>
         {!embedded && <ExplorerNav />}
 
-        <div className="flex flex-col shrink-0 border-b border-amber-900/40 bg-[var(--c-surface-2,#150e0c)]">
-          <div className="flex items-center justify-between p-3">
-            <span className="text-[10px] uppercase tracking-widest text-amber-200/50 font-semibold select-none">
-              Explorateur du Grimoire
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setIsCreatingBook(true)}
-                title="Créer un roman rapidement"
-                aria-label="Créer un roman"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/35 transition-colors cursor-pointer"
-              >
-                <IconBooks className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsCreatingCategory(true)}
-                title="Créer une catégorie rapidement"
-                aria-label="Créer une catégorie"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/35 transition-colors cursor-pointer"
-              >
-                <IconAdd className="size-4" />
-              </button>
-              {!embedded && (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  title="Fermer l'explorateur (Échap)"
-                  aria-label="Fermer l'explorateur"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/35 transition-colors cursor-pointer"
-                >
-                  <IconClose className="size-4" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {isCreatingBook && (
-            <div className="px-3 pb-3">
-              <input
-                ref={bookInputRef}
-                type="text"
-                value={newBookTitle}
-                onChange={(e) => setNewBookTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleCreateBookSubmit();
-                  if (e.key === 'Escape') setIsCreatingBook(false);
-                }}
-                onBlur={() => void handleCreateBookSubmit()}
-                placeholder="Nom du nouveau roman..."
-                className="w-full rounded-lg border border-amber-800 bg-neutral-900 px-3 py-1.5 text-xs text-amber-100 focus:outline-none font-serif"
-              />
-            </div>
+        <ExplorerToolbar title="Fiches et idées">
+          <ToolbarButton onClick={() => setIsCreatingBook(true)} title="Créer un roman rapidement" label="Créer un roman">
+            <IconBooks className="size-4" aria-hidden="true" />
+          </ToolbarButton>
+          <ToolbarButton onClick={() => setIsCreatingCategory(true)} title="Créer une catégorie rapidement" label="Créer une catégorie">
+            <IconAdd className="size-4" aria-hidden="true" />
+          </ToolbarButton>
+          {!embedded && (
+            <ToolbarButton onClick={onClose} title="Fermer l'explorateur (Échap)" label="Fermer l'explorateur">
+              <IconClose className="size-4" aria-hidden="true" />
+            </ToolbarButton>
           )}
+        </ExplorerToolbar>
 
-          {isCreatingCategory && (
-            <div className="px-3 pb-3">
-              <input
-                ref={categoryInputRef}
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleCreateCategorySubmit();
-                  if (e.key === 'Escape') setIsCreatingCategory(false);
-                }}
-                onBlur={() => void handleCreateCategorySubmit()}
-                placeholder="Nom de la nouvelle catégorie..."
-                className="w-full rounded-lg border border-amber-800 bg-neutral-900 px-3 py-1.5 text-xs text-amber-100 focus:outline-none font-serif"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-2 px-2 space-y-1 custom-scrollbar font-serif">
-          <div className="pb-1 px-3 text-[10px] uppercase tracking-wider text-amber-200/40 font-semibold font-sans">
-            Arborescence
+        {isCreatingBook && (
+          <div className="border-b border-amber-900/30 px-3 py-2">
+            <input
+              ref={bookInputRef}
+              type="text"
+              value={newBookTitle}
+              onChange={(e) => setNewBookTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleCreateBookSubmit();
+                if (e.key === 'Escape') setIsCreatingBook(false);
+              }}
+              onBlur={() => void handleCreateBookSubmit()}
+              placeholder="Nom du nouveau roman..."
+              className={INPUT}
+            />
           </div>
+        )}
 
+        {isCreatingCategory && (
+          <div className="border-b border-amber-900/30 px-3 py-2">
+            <input
+              ref={categoryInputRef}
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleCreateCategorySubmit();
+                if (e.key === 'Escape') setIsCreatingCategory(false);
+              }}
+              onBlur={() => void handleCreateCategorySubmit()}
+              placeholder="Nom de la nouvelle catégorie..."
+              className={INPUT}
+            />
+          </div>
+        )}
+
+        <div className={SCROLL}>
           {bookGroups.map(({ bookId, categories: categoryGroups }) => {
             const book = bookId == null ? undefined : books.find((item) => item.id === bookId);
             const bookName = bookId == null ? 'Non rattaché à un roman' : (book?.title ?? `Roman #${bookId}`);
@@ -1023,18 +971,18 @@ export function SheetExplorer({
                   type="button"
                   onClick={(event) => toggleFolder(bookKey, event)}
                   aria-expanded={expanded}
-                  className="flex min-h-10 items-center gap-2 rounded-lg px-2 text-left text-sm text-amber-200/80 transition-colors hover:bg-amber-900/20 cursor-pointer"
+                  className={row('l1')}
                 >
                   <IconChevronRight className={`size-4 shrink-0 text-amber-400/60 transition-transform ${expanded ? 'rotate-90' : ''}`} />
-                  <IconBooks className="size-4 shrink-0 opacity-60" aria-hidden="true" />
-                  <span className="truncate font-bold">{bookName}</span>
-                  <span className="ml-auto text-[10px] opacity-40">{totalSheets + totalIdeas}</span>
+                  <IconBooks className="size-4 shrink-0 text-amber-500/90" aria-hidden="true" />
+                  <span className="truncate">{bookName}</span>
+                  <span className={TREE_COUNT}>{totalSheets + totalIdeas}</span>
                 </button>
 
                 {expanded && (
-                  <div className="ml-3 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-3">
+                  <div className={TREE_BRANCH}>
                     {categoryGroups.length === 0 ? (
-                      <div className="py-1 text-[10px] text-amber-200/30 italic">Aucune catégorie.</div>
+                      <div className={TREE_EMPTY}>Aucune catégorie.</div>
                     ) : (
                       categoryGroups.map((group) => renderCategoryGroup(
                         bookId,
@@ -1050,15 +998,13 @@ export function SheetExplorer({
           })}
         </div>
 
-        <div className="shrink-0 border-t border-amber-900/20 bg-[var(--c-surface-2,#150e0c)] px-3 py-2.5 text-center text-[10px] uppercase tracking-widest text-amber-200/30 font-sans">
-          {books.length} {books.length > 1 ? 'romans' : 'roman'} · {sheets.length} {sheets.length > 1 ? 'fiches' : 'fiche'}
-        </div>
+        <ExplorerFooter>{books.length} {books.length > 1 ? 'romans' : 'roman'} · {sheets.length} {sheets.length > 1 ? 'fiches' : 'fiche'}</ExplorerFooter>
     </>
   );
 
   // Intégré à l'explorateur commun : seulement le contenu, l'enveloppe est fournie par lui.
   if (embedded) {
-    return <div className={`flex min-h-0 flex-1 flex-col ${isOpen ? '' : 'hidden'}`}>{content}</div>;
+    return <div className={`flex min-h-0 flex-1 flex-col font-sans ${isOpen ? '' : 'hidden'}`}>{content}</div>;
   }
 
   return (

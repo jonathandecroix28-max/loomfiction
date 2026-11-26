@@ -15,9 +15,25 @@ import { offlineSheetVersionService } from '../../services/offlineSheetVersionSe
 import { offlineIdeaService } from '../../services/offlineIdeaService';
 import { offlineIdeaVersionService } from '../../services/offlineIdeaVersionService';
 import { useDataChanged } from '../../hooks/useDataChanged';
-import { formatDate } from '../../utils/date/dateFormatter';
 import { IconBooks, IconChevronRight, IconClose, IconFile, IconHistory, IconIdea, IconSheet } from '../icons';
 import { ExplorerNav } from '../explorer/ExplorerNav';
+import {
+  ExplorerFooter,
+  ExplorerSearch,
+  ExplorerToolbar,
+  PANEL_MESSAGE,
+  ROW_ACTION,
+  SCROLL,
+  ToolbarButton,
+  TREE_BRANCH,
+  TREE_COUNT,
+  TREE_EMPTY,
+  TREE_SECTION,
+  VersionLeaf,
+  row,
+  rowMain,
+  rowShell,
+} from '../explorer/ExplorerParts';
 import '../diff/diff.css';
 
 
@@ -147,7 +163,6 @@ export function VersionsExplorer({
       safe(offlineIdeaVersionService.getAll()),
     ]);
     const chapterLists = await Promise.all(books.data.map((book) => safe(offlineChapterService.getByBookId(book.id))));
-
     if (request !== requestRef.current) return;
 
     setData({
@@ -274,6 +289,7 @@ export function VersionsExplorer({
   const totalVersions = data.chapterVersions.length + data.sheetVersions.length + data.ideaVersions.length;
   const query = filterQuery.trim().toLowerCase();
 
+  /** Pendant une recherche, seuls les dossiers et versions qui correspondent restent affichés. */
   const groups = useMemo(
     () =>
       GROUPS.map((group) => {
@@ -292,7 +308,6 @@ export function VersionsExplorer({
 
   /* ───────────── Dépliage ───────────── */
 
-  // À l’arrivée sur une page (ou un changement de dossier courant), on déplie les trois rubriques et le dossier courant.
   const autoExpandKey = isOpen ? `${kind}|${parentId ?? ''}|${bookId ?? ''}` : '';
   if (autoExpandKey !== appliedAutoExpandKey) {
     setAppliedAutoExpandKey(autoExpandKey);
@@ -342,26 +357,22 @@ export function VersionsExplorer({
 
     return (
       <div key={folder.key} className="flex flex-col">
-        <div className="flex items-center gap-1">
+        <div className={rowShell('l2', isCurrentFolder)}>
           <button
             type="button"
             onClick={() => toggle(folder.key)}
             aria-expanded={isOpenFolder}
-            className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors ${
-              isCurrentFolder ? 'bg-amber-900/25 text-amber-100' : 'text-amber-200/80 hover:bg-neutral-800/70'
-            }`}
+            className={rowMain('l2')}
           >
             <IconChevronRight
-              className={`size-3.5 shrink-0 text-amber-200/50 transition-transform ${isOpenFolder ? 'rotate-90' : ''}`}
+              className={`size-3.5 shrink-0 text-amber-400/60 transition-transform ${isOpenFolder ? 'rotate-90' : ''}`}
               aria-hidden="true"
             />
-            <ItemIcon className="size-4 shrink-0 text-amber-500/80" aria-hidden="true" />
+            <ItemIcon className="size-3.5 shrink-0 text-amber-500/80" aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate" title={folder.title}>
               {folder.title}
             </span>
-            <span className="shrink-0 rounded-full bg-amber-950 px-1.5 py-0.5 font-sans text-[10px] text-amber-300">
-              {folder.leaves.length}
-            </span>
+            <span className={TREE_COUNT}>{folder.leaves.length}</span>
           </button>
           {folder.listPath && !isCurrentFolder && (
             <button
@@ -369,7 +380,7 @@ export function VersionsExplorer({
               onClick={() => go(folder.listPath!)}
               title="Ouvrir l’historique de ce dossier"
               aria-label={`Ouvrir l’historique de ${folder.title}`}
-              className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-amber-200/50 transition-colors hover:bg-neutral-800 hover:text-amber-100"
+              className={ROW_ACTION}
             >
               <IconHistory className="size-3.5" aria-hidden="true" />
             </button>
@@ -377,34 +388,21 @@ export function VersionsExplorer({
         </div>
 
         {isOpenFolder && (
-          <ul className="ml-3.5 mt-0.5 flex flex-col gap-0.5 border-l border-amber-900/40 pl-2">
+          <ul className={TREE_BRANCH}>
             {folder.leaves.map((leaf) => {
               const active = isCurrentFolder && leaf.id === selectedVersionId;
               const blocked = !leaf.path && !(isCurrentFolder && onSelectVersion);
               return (
-                <li key={leaf.id} className="relative">
-                  <span
-                    aria-hidden="true"
-                    className={`absolute -left-[0.8125rem] top-1/2 size-2 -translate-y-1/2 rounded-full border ${
-                      active ? 'border-amber-500 bg-amber-500' : 'border-amber-500/60 bg-[var(--c-surface)]'
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    data-active={active}
+                <li key={leaf.id}>
+                  <VersionLeaf
+                    number={leaf.number}
+                    name={leaf.name}
+                    date={leaf.date}
+                    active={active}
                     disabled={blocked}
-                    onClick={() => selectLeaf(folder, leaf)}
                     title={blocked ? 'Roman introuvable : cette version ne peut pas être ouverte.' : undefined}
-                    className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                      active ? 'bg-amber-700 text-amber-50' : 'text-amber-200/80 hover:bg-neutral-800/70'
-                    }`}
-                  >
-                    <span className="shrink-0 font-sans font-semibold">v{leaf.number}</span>
-                    <span className="min-w-0 flex-1 truncate">{leaf.name || 'Sans nom'}</span>
-                    <span className={`shrink-0 font-sans text-[10px] ${active ? 'text-amber-100/80' : 'text-amber-200/40'}`}>
-                      {formatDate(leaf.date)}
-                    </span>
-                  </button>
+                    onSelect={() => selectLeaf(folder, leaf)}
+                  />
                 </li>
               );
             })}
@@ -418,37 +416,22 @@ export function VersionsExplorer({
     <>
         {!embedded && <ExplorerNav />}
 
-        <div className="flex items-center justify-between gap-2 px-3 py-3 font-sans">
-          <div className="flex min-w-0 items-center gap-2">
-            <IconHistory className="size-5 shrink-0 text-amber-500" aria-hidden="true" />
-            <h2 className="truncate text-sm font-semibold text-amber-100">Explorateur des versions</h2>
-          </div>
+        <ExplorerToolbar title="Historique des versions">
           {!embedded && (
-            <button
-              type="button"
-              onClick={onClose}
-              title="Fermer l’explorateur (Échap)"
-              aria-label="Fermer l’explorateur"
-              className="touch-target flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-amber-200/60 transition-colors hover:bg-neutral-800 hover:text-amber-100"
-            >
+            <ToolbarButton onClick={onClose} title="Fermer l’explorateur (Échap)" label="Fermer l’explorateur">
               <IconClose className="size-4" aria-hidden="true" />
-            </button>
+            </ToolbarButton>
           )}
-        </div>
-        <div className="ld-stitchline" aria-hidden="true" />
+        </ExplorerToolbar>
 
-        <div className="flex flex-col gap-2 px-3 py-3 font-sans">
-          <input
-            type="search"
-            value={filterQuery}
-            onChange={(event) => setFilterQuery(event.target.value)}
-            placeholder="Filtrer : nom, roman, v3…"
-            aria-label="Filtrer les versions"
-            className="w-full rounded-lg border border-amber-900/40 bg-neutral-900 px-3 py-2 text-base text-amber-100 placeholder:text-amber-200/30 focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-xs"
-          />
-        </div>
+        <ExplorerSearch
+          value={filterQuery}
+          onChange={setFilterQuery}
+          placeholder="Filtrer : nom, roman, v3…"
+          label="Filtrer les versions"
+        />
 
-        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+        <div ref={listRef} className={SCROLL}>
           {failed && (
             <div className="mx-1 mb-2 flex items-center justify-between gap-2 rounded-lg border border-red-900/40 bg-red-950/30 px-3 py-2 font-sans text-xs text-red-200">
               <span>Certaines données n’ont pas pu être chargées.</span>
@@ -463,9 +446,9 @@ export function VersionsExplorer({
           )}
 
           {status === 'loading' ? (
-            <p className="px-3 py-8 text-center font-sans text-xs text-amber-200/50">Chargement des versions…</p>
+            <p className={PANEL_MESSAGE}>Chargement des versions…</p>
           ) : query && !hasResults ? (
-            <div className="px-3 py-8 text-center font-sans text-xs text-amber-200/60">
+            <div className={PANEL_MESSAGE}>
               Aucun résultat pour « {filterQuery.trim()} ».
               <button
                 type="button"
@@ -486,29 +469,26 @@ export function VersionsExplorer({
                     type="button"
                     onClick={() => toggle(groupKey)}
                     aria-expanded={groupOpen}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold text-amber-100 transition-colors hover:bg-neutral-800/70"
+                    className={row('l1')}
                   >
                     <IconChevronRight
-                      className={`size-4 shrink-0 text-amber-200/50 transition-transform ${groupOpen ? 'rotate-90' : ''}`}
+                      className={`size-4 shrink-0 text-amber-400/60 transition-transform ${groupOpen ? 'rotate-90' : ''}`}
                       aria-hidden="true"
                     />
-                    <Icon className="size-4 shrink-0 text-amber-500" aria-hidden="true" />
-                    <span className="flex-1">{label}</span>
-                    <span className="font-sans text-[11px] font-normal text-amber-200/50">{versionCount}</span>
+                    <Icon className="size-4 shrink-0 text-amber-500/90" aria-hidden="true" />
+                    <span className="truncate">{label}</span>
+                    <span className={TREE_COUNT}>{versionCount}</span>
                   </button>
 
                   {groupOpen && (
-                    <div className="mt-0.5 flex flex-col gap-0.5 pl-2">
+                    <div className={TREE_BRANCH}>
                       {list.length === 0 ? (
-                        <p className="px-3 py-2 font-sans text-xs text-amber-200/40">{empty}</p>
+                        <p className={TREE_EMPTY}>{empty}</p>
                       ) : (
                         list.map((folder, index) => (
                           <Fragment key={folder.key}>
                             {folder.section && folder.section !== list[index - 1]?.section && (
-                              <div
-                                className="truncate px-1.5 pb-0.5 pt-2 font-sans text-[10px] uppercase tracking-widest text-amber-200/40"
-                                title={folder.section}
-                              >
+                              <div className={TREE_SECTION} title={folder.section}>
                                 {folder.section}
                               </div>
                             )}
@@ -524,15 +504,12 @@ export function VersionsExplorer({
           )}
         </div>
 
-        <div className="border-t border-amber-900/30 px-3 py-2 font-sans text-[11px] text-amber-200/50">
-          {totalVersions} version{totalVersions > 1 ? 's' : ''} au total
-        </div>
+        <ExplorerFooter>{totalVersions} version{totalVersions > 1 ? 's' : ''} au total</ExplorerFooter>
     </>
   );
 
-  // Intégré à l'explorateur commun : seulement le contenu, l'enveloppe est fournie par lui.
   if (embedded) {
-    return <div className={`flex min-h-0 flex-1 flex-col ${isOpen ? '' : 'hidden'}`}>{content}</div>;
+    return <div className={`flex min-h-0 flex-1 flex-col font-sans ${isOpen ? '' : 'hidden'}`}>{content}</div>;
   }
 
   return (

@@ -18,9 +18,9 @@ import {
   IconBooks,
   IconSheet,
 } from '../../../components/icons';
-import { formatDate } from '../../../utils/date/dateFormatter';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
+import { ExplorerFooter, ExplorerToolbar, INLINE_BARE, INLINE_BOX, INPUT, ROW_ACTION, SCROLL, ToolbarButton, TREE_BRANCH, TREE_COUNT, TREE_EMPTY, VersionLeaf, row, rowMain, rowShell } from '../../../components/explorer/ExplorerParts';
 
 type ChapterExplorerProps = {
   isOpen: boolean;
@@ -53,6 +53,7 @@ export function ChapterExplorer({
 
   const [loadedChaptersByBook, setChaptersByBook] = useState<Record<number, ChapterResponse[]>>({});
 
+  // Les chapitres du livre courant (hook) priment sur ceux chargés globalement.
   const chaptersByBook = useMemo<Record<number, ChapterResponse[]>>(
     () => (chapters.length > 0 ? { ...loadedChaptersByBook, [bookId]: chapters } : loadedChaptersByBook),
     [loadedChaptersByBook, chapters, bookId],
@@ -88,6 +89,7 @@ export function ChapterExplorer({
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // Une création en cours est annulée ici : on le signale pour que l'explorateur ne se ferme pas aussi.
         if (isCreatingBook || isCreatingChapterForBookId !== null || creatingVersionForChapterId !== null) event.preventDefault();
         if (isCreatingBook) {
           setIsCreatingBook(false);
@@ -122,6 +124,7 @@ export function ChapterExplorer({
 
       const chapterMap: Record<number, ChapterResponse[]> = {};
       for (const b of (booksData ?? [])) {
+        // Utilisation de getByBookId au lieu de getByBook
         const chs = await offlineChapterService.getByBookId(b.id).catch(() => []);
         chapterMap[b.id] = chs ?? [];
       }
@@ -146,6 +149,7 @@ export function ChapterExplorer({
     };
   }, [isOpen]);
 
+  // Mise à jour en direct quand la page modifie un chapitre ou une version ; on ignore nos propres événements.
   useDataChanged((source) => {
     if (source === 'chapter-explorer' || !isOpen) return;
     void loadGlobalData();
@@ -180,6 +184,7 @@ export function ChapterExplorer({
     return sheets.filter((sheet) => sheetIds.has(sheet.id));
   };
 
+  // Ouvre automatiquement le roman / chapitre courant (ajustement d'état pendant le rendu).
   const autoExpandKey = isOpen && bookId ? `${bookId}|${currentChapterId || ''}` : '';
   const [appliedAutoExpandKey, setAppliedAutoExpandKey] = useState('');
   if (autoExpandKey !== appliedAutoExpandKey) {
@@ -306,37 +311,19 @@ export function ChapterExplorer({
     <>
         {!embedded && <ExplorerNav />}
 
-        <div className="flex shrink-0 items-center justify-between p-3 border-b border-amber-900/40 bg-[var(--c-surface-2)]">
-          <span className="text-[10px] uppercase tracking-widest text-amber-200/50 font-semibold select-none">
-            Explorateur des Romans
-          </span>
-
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setIsCreatingBook(true)}
-              title="Créer un nouveau roman"
-              aria-label="Créer un roman"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/30 transition-colors cursor-pointer"
-            >
-              <IconBooks className="size-4" aria-hidden="true" />
-            </button>
-            {!embedded && (
-              <button
-                type="button"
-                onClick={onClose}
-                title="Fermer l'explorateur"
-                aria-label="Fermer l'explorateur"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/30 transition-colors cursor-pointer"
-              >
-                <IconClose className="size-4" aria-hidden="true" />
-              </button>
-            )}
-          </div>
-        </div>
+        <ExplorerToolbar title="Romans et chapitres">
+          <ToolbarButton onClick={() => setIsCreatingBook(true)} title="Créer un nouveau roman" label="Créer un roman">
+            <IconBooks className="size-4" aria-hidden="true" />
+          </ToolbarButton>
+          {!embedded && (
+            <ToolbarButton onClick={onClose} title="Fermer l'explorateur" label="Fermer l'explorateur">
+              <IconClose className="size-4" aria-hidden="true" />
+            </ToolbarButton>
+          )}
+        </ExplorerToolbar>
 
         {isCreatingBook && (
-          <div className="p-2.5 bg-neutral-950 border-b border-amber-900/30">
+          <div className="border-b border-amber-900/30 px-3 py-2">
             <input
               ref={bookInputRef}
               type="text"
@@ -348,18 +335,18 @@ export function ChapterExplorer({
               }}
               onBlur={() => void handleCreateBookSubmit()}
               placeholder="Titre du nouveau roman..."
-              className="w-full rounded border border-amber-800 bg-neutral-900 px-2.5 py-1 text-xs text-amber-100 focus:outline-none font-serif"
+              className={INPUT}
             />
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-2 px-2 space-y-1 custom-scrollbar">
+        <div className={SCROLL}>
           {isLoadingChapters && books.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-amber-200/40 font-serif italic">
+            <div className={TREE_EMPTY}>
               Chargement...
             </div>
           ) : books.length === 0 ? (
-            <div className="px-4 py-3 text-xs text-amber-200/40 font-serif italic">
+            <div className={TREE_EMPTY}>
               Aucun roman trouvé.
             </div>
           ) : (
@@ -373,22 +360,21 @@ export function ChapterExplorer({
               return (
                 <div key={book.id} className="flex flex-col">
                   <div
-                    className={`group flex items-center justify-between gap-1 rounded-lg transition-colors ${
-                      isCurrentBook ? 'bg-amber-950/50 text-amber-100 font-medium' : 'text-amber-200/70 hover:bg-amber-900/20'
-                    }`}
+                    className={rowShell('l1', isCurrentBook)}
                   >
                     <button
                       type="button"
                       onClick={(e) => toggleFolder(bookKey, e)}
                       aria-expanded={isBookExpanded}
-                      className="flex flex-1 items-center gap-1.5 px-2 py-2 text-left text-xs font-bold cursor-pointer min-w-0"
+                      className={rowMain('l1')}
                     >
                       <IconChevronRight
-                        className={`size-3.5 shrink-0 text-amber-400/60 transition-transform ${isBookExpanded ? 'rotate-90' : ''}`}
+                        className={`size-4 shrink-0 text-amber-400/60 transition-transform ${isBookExpanded ? 'rotate-90' : ''}`}
                         aria-hidden="true"
                       />
-                      <IconBooks className="size-4 shrink-0 opacity-70" aria-hidden="true" />
+                      <IconBooks className="size-4 shrink-0 text-amber-500/90" aria-hidden="true" />
                       <span className="truncate">{book.title}</span>
+                      <span className={TREE_COUNT}>{bookChapters.length}</span>
                     </button>
 
                     <button
@@ -399,17 +385,17 @@ export function ChapterExplorer({
                         setIsCreatingChapterForBookId(book.id);
                       }}
                       title="Ajouter un chapitre dans ce roman"
-                      className="p-1.5 mr-1 text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/40 rounded transition-colors cursor-pointer"
+                      className={ROW_ACTION}
                     >
                       <IconAdd className="size-3.5" aria-hidden="true" />
                     </button>
                   </div>
 
                   {isBookExpanded && (
-                    <div className="ml-3 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-3">
+                    <div className={TREE_BRANCH}>
                       {isCreatingChapterHere && (
-                        <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-amber-950/60 border border-amber-500/50 my-1">
-                          <span className="text-xs text-amber-200/50 pl-1 font-medium">
+                        <div className={INLINE_BOX}>
+                          <span className="shrink-0 text-xs text-amber-200/50">
                             {bookChapters.length + 1}.
                           </span>
                           <input
@@ -426,15 +412,15 @@ export function ChapterExplorer({
                             }}
                             onBlur={() => void handleCreateChapterSubmit(book.id)}
                             placeholder="Titre du chapitre..."
-                            className="w-full bg-transparent text-xs text-amber-100 focus:outline-none placeholder:text-amber-200/30 font-serif"
+                            className={INLINE_BARE}
                           />
                         </div>
                       )}
 
                       {isLoadingAllChapters && bookChapters.length === 0 ? (
-                        <div className="py-2 text-[11px] text-amber-200/40 italic">Chargement des chapitres...</div>
+                        <div className={TREE_EMPTY}>Chargement des chapitres...</div>
                       ) : bookChapters.length === 0 && !isCreatingChapterHere ? (
-                        <div className="py-2 text-[11px] text-amber-200/40 italic">Aucun chapitre dans ce roman.</div>
+                        <div className={TREE_EMPTY}>Aucun chapitre dans ce roman.</div>
                       ) : (
                         bookChapters.map((chapter) => {
                           const isCurrentChapter = chapter.id === currentChapterId && isCurrentBook;
@@ -452,17 +438,13 @@ export function ChapterExplorer({
                           return (
                             <div key={chapter.id} className="flex flex-col">
                               <div
-                                className={`group flex items-center justify-between gap-1 rounded-lg transition-colors ${
-                                  isCurrentChapter
-                                    ? 'bg-amber-900/40 text-amber-100 font-medium'
-                                    : 'text-amber-200/70 hover:bg-amber-900/20'
-                                }`}
+                                className={rowShell('l2', isCurrentChapter)}
                               >
                                 <button
                                   type="button"
                                   onClick={(e) => toggleFolder(chapterKey, e)}
                                   aria-expanded={isChapterExpanded}
-                                  className="flex flex-1 items-center gap-1.5 py-2 pl-1 pr-2 text-left text-xs cursor-pointer min-w-0"
+                                  className={rowMain('l2')}
                                 >
                                   <IconChevronRight
                                     className={`size-3.5 shrink-0 text-amber-400/60 transition-transform ${isChapterExpanded ? 'rotate-90' : ''}`}
@@ -488,32 +470,33 @@ export function ChapterExplorer({
                                     setCreatingVersionForChapterId(chapter.id);
                                   }}
                                   title="Archiver une nouvelle version"
-                                  className="opacity-0 group-hover:opacity-100 p-1 mr-1 text-amber-200/60 hover:text-amber-100 hover:bg-amber-900/40 rounded transition-opacity cursor-pointer"
+                                  className={ROW_ACTION}
                                 >
-                                  <IconAdd className="size-3" aria-hidden="true" />
+                                  <IconAdd className="size-3.5" aria-hidden="true" />
                                 </button>
                               </div>
 
                               {isChapterExpanded && (
-                                <div className="ml-3 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-3">
+                                <div className={TREE_BRANCH}>
                                   {/* Sous-dossier : Versions */}
                                   <div className="flex flex-col">
                                     <button
                                       type="button"
                                       onClick={(e) => toggleFolder(versionsKey, e)}
                                       aria-expanded={isVersionsExpanded}
-                                      className="flex items-center gap-1.5 py-1 px-1.5 rounded text-[11px] text-amber-200/60 hover:bg-amber-900/20 cursor-pointer"
+                                      className={row('l3')}
                                     >
                                       <IconChevronRight className={`size-3 transition-transform ${isVersionsExpanded ? 'rotate-90' : ''}`} />
                                       <IconHistory className="size-3 opacity-60" />
-                                      <span>Versions ({chapterVersions.length})</span>
+                                      <span className="truncate">Versions</span>
+                                      <span className={TREE_COUNT}>{chapterVersions.length}</span>
                                     </button>
 
                                     {isVersionsExpanded && (
-                                      <div className="ml-4 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-2">
+                                      <div className={TREE_BRANCH}>
                                         {isCreatingVersionHere && (
-                                          <div className="flex items-center gap-1 px-2 py-1 rounded bg-amber-950/60 border border-amber-500/50 my-1">
-                                            <span className="text-[10px] text-amber-200/50 font-medium">v</span>
+                                          <div className={INLINE_BOX}>
+                                            <span className="shrink-0 text-xs text-amber-200/50">v</span>
                                             <input
                                               ref={versionInputRef}
                                               type="text"
@@ -525,33 +508,24 @@ export function ChapterExplorer({
                                               }}
                                               onBlur={() => void handleCreateVersionSubmit(chapter.id)}
                                               placeholder="Nom de la version..."
-                                              className="w-full bg-transparent text-xs text-amber-100 focus:outline-none font-serif"
+                                              className={INLINE_BARE}
                                             />
                                           </div>
                                         )}
                                         {chapterVersions.length === 0 && !isCreatingVersionHere ? (
-                                          <div className="py-1 text-[10px] text-amber-200/30 italic">Aucune version</div>
+                                          <div className={TREE_EMPTY}>Aucune version</div>
                                         ) : (
                                           chapterVersions.map((version) => (
-                                            <button
-                                              type="button"
+                                            <VersionLeaf
                                               key={version.id}
-                                              onClick={() => {
+                                              number={version.versionNumber}
+                                              name={version.name}
+                                              date={version.updatedAt || version.createdAt}
+                                              onSelect={() => {
                                                 handleChapterNavigation(book.id, chapter.id);
                                                 if (onSelectVersion) onSelectVersion(version, { bookId: book.id });
                                               }}
-                                              className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-[11px] text-amber-200/50 hover:bg-amber-900/20 hover:text-amber-200 cursor-pointer"
-                                            >
-                                              <IconHistory className="size-3 opacity-60 shrink-0" />
-                                              <div className="min-w-0 flex-1">
-                                                <div className="truncate font-medium">
-                                                  v{version.versionNumber} {version.name ? `- ${version.name}` : ''}
-                                                </div>
-                                                <div className="text-[9px] font-sans opacity-60">
-                                                  {formatDate(version.updatedAt || version.createdAt)}
-                                                </div>
-                                              </div>
-                                            </button>
+                                            />
                                           ))
                                         )}
                                       </div>
@@ -564,17 +538,18 @@ export function ChapterExplorer({
                                       type="button"
                                       onClick={(e) => toggleFolder(sheetsKey, e)}
                                       aria-expanded={isSheetsExpanded}
-                                      className="flex items-center gap-1.5 py-1 px-1.5 rounded text-[11px] text-amber-200/60 hover:bg-amber-900/20 cursor-pointer"
+                                      className={row('l3')}
                                     >
                                       <IconChevronRight className={`size-3 transition-transform ${isSheetsExpanded ? 'rotate-90' : ''}`} />
                                       <IconSheet className="size-3 opacity-60" />
-                                      <span>Fiches mentionnées ({mentionedSheets.length})</span>
+                                      <span className="truncate">Fiches mentionnées</span>
+                                      <span className={TREE_COUNT}>{mentionedSheets.length}</span>
                                     </button>
 
                                     {isSheetsExpanded && (
-                                      <div className="ml-4 my-1 flex flex-col space-y-1 border-l border-amber-900/20 pl-2">
+                                      <div className={TREE_BRANCH}>
                                         {mentionedSheets.length === 0 ? (
-                                          <div className="py-1 text-[10px] text-amber-200/30 italic">Aucune fiche liée</div>
+                                          <div className={TREE_EMPTY}>Aucune fiche liée</div>
                                         ) : (
                                           mentionedSheets.map((sheet) => (
                                             <button
@@ -584,9 +559,9 @@ export function ChapterExplorer({
                                                 navigate(`/ideas/fiches/${sheet.id}`);
                                                 if (window.innerWidth < 768) onClose();
                                               }}
-                                              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[11px] text-amber-200/50 hover:bg-amber-900/20 hover:text-amber-200 cursor-pointer"
+                                              className={row('leaf')}
                                             >
-                                              <IconSheet className="size-3 opacity-60 shrink-0" />
+                                              <IconSheet className="size-3.5 shrink-0 opacity-70" />
                                               <span className="truncate">{sheet.name}</span>
                                             </button>
                                           ))
@@ -608,15 +583,13 @@ export function ChapterExplorer({
           )}
         </div>
 
-        <div className="shrink-0 border-t border-amber-900/20 bg-[var(--c-surface-2)] px-3 py-2.5 text-center text-[10px] uppercase tracking-widest text-amber-200/30">
-          {books.length} {books.length > 1 ? 'romans' : 'roman'}
-        </div>
+        <ExplorerFooter>{books.length} {books.length > 1 ? 'romans' : 'roman'}</ExplorerFooter>
     </>
   );
 
   // Intégré à l'explorateur commun : seulement le contenu, l'enveloppe est fournie par lui.
   if (embedded) {
-    return <div className={`flex min-h-0 flex-1 flex-col ${isOpen ? '' : 'hidden'}`}>{content}</div>;
+    return <div className={`flex min-h-0 flex-1 flex-col font-sans ${isOpen ? '' : 'hidden'}`}>{content}</div>;
   }
 
   return (
