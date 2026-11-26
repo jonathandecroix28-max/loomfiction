@@ -28,7 +28,7 @@ jobs:
 
       - name: Création d'une Pull Request
         id: cpr
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "security: correctifs automatiques npm audit"
