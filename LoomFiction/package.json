@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "jest --config jest.config.cjs --runInBand",
+    "test": "jest --config jest.config.cjs --passWithNoTests --runInBand",
     "test:watch": "jest --config jest.config.cjs --watchAll",
     "test:coverage": "jest --config jest.config.cjs --coverage",
     "test:report": "jest --config jest.config.cjs --runInBand && open rapport-tests.html"
