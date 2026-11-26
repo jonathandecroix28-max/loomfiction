@@ -58,18 +58,19 @@ export function LineDiffView({
 }: Props) {
   const sides: LineChoice[] = mode === 'current-left' ? ['current', 'version'] : ['version', 'current'];
 
+  const oldSide: LineChoice = tones.current === 'del' ? 'current' : 'version';
+  const newSide: LineChoice = oldSide === 'current' ? 'version' : 'current';
+
   const wordSegs = useMemo(() => {
     const map = new Map<string, Record<LineChoice, Seg[]>>();
     for (const row of rows) {
       if (row.kind === 'equal' || isSideMissing(row, 'current') || isSideMissing(row, 'version')) continue;
-      const oldSide: LineChoice = tones.current === 'del' ? 'current' : 'version';
-      const newSide: LineChoice = oldSide === 'current' ? 'version' : 'current';
       const diff = wordDiff(textOf(row, oldSide), textOf(row, newSide));
       if (!diff || diff.ratio < MIN_WORD_RATIO) continue;
       map.set(row.id, { [oldSide]: diff.left, [newSide]: diff.right } as Record<LineChoice, Seg[]>);
     }
     return map;
-  }, [rows, tones.current]);
+  }, [rows, oldSide, newSide]);
 
   const renderText = (row: LineDiffRow, side: LineChoice): ReactNode => {
     if (isSideMissing(row, side)) return <span className="ld-italic">absente</span>;

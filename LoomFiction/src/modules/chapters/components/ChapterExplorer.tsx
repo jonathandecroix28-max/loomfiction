@@ -20,7 +20,8 @@ import {
 } from '../../../components/icons';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
-import { ExplorerFooter, ExplorerToolbar, INLINE_BARE, INLINE_BOX, INPUT, ROW_ACTION, SCROLL, ToolbarButton, TREE_BRANCH, TREE_COUNT, TREE_EMPTY, VersionLeaf, row, rowMain, rowShell } from '../../../components/explorer/ExplorerParts';
+import { ExplorerFooter, ExplorerToolbar, INLINE_BARE, INLINE_BOX, INPUT, ROW_ACTION, SCROLL, ToolbarButton, TREE_BRANCH, TREE_COUNT, TREE_EMPTY, VersionLeaf } from '../../../components/explorer/ExplorerParts';
+import { row, rowMain, rowShell } from '../../../components/explorer/explorerRows';
 
 type ChapterExplorerProps = {
   isOpen: boolean;
@@ -137,16 +138,14 @@ export function ChapterExplorer({
     }
   };
 
+  const loadGlobalDataRef = useRef(loadGlobalData);
+  useEffect(() => {
+    loadGlobalDataRef.current = loadGlobalData;
+  });
+
   useEffect(() => {
     if (!isOpen) return;
-    let cancelled = false;
-    const fetchAll = async () => {
-      await loadGlobalData();
-    };
-    if (!cancelled) void fetchAll();
-    return () => {
-      cancelled = true;
-    };
+    void loadGlobalDataRef.current();
   }, [isOpen]);
 
   // Mise à jour en direct quand la page modifie un chapitre ou une version ; on ignore nos propres événements.
