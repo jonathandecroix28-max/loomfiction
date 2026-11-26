@@ -30,7 +30,8 @@ import {
 import { bookOfSheet } from '../sheetLinks';
 import { useToast } from '../../../components/feedback/FeedbackProvider';
 import { notifyDataChanged, useDataChanged } from '../../../hooks/useDataChanged';
-import { ExplorerFooter, ExplorerToolbar, INPUT, ROW_ACTION, SCROLL, ToolbarButton, TREE_BRANCH, TREE_COUNT, TREE_EMPTY, VersionLeaf, row, rowMain, rowShell } from '../../../components/explorer/ExplorerParts';
+import { ExplorerFooter, ExplorerToolbar, INPUT, ROW_ACTION, SCROLL, ToolbarButton, TREE_BRANCH, TREE_COUNT, TREE_EMPTY, VersionLeaf } from '../../../components/explorer/ExplorerParts';
+import { row, rowMain, rowShell } from '../../../components/explorer/explorerRows';
 
 type ChapterEntry = { chapter: ChapterResponse; bookId: number };
 

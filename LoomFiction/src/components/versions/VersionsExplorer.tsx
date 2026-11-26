@@ -30,10 +30,8 @@ import {
   TREE_EMPTY,
   TREE_SECTION,
   VersionLeaf,
-  row,
-  rowMain,
-  rowShell,
 } from '../explorer/ExplorerParts';
+import { row, rowMain, rowShell } from '../explorer/explorerRows';
 import '../diff/diff.css';
 
 
