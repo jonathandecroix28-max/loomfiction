@@ -1,0 +1,239 @@
+.loom,.loom-diff{
+  --add:96 182 132;
+  --del:229 114 102;
+  --thread:var(--c-text-2);
+  --ed:color-mix(in srgb,var(--c-page) 72%,black);
+}
+html.sunrise-mode .loom,html.sunrise-mode .loom-diff{
+  --add:24 116 78;
+  --del:172 48 42;
+  --ed:color-mix(in srgb,var(--c-surface) 72%,var(--c-page));
+}
+.loom-diff{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* Zone de code : fond d’éditeur, fils de chaîne très discrets */
+.loom-diff .ld-body{
+  background-color:var(--ed);
+  background-image:repeating-linear-gradient(90deg,color-mix(in srgb,var(--thread) 4%,transparent) 0 1px,transparent 1px 14px);
+}
+
+/* Onglets de colonne */
+.loom-diff .ld-head{position:sticky;top:0;z-index:10}
+.loom-diff .ld-tab{
+  display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-width:0;
+  padding:.55rem 1rem;background:var(--c-surface);color:var(--c-text-2);
+  border-top:2px solid transparent;border-bottom:1px solid color-mix(in srgb,var(--thread) 22%,transparent);
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:.75rem;
+}
+.loom-diff .ld-tab-del{border-top-color:rgb(var(--del)/.85)}
+.loom-diff .ld-tab-add{border-top-color:rgb(var(--add)/.85)}
+.loom-diff .ld-badge{flex-shrink:0;border-radius:999px;padding:.1rem .55rem;font-size:.625rem;letter-spacing:.04em;text-transform:uppercase}
+.loom-diff .ld-badge-del{background:rgb(var(--del)/.16);color:rgb(var(--del))}
+.loom-diff .ld-badge-add{background:rgb(var(--add)/.16);color:rgb(var(--add))}
+
+/* Rangées */
+.loom-diff .ld-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.loom-diff .ld-cell{
+  position:relative;display:grid;grid-template-columns:2.75rem 1.25rem 1.25rem minmax(0,1fr);
+  min-height:1.75rem;font-size:13px;line-height:1.55rem;
+}
+.loom-diff .ld-r{border-left:1px solid color-mix(in srgb,var(--thread) 18%,transparent)}
+.loom-diff .ld-num{
+  padding-right:.5rem;text-align:right;user-select:none;font-variant-numeric:tabular-nums;
+  color:color-mix(in srgb,var(--thread) 55%,transparent);
+}
+.loom-diff .ld-rail{position:relative}
+.loom-diff .ld-rail::before{
+  content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;transform:translateX(-50%);
+  background:color-mix(in srgb,var(--thread) 30%,transparent);
+}
+.loom-diff .ld-mark{text-align:center;font-weight:700;user-select:none}
+.loom-diff .ld-text{
+  padding:0 .75rem 0 .25rem;white-space:pre-wrap;overflow-wrap:anywhere;
+  color:color-mix(in srgb,var(--c-ink) 92%,transparent);
+}
+.loom-diff .ld-eq .ld-text{color:color-mix(in srgb,var(--c-ink) 68%,transparent)}
+
+/* Fils modifiés : rail épaissi et teinté, fond léger */
+.loom-diff .ld-del{background:rgb(var(--del)/.10)}
+.loom-diff .ld-add{background:rgb(var(--add)/.10)}
+.loom-diff .ld-del .ld-rail::before{width:3px;border-radius:2px;background:rgb(var(--del))}
+.loom-diff .ld-add .ld-rail::before{width:3px;border-radius:2px;background:rgb(var(--add))}
+.loom-diff .ld-del .ld-mark{color:rgb(var(--del))}
+.loom-diff .ld-add .ld-mark{color:rgb(var(--add))}
+.loom-diff .ld-del .ld-w{background:rgb(var(--del)/.30);border-radius:3px;box-shadow:0 0 0 1px rgb(var(--del)/.16)}
+.loom-diff .ld-add .ld-w{background:rgb(var(--add)/.30);border-radius:3px;box-shadow:0 0 0 1px rgb(var(--add)/.16)}
+
+/* Côté absent : hachures, comme un fil qui n’existe pas de ce côté */
+.loom-diff .ld-empty{
+  background-image:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--thread) 11%,transparent) 6px 7px);
+}
+
+/* Décision : le fil écarté s’estompe */
+.loom-diff [data-d="accepted"] .ld-del,
+.loom-diff [data-d="rejected"] .ld-add{opacity:.4}
+
+/* Barre de changement : nœud + couture */
+.loom-diff .ld-hunk{
+  display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;scroll-margin-top:3rem;
+  padding:.4rem .75rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:.75rem;color:var(--c-text-2);
+  background:color-mix(in srgb,var(--c-surface) 78%,transparent);
+  border-block:1px solid color-mix(in srgb,var(--thread) 22%,transparent);
+}
+.loom-diff .ld-knot{
+  flex-shrink:0;width:.8rem;height:.8rem;border-radius:999px;border:2px solid var(--c-a500);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--c-surface) 78%,transparent);
+}
+.loom-diff [data-d="accepted"] > .ld-knot{background:rgb(var(--add));border-color:rgb(var(--add))}
+.loom-diff [data-d="rejected"] > .ld-knot{background:rgb(var(--del));border-color:rgb(var(--del))}
+.loom-diff .ld-stitch{flex:1 1 1rem;min-width:.75rem;border-top:2px dashed color-mix(in srgb,var(--thread) 32%,transparent)}
+.loom-diff .ld-del-t{color:rgb(var(--del))}
+.loom-diff .ld-add-t{color:rgb(var(--add))}
+.loom-diff .ld-btn{
+  min-height:2.5rem;padding:0 .8rem;cursor:pointer;border-radius:.5rem;font:inherit;font-weight:500;
+  color:var(--c-text-2);background:var(--c-surface-2);border:1px solid color-mix(in srgb,var(--thread) 30%,transparent);
+  transition:background-color .15s,border-color .15s,color .15s;
+}
+.loom-diff .ld-btn:hover{background:var(--c-surface-3);color:var(--c-heading)}
+.loom-diff .ld-btn[data-on="true"].ld-yes{background:rgb(var(--add)/.2);border-color:rgb(var(--add));color:rgb(var(--add))}
+.loom-diff .ld-btn[data-on="true"].ld-no{background:rgb(var(--del)/.2);border-color:rgb(var(--del));color:rgb(var(--del))}
+@media (min-width:768px){.loom-diff .ld-btn{min-height:2rem}}
+@media (max-width:640px){.loom-diff .ld-stitch{display:none}}
+
+/* Lignes identiques repliées */
+.loom-diff .ld-fold{
+  display:flex;width:100%;align-items:center;gap:.75rem;padding:.3rem .75rem;cursor:pointer;
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:.6875rem;color:color-mix(in srgb,var(--thread) 70%,transparent);
+  background:color-mix(in srgb,var(--c-surface) 40%,transparent);
+}
+.loom-diff .ld-fold:hover{color:var(--c-heading)}
+
+/* Fil des changements (navigation) */
+.loom-diff .ld-beads{display:flex;align-items:center;overflow-x:auto;padding:.1rem 0}
+.loom-diff .ld-bead-link{flex-shrink:0;width:.9rem;border-top:2px dashed color-mix(in srgb,var(--thread) 35%,transparent)}
+.loom-diff .ld-bead{
+  flex-shrink:0;width:1.75rem;height:1.75rem;cursor:pointer;border-radius:999px;font-size:.6875rem;
+  border:2px solid var(--c-a500);background:transparent;color:var(--c-text-2);
+}
+.loom-diff .ld-bead[data-d="accepted"]{background:rgb(var(--add));border-color:rgb(var(--add));color:var(--c-page)}
+.loom-diff .ld-bead[data-d="rejected"]{background:rgb(var(--del));border-color:rgb(var(--del));color:var(--c-page)}
+
+/* Interrupteur « masquer les lignes identiques » */
+:is(.loom,.loom-diff) .ld-switch{
+  position:relative;flex-shrink:0;width:2.25rem;height:1.25rem;border-radius:999px;
+  background:var(--c-surface-2);border:1px solid color-mix(in srgb,var(--thread) 35%,transparent);transition:background-color .15s;
+}
+:is(.loom,.loom-diff) .ld-switch::after{
+  content:"";position:absolute;top:2px;left:2px;width:.875rem;height:.875rem;border-radius:999px;
+  background:var(--c-text-2);transition:transform .15s;
+}
+:is(.loom,.loom-diff) input:checked + .ld-switch{background:var(--c-a700);border-color:var(--c-a700)}
+:is(.loom,.loom-diff) input:checked + .ld-switch::after{transform:translateX(1rem);background:var(--c-a50)}
+:is(.loom,.loom-diff) input:focus-visible + .ld-switch{outline:2px solid var(--c-a500);outline-offset:2px}
+
+@media (prefers-reduced-motion: reduce){
+  .loom-diff *{transition:none!important}
+}
+
+/* ───────── Parties communes aux pages de versions (classe .loom) ───────── */
+
+/* Fil des versions : un nœud par version sur un fil vertical, comme un journal de commits */
+.loom .ld-log{list-style:none;margin:0;padding:0}
+.loom .ld-vrow{
+  position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;
+  padding:.7rem 1rem;transition:background-color .15s;
+}
+.loom .ld-vrow::before{
+  content:"";position:absolute;left:calc(1rem + 1.125rem);top:0;bottom:0;width:2px;transform:translateX(-1px);
+  background:color-mix(in srgb,var(--thread) 35%,transparent);
+}
+.loom .ld-vrow:first-child::before{top:50%}
+.loom .ld-vrow:last-child::before{bottom:50%}
+.loom .ld-vrow:only-child::before{display:none}
+.loom .ld-vrow:hover{background:color-mix(in srgb,var(--c-surface-2) 55%,transparent)}
+.loom .ld-vrow[data-selected="true"]{background:color-mix(in srgb,var(--c-a700) 10%,transparent)}
+.loom .ld-vknot{
+  position:relative;z-index:1;flex-shrink:0;display:flex;width:2.25rem;height:2.25rem;align-items:center;justify-content:center;
+  border-radius:999px;border:2px solid var(--c-a500);background:var(--c-surface);color:var(--c-text-2);
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:.8125rem;font-weight:700;
+}
+.loom .ld-vrow[data-selected="true"] .ld-vknot{
+  background:var(--c-a700);border-color:var(--c-a600);color:var(--c-a50);
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--c-a700) 22%,transparent);
+}
+
+/* Feuillets : carte avec un fil coloré en tête (ancienne = rouge, actuelle = vert) */
+.loom .ld-sheet{
+  min-width:0;border-radius:.75rem;border:1px solid color-mix(in srgb,var(--thread) 25%,transparent);border-top-width:3px;
+  background:color-mix(in srgb,var(--c-surface) 55%,var(--c-page));
+}
+.loom .ld-sheet-del{border-top-color:rgb(var(--del)/.85)}
+.loom .ld-sheet-add{border-top-color:rgb(var(--add)/.85)}
+.loom .ld-sheet-neutral{border-top-color:color-mix(in srgb,var(--c-a500) 75%,transparent)}
+.loom .ld-sheet-eq{border-top-color:color-mix(in srgb,var(--thread) 40%,transparent)}
+
+/* Pastilles d’état */
+.loom .ld-pill{
+  display:inline-flex;align-items:center;gap:.35rem;border:1px solid transparent;border-radius:999px;padding:.1rem .6rem;
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:.6875rem;font-weight:500;white-space:nowrap;
+}
+.loom .ld-pill-del{background:rgb(var(--del)/.14);color:rgb(var(--del));border-color:rgb(var(--del)/.3)}
+.loom .ld-pill-add{background:rgb(var(--add)/.14);color:rgb(var(--add));border-color:rgb(var(--add)/.3)}
+.loom .ld-pill-mod{background:color-mix(in srgb,var(--c-a500) 16%,transparent);color:var(--c-a400);border-color:color-mix(in srgb,var(--c-a500) 40%,transparent)}
+.loom .ld-pill-eq{background:color-mix(in srgb,var(--thread) 10%,transparent);color:color-mix(in srgb,var(--thread) 85%,transparent);border-color:color-mix(in srgb,var(--thread) 25%,transparent)}
+
+/* Côtés comparés dans un feuillet */
+.loom .ld-side{min-width:0;padding:.75rem}
+.loom .ld-side-del{background:rgb(var(--del)/.08)}
+.loom .ld-side-add{background:rgb(var(--add)/.08)}
+.loom .ld-side-del .ld-w{background:rgb(var(--del)/.30);border-radius:3px;box-shadow:0 0 0 1px rgb(var(--del)/.16)}
+.loom .ld-side-add .ld-w{background:rgb(var(--add)/.30);border-radius:3px;box-shadow:0 0 0 1px rgb(var(--add)/.16)}
+.loom .ld-side-label{margin-bottom:.35rem;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:.625rem;letter-spacing:.08em;text-transform:uppercase}
+.loom .ld-side-del .ld-side-label{color:rgb(var(--del))}
+.loom .ld-side-add .ld-side-label{color:rgb(var(--add))}
+
+/* Côté retenu / écarté par un choix */
+:is(.loom,.loom-diff) [data-pick="kept"].ld-del{box-shadow:inset 0 0 0 1px rgb(var(--del)/.6)}
+:is(.loom,.loom-diff) [data-pick="kept"].ld-add{box-shadow:inset 0 0 0 1px rgb(var(--add)/.6)}
+:is(.loom,.loom-diff) [data-pick="kept"].ld-side-del{box-shadow:inset 0 0 0 1px rgb(var(--del)/.6)}
+:is(.loom,.loom-diff) [data-pick="kept"].ld-side-add{box-shadow:inset 0 0 0 1px rgb(var(--add)/.6)}
+:is(.loom,.loom-diff) [data-pick="dropped"]{opacity:.45}
+
+/* Cellules cliquables (choix ligne par ligne) */
+.loom-diff .ld-pickcell{
+  display:grid;width:100%;cursor:pointer;border:0;padding:0;color:inherit;font:inherit;text-align:left;
+  transition:opacity .15s,box-shadow .15s,background-color .15s;
+}
+.loom-diff .ld-pickcell:hover{background-color:color-mix(in srgb,var(--c-text-2) 8%,transparent)}
+.loom-diff .ld-pickcell:focus-visible{outline:2px solid var(--c-a500);outline-offset:-2px}
+.loom-diff .ld-kept{
+  position:absolute;right:.5rem;top:.2rem;border-radius:999px;padding:0 .45rem;
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:.625rem;line-height:1.1rem;
+  background:var(--c-a700);color:var(--c-a50);
+}
+.loom-diff .ld-hint{font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+.loom-diff .ld-italic{font-style:italic;color:color-mix(in srgb,var(--thread) 55%,transparent)}
+
+/* Commutateur segmenté (choix « actuel / version ») */
+:is(.loom,.loom-diff) .ld-seg{display:inline-flex;overflow:hidden;border:1px solid color-mix(in srgb,var(--thread) 32%,transparent);border-radius:.6rem}
+:is(.loom,.loom-diff) .ld-seg button{
+  min-height:2.5rem;cursor:pointer;border:0;padding:0 .9rem;background:var(--c-surface-2);color:var(--c-text-2);
+  font:inherit;font-size:.75rem;font-weight:500;transition:background-color .15s,color .15s;
+}
+:is(.loom,.loom-diff) .ld-seg button + button{border-left:1px solid color-mix(in srgb,var(--thread) 32%,transparent)}
+:is(.loom,.loom-diff) .ld-seg button:hover{background:var(--c-surface-3)}
+:is(.loom,.loom-diff) .ld-seg button[aria-pressed="true"]{background:var(--c-a700);color:var(--c-a50)}
+
+/* Couture décorative */
+.loom .ld-stitchline{border-top:2px dashed color-mix(in srgb,var(--thread) 28%,transparent)}
+
+
+/* Choix ligne par ligne sur mobile */
+.loom-diff .ld-mrow{border-bottom:1px solid color-mix(in srgb,var(--thread) 14%,transparent)}
+.loom-diff .ld-lbl{display:block;padding:.4rem .75rem 0;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:.625rem;letter-spacing:.08em;text-transform:uppercase}
+.loom-diff .ld-lbl-del{color:rgb(var(--del))}
+.loom-diff .ld-lbl-add{color:rgb(var(--add))}
+
+/* Bouton de choix dans une barre de changement : la couleur rappelle la colonne concernée */
+.loom-diff .ld-btn.ld-no[data-on="false"]{border-color:rgb(var(--del)/.35)}
+.loom-diff .ld-btn.ld-yes[data-on="false"]{border-color:rgb(var(--add)/.35)}
